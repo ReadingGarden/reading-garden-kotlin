@@ -2,16 +2,13 @@ package std.nooook.readinggardenkotlin.contracts
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.core.io.ClassPathResource
+import tools.jackson.databind.json.JsonMapper
 import tools.jackson.databind.JsonNode
-import tools.jackson.databind.ObjectMapper
 
-@SpringBootTest
-class LegacyContractFixtureTest(
-    @Autowired private val objectMapper: ObjectMapper,
-) {
+class LegacyContractFixtureTest {
+    private val objectMapper = JsonMapper.builder().build()
+
     @Test
     fun `legacy login success fixture should expose resp envelope`() {
         val fixture = readFixture("contracts/legacy/auth/login-success.json")
