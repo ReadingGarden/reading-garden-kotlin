@@ -29,10 +29,21 @@ class LegacyErrorEnvelopeMvcTest(
             .andExpect(jsonPath("$.resp_msg").value("legacy bad request"))
     }
 
+    @Test
+    fun `unhandled exception should not expose internal message`() {
+        mockMvc.perform(get("/api/test/internal-error"))
+            .andExpect(status().isInternalServerError)
+            .andExpect(jsonPath("$.resp_code").value(500))
+            .andExpect(jsonPath("$.resp_msg").value("An unexpected error occurred."))
+    }
+
     @RestController
     @RequestMapping("/api/test")
     class ErrorController {
         @GetMapping("/error")
         fun throwError(): Nothing = throw ApiException(ErrorCode.BAD_REQUEST, "legacy bad request")
+
+        @GetMapping("/internal-error")
+        fun throwInternalError(): Nothing = throw IllegalStateException("database password leaked")
     }
 }

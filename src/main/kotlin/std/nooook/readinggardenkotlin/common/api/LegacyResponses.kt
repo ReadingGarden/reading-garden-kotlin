@@ -6,5 +6,9 @@ object LegacyResponses {
     fun created(message: String, data: Any) =
         LegacyDataResponse(resp_code = 201, resp_msg = message, data = data)
 
-    fun error(status: Int, message: String) = LegacyHttpResponse(resp_code = status, resp_msg = message)
+    fun error(
+        status: Int,
+        message: String,
+        errors: List<Map<String, Any?>>? = null,
+    ) = LegacyHttpResponse(resp_code = status, resp_msg = message, errors = errors)
 }
