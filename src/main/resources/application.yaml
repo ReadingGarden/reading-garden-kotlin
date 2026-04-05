@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: reading-garden-kotlin
+  mvc:
+    problemdetails:
+      enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
