@@ -4,6 +4,8 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
+import org.springframework.security.core.userdetails.UserDetailsService
+import org.springframework.security.core.userdetails.UsernameNotFoundException
 import org.springframework.security.web.SecurityFilterChain
 
 @Configuration
@@ -32,5 +34,11 @@ class SecurityConfig {
             .httpBasic { it.disable() }
 
         return http.build()
+    }
+
+    @Bean
+    fun userDetailsService(): UserDetailsService {
+        // Prevent Boot from creating a generated default user while auth is not migrated yet.
+        return UserDetailsService { throw UsernameNotFoundException("No local users configured") }
     }
 }
