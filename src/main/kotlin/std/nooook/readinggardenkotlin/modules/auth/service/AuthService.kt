@@ -3,7 +3,6 @@ package std.nooook.readinggardenkotlin.modules.auth.service
 import io.jsonwebtoken.JwtException
 import jakarta.transaction.Transactional
 import org.springframework.http.HttpStatus
-import org.springframework.scheduling.TaskScheduler
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
@@ -27,13 +26,9 @@ import std.nooook.readinggardenkotlin.modules.memo.repository.MemoImageRepositor
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
 import std.nooook.readinggardenkotlin.modules.push.entity.PushEntity
 import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
+import std.nooook.readinggardenkotlin.modules.scheduler.service.AuthPasswordResetExpiryJobService
 import java.time.LocalDateTime
 import java.time.ZoneOffset
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ScheduledFuture
 
 @Service
 class AuthService(
@@ -50,14 +45,8 @@ class AuthService(
     private val jwtService: LegacyJwtService,
     private val mailSender: MailSender,
     private val passwordEncoder: PasswordEncoder,
-    private val taskScheduler: TaskScheduler,
-    private val utcClock: Clock,
-    @org.springframework.beans.factory.annotation.Value("\${app.auth.password-reset-auth-ttl:PT5M}")
-    private val passwordResetAuthTtl: Duration,
+    private val passwordResetExpiryJobService: AuthPasswordResetExpiryJobService,
 ) {
-    private val passwordResetExpiries = ConcurrentHashMap<Int, Instant>()
-    private val passwordResetClearTasks = ConcurrentHashMap<Int, ScheduledFuture<*>>()
-
     @Transactional
     fun signup(request: CreateUserRequest): SignupResponse {
         validateSignupDuplicate(request)
@@ -225,7 +214,10 @@ class AuthService(
 
         user.userAuthNumber = authNumber
         userRepository.save(user)
-        registerPasswordResetExpiry(user.userNo ?: throw IllegalStateException("User id was not generated"), authNumber)
+        passwordResetExpiryJobService.schedulePasswordResetExpiry(
+            user.userNo ?: throw IllegalStateException("User id was not generated"),
+            authNumber,
+        )
     }
 
     fun checkPasswordResetAuth(
@@ -235,12 +227,7 @@ class AuthService(
         val user = userRepository.findByUserEmail(email)
             ?: throw badRequest("등록되지 않은 이메일 주소입니다.")
         val userNo = user.userNo ?: throw IllegalStateException("User id was not generated")
-        val expiresAt = passwordResetExpiries[userNo]
-        if (expiresAt == null || Instant.now(utcClock).isAfter(expiresAt)) {
-            clearPasswordResetAuthNumber(userNo, user.userAuthNumber)
-            throw badRequest("인증번호 불일치")
-        }
-        if (user.userAuthNumber != authNumber) {
+        if (user.userAuthNumber != authNumber || !passwordResetExpiryJobService.isPasswordResetAuthValid(userNo, authNumber)) {
             throw badRequest("인증번호 불일치")
         }
     }
@@ -361,38 +348,6 @@ class AuthService(
 
     private fun encodePassword(password: String): String =
         passwordEncoder.encode(password) ?: throw IllegalStateException("Encoded password must not be null")
-
-    /**
-     * No expiry column exists in USER, so the safest compatibility restore is:
-     * 1) keep an in-memory expiry registry that invalidates codes after TTL, even before DB cleanup
-     * 2) schedule a one-off DB clear so user_auth_number is nulled like the legacy behavior
-     * On restart, the in-memory registry is lost, so stale codes become invalid immediately instead of lingering forever.
-     */
-    private fun registerPasswordResetExpiry(
-        userNo: Int,
-        authNumber: String,
-    ) {
-        val expiresAt = Instant.now(utcClock).plus(passwordResetAuthTtl)
-        passwordResetExpiries[userNo] = expiresAt
-        passwordResetClearTasks.remove(userNo)?.cancel(false)
-        passwordResetClearTasks[userNo] = taskScheduler.schedule(
-            { clearPasswordResetAuthNumber(userNo, authNumber) },
-            expiresAt,
-        )
-    }
-
-    private fun clearPasswordResetAuthNumber(
-        userNo: Int,
-        expectedAuthNumber: String?,
-    ) {
-        passwordResetExpiries.remove(userNo)
-        passwordResetClearTasks.remove(userNo)
-        val user = userRepository.findByUserNo(userNo) ?: return
-        if (expectedAuthNumber == null || user.userAuthNumber == expectedAuthNumber) {
-            user.userAuthNumber = null
-            userRepository.save(user)
-        }
-    }
 
     companion object {
         private const val DEFAULT_USER_IMAGE = "데이지"

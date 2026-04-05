@@ -37,6 +37,8 @@ import std.nooook.readinggardenkotlin.modules.memo.entity.MemoImageEntity
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoImageRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
 import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
+import std.nooook.readinggardenkotlin.modules.scheduler.repository.ApschedulerJobRepository
+import std.nooook.readinggardenkotlin.modules.scheduler.service.AuthPasswordResetExpiryJobService
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.TimeZone
@@ -61,6 +63,8 @@ class AuthControllerIntegrationTest(
     @Autowired private val memoRepository: MemoRepository,
     @Autowired private val memoImageRepository: MemoImageRepository,
     @Autowired private val pushRepository: PushRepository,
+    @Autowired private val apschedulerJobRepository: ApschedulerJobRepository,
+    @Autowired private val passwordResetExpiryJobService: AuthPasswordResetExpiryJobService,
     @Autowired private val recordingMailSender: RecordingMailSender,
 ) {
     private val objectMapper: ObjectMapper = JsonMapper.builder().findAndAddModules().build()
@@ -76,6 +80,7 @@ class AuthControllerIntegrationTest(
         gardenRepository.deleteAll()
         memoImageRepository.deleteAll()
         memoRepository.deleteAll()
+        apschedulerJobRepository.deleteAll()
         userRepository.deleteAll()
         recordingMailSender.sentMessages.clear()
     }
@@ -339,7 +344,25 @@ class AuthControllerIntegrationTest(
     }
 
     @Test
-    fun `find password auth number should expire and be cleared after ttl`() {
+    fun `find password should persist auth expiry job`() {
+        signup("resetpersist@example.com", "before-password", "fcm-reset-persist")
+
+        mockMvc.perform(
+            post("/api/v1/auth/find-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"user_email":"resetpersist@example.com"}"""),
+        )
+            .andExpect(status().isOk)
+
+        val userNo = checkNotNull(userRepository.findByUserEmail("resetpersist@example.com")?.userNo)
+        val persistedJob = apschedulerJobRepository.findById(AuthPasswordResetExpiryJobService.jobId(userNo))
+
+        kotlin.test.assertTrue(persistedJob.isPresent)
+        kotlin.test.assertNotNull(persistedJob.get().nextRunTime)
+    }
+
+    @Test
+    fun `expired persisted auth expiry job should fail check and clear auth number`() {
         signup("resetexpire@example.com", "before-password", "fcm-reset-expire")
 
         mockMvc.perform(
@@ -349,8 +372,12 @@ class AuthControllerIntegrationTest(
         )
             .andExpect(status().isOk)
 
-        val authNumber = checkNotNull(userRepository.findByUserEmail("resetexpire@example.com")?.userAuthNumber)
-        Thread.sleep(2500)
+        val user = checkNotNull(userRepository.findByUserEmail("resetexpire@example.com"))
+        val authNumber = checkNotNull(user.userAuthNumber)
+        val jobId = AuthPasswordResetExpiryJobService.jobId(checkNotNull(user.userNo))
+        val persistedJob = checkNotNull(apschedulerJobRepository.findById(jobId).orElse(null))
+        persistedJob.nextRunTime = (System.currentTimeMillis() - 1_000).toDouble() / 1000.0
+        apschedulerJobRepository.save(persistedJob)
 
         mockMvc.perform(
             post("/api/v1/auth/find-password/check")
@@ -362,6 +389,45 @@ class AuthControllerIntegrationTest(
             .andExpect(jsonPath("$.resp_msg").value("인증번호 불일치"))
 
         kotlin.test.assertNull(userRepository.findByUserEmail("resetexpire@example.com")?.userAuthNumber)
+        kotlin.test.assertFalse(apschedulerJobRepository.findById(jobId).isPresent)
+    }
+
+    @Test
+    fun `startup rehydration should clear overdue jobs and reschedule future jobs`() {
+        signup("rehydrateoverdue@example.com", "before-password", "fcm-rehydrate-overdue")
+        signup("rehydratefuture@example.com", "before-password", "fcm-rehydrate-future")
+
+        mockMvc.perform(
+            post("/api/v1/auth/find-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"user_email":"rehydrateoverdue@example.com"}"""),
+        )
+            .andExpect(status().isOk)
+        mockMvc.perform(
+            post("/api/v1/auth/find-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"user_email":"rehydratefuture@example.com"}"""),
+        )
+            .andExpect(status().isOk)
+
+        val overdueUser = checkNotNull(userRepository.findByUserEmail("rehydrateoverdue@example.com"))
+        val futureUser = checkNotNull(userRepository.findByUserEmail("rehydratefuture@example.com"))
+        val overdueJobId = AuthPasswordResetExpiryJobService.jobId(checkNotNull(overdueUser.userNo))
+        val futureJobId = AuthPasswordResetExpiryJobService.jobId(checkNotNull(futureUser.userNo))
+        val overdueJob = checkNotNull(apschedulerJobRepository.findById(overdueJobId).orElse(null))
+        overdueJob.nextRunTime = (System.currentTimeMillis() - 1_000).toDouble() / 1000.0
+        apschedulerJobRepository.save(overdueJob)
+
+        passwordResetExpiryJobService.rehydratePasswordResetExpiryJobs()
+
+        kotlin.test.assertNull(userRepository.findByUserEmail("rehydrateoverdue@example.com")?.userAuthNumber)
+        kotlin.test.assertFalse(apschedulerJobRepository.findById(overdueJobId).isPresent)
+        kotlin.test.assertTrue(apschedulerJobRepository.findById(futureJobId).isPresent)
+
+        Thread.sleep(2_500)
+
+        kotlin.test.assertNull(userRepository.findByUserEmail("rehydratefuture@example.com")?.userAuthNumber)
+        kotlin.test.assertFalse(apschedulerJobRepository.findById(futureJobId).isPresent)
     }
 
     @Test
