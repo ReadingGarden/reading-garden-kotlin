@@ -2,17 +2,27 @@ package std.nooook.readinggardenkotlin.common.exception
 
 import jakarta.validation.ConstraintViolationException
 import org.slf4j.LoggerFactory
+import org.springframework.beans.TypeMismatchException
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.HttpStatusCode
+import org.springframework.http.ProblemDetail
 import org.springframework.http.ResponseEntity
+import org.springframework.http.converter.HttpMessageNotReadableException
+import org.springframework.validation.BindingResult
 import org.springframework.validation.BindException
 import org.springframework.validation.FieldError
+import org.springframework.validation.ObjectError
 import org.springframework.validation.method.ParameterValidationResult
+import org.springframework.web.bind.MissingRequestHeaderException
+import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.MethodArgumentNotValidException
+import org.springframework.web.bind.ServletRequestBindingException
 import org.springframework.web.bind.annotation.ExceptionHandler
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.context.request.WebRequest
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 import org.springframework.web.method.annotation.HandlerMethodValidationException
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler
 import std.nooook.readinggardenkotlin.common.api.LegacyHttpResponse
@@ -68,13 +78,17 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
             ex,
             LegacyResponses.error(
                 status = status.value(),
-                message = "Request body validation failed.",
-                errors = ex.bindingResult.fieldErrors.toFieldErrorItems(),
+                message = if (ex.parameter.hasParameterAnnotation(RequestBody::class.java)) {
+                    "Request body validation failed."
+                } else {
+                    "Request parameter validation failed."
+                },
+                errors = ex.bindingResult.toBindingErrorItems(),
             ),
             headers,
             status,
             request,
-        )!!
+        )
 
     override fun handleHandlerMethodValidationException(
         ex: HandlerMethodValidationException,
@@ -92,7 +106,7 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
             headers,
             status,
             request,
-        )!!
+        )
 
     @ExceptionHandler(BindException::class)
     fun handleBindException(
@@ -104,27 +118,138 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
                 LegacyResponses.error(
                     status = HttpStatus.BAD_REQUEST.value(),
                     message = "Request binding failed.",
-                    errors = ex.bindingResult.fieldErrors.toFieldErrorItems(),
+                    errors = ex.bindingResult.toBindingErrorItems(),
                 ),
             )
 
-    private fun List<FieldError>.toFieldErrorItems(): List<Map<String, Any?>> = map { fieldError ->
-        mapOf(
+    override fun handleExceptionInternal(
+        ex: Exception,
+        body: Any?,
+        headers: HttpHeaders,
+        status: HttpStatusCode,
+        request: WebRequest,
+    ): ResponseEntity<Any> {
+        val legacyBody = when {
+            body is LegacyHttpResponse -> body
+            ex is MissingServletRequestParameterException -> LegacyResponses.error(
+                status = status.value(),
+                message = "Required request parameter is missing.",
+                errors = listOf(
+                    mapOf(
+                        "parameter" to ex.parameterName,
+                        "expectedType" to ex.parameterType,
+                    ),
+                ),
+            )
+            ex is HttpMessageNotReadableException -> LegacyResponses.error(
+                status = status.value(),
+                message = "Request body is unreadable.",
+            )
+            ex is TypeMismatchException -> LegacyResponses.error(
+                status = status.value(),
+                message = "Request parameter type mismatch.",
+                errors = listOf(ex.toTypeMismatchErrorItem()),
+            )
+            ex is ServletRequestBindingException -> LegacyResponses.error(
+                status = status.value(),
+                message = "Request binding failed.",
+                errors = ex.toRequestBindingErrorItems(),
+            )
+            body is ProblemDetail -> LegacyResponses.error(
+                status = status.value(),
+                message = body.detail ?: defaultMessage(status),
+            )
+            else -> LegacyResponses.error(
+                status = status.value(),
+                message = defaultMessage(status),
+            )
+        }
+
+        return super.handleExceptionInternal(ex, legacyBody, headers, status, request)!!
+    }
+
+    override fun createResponseEntity(
+        body: Any?,
+        headers: HttpHeaders,
+        status: HttpStatusCode,
+        request: WebRequest,
+    ): ResponseEntity<Any> {
+        val legacyBody = if (body is ProblemDetail) {
+            LegacyResponses.error(status.value(), body.detail ?: defaultMessage(status))
+        } else {
+            body
+        }
+        return super.createResponseEntity(legacyBody, headers, status, request)
+    }
+
+    private fun BindingResult.toBindingErrorItems(): List<Map<String, Any?>> =
+        fieldErrors.toFieldErrorItems() + globalErrors.toGlobalErrorItems()
+
+    private fun List<FieldError>.toFieldErrorItems(parameter: String? = null): List<Map<String, Any?>> = map { fieldError ->
+        linkedMapOf(
+            "parameter" to parameter,
             "field" to fieldError.field,
             "message" to (fieldError.defaultMessage ?: "Invalid value"),
             "rejectedValue" to fieldError.rejectedValue,
-        )
+        ).withoutNullValues()
+    }
+
+    private fun List<ObjectError>.toGlobalErrorItems(parameter: String? = null): List<Map<String, Any?>> = map { error ->
+        linkedMapOf(
+            "parameter" to parameter,
+            "object" to error.objectName,
+            "message" to (error.defaultMessage ?: "Invalid value"),
+        ).withoutNullValues()
     }
 
     private fun List<ParameterValidationResult>.toParameterErrorItems(): List<Map<String, Any?>> =
         flatMap { result ->
-            result.resolvableErrors.map { error ->
-                mapOf(
-                    "parameter" to result.methodParameter.parameterName,
-                    "message" to error.defaultMessage,
-                )
+            val parameterName = result.methodParameter.parameterName
+            when (result) {
+                is org.springframework.validation.method.ParameterErrors -> {
+                    result.fieldErrors.toFieldErrorItems(parameterName) +
+                        result.globalErrors.toGlobalErrorItems(parameterName)
+                }
+                else -> {
+                    result.resolvableErrors.map { error ->
+                        linkedMapOf(
+                            "parameter" to parameterName,
+                            "message" to error.defaultMessage,
+                            "rejectedValue" to result.argument,
+                            "containerIndex" to result.containerIndex,
+                            "containerKey" to result.containerKey,
+                        ).withoutNullValues()
+                    }
+                }
             }
         }
+
+    private fun TypeMismatchException.toTypeMismatchErrorItem(): Map<String, Any?> =
+        linkedMapOf(
+            "parameter" to ((this as? MethodArgumentTypeMismatchException)?.name ?: propertyName),
+            "message" to (message ?: "Type mismatch"),
+            "rejectedValue" to value,
+            "requiredType" to requiredType?.simpleName,
+        ).withoutNullValues()
+
+    private fun ServletRequestBindingException.toRequestBindingErrorItems(): List<Map<String, Any?>> =
+        when (this) {
+            is MissingRequestHeaderException -> listOf(
+                linkedMapOf(
+                    "source" to "header",
+                    "parameter" to headerName,
+                ).withoutNullValues(),
+            )
+            else -> emptyList()
+        }
+
+    private fun defaultMessage(status: HttpStatusCode): String =
+        if (status.value() >= 500) ErrorCode.INTERNAL_SERVER_ERROR.detail else "Bad Request"
+
+    private fun Map<String, Any?>.withoutNullValues(): Map<String, Any?> =
+        entries
+            .filter { it.value != null }
+            .associate { it.key to it.value }
 
     companion object {
         private val log = LoggerFactory.getLogger(GlobalExceptionHandler::class.java)

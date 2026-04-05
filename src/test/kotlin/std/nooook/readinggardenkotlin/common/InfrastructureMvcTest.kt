@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.ModelAttribute
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
@@ -65,12 +66,52 @@ class InfrastructureMvcTest(
     }
 
     @Test
-    fun `request binding conversion errors should keep legacy envelope errors`() {
-        mockMvc.perform(get("/api/test/binding").param("age", "abc"))
+    fun `malformed json should return legacy envelope`() {
+        mockMvc.perform(
+            post("/api/test/validation")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"name":"""),
+        )
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.resp_code").value(400))
-            .andExpect(jsonPath("$.resp_msg").value("Request body validation failed."))
-            .andExpect(jsonPath("$.errors[0].field").value("age"))
+            .andExpect(jsonPath("$.resp_msg").value("Request body is unreadable."))
+    }
+
+    @Test
+    fun `missing request parameter should return legacy envelope`() {
+        mockMvc.perform(get("/api/test/required-param"))
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("Required request parameter is missing."))
+            .andExpect(jsonPath("$.errors[0].parameter").value("name"))
+    }
+
+    @Test
+    fun `type mismatch should return legacy envelope`() {
+        mockMvc.perform(get("/api/test/type-mismatch").param("count", "abc"))
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("Request parameter type mismatch."))
+            .andExpect(jsonPath("$.errors[0].parameter").value("count"))
+            .andExpect(jsonPath("$.errors[0].rejectedValue").value("abc"))
+    }
+
+    @Test
+    fun `missing request header should return legacy envelope`() {
+        mockMvc.perform(get("/api/test/required-header"))
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("Request binding failed."))
+    }
+
+    @Test
+    fun `validated model attribute errors should return structured legacy envelope`() {
+        mockMvc.perform(get("/api/test/model-validation").param("name", "").param("page", "0"))
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("Request parameter validation failed."))
+            .andExpect(jsonPath("$.errors[?(@.field=='name')]").isNotEmpty)
+            .andExpect(jsonPath("$.errors[?(@.field=='page')]").isNotEmpty)
     }
 
     @Test
@@ -98,10 +139,25 @@ class InfrastructureMvcTest(
             @RequestParam @Min(1) count: Int,
         ): Map<String, Int> = mapOf("count" to count)
 
-        @GetMapping("/binding")
-        fun bindParam(
-            @ModelAttribute request: BindingRequest,
-        ): Map<String, Int> = mapOf("age" to request.age)
+        @GetMapping("/required-param")
+        fun requiredParam(
+            @RequestParam name: String,
+        ): Map<String, String> = mapOf("name" to name)
+
+        @GetMapping("/type-mismatch")
+        fun typeMismatch(
+            @RequestParam count: Int,
+        ): Map<String, Int> = mapOf("count" to count)
+
+        @GetMapping("/required-header")
+        fun requiredHeader(
+            @RequestHeader("X-Trace-Id") traceId: String,
+        ): Map<String, String> = mapOf("traceId" to traceId)
+
+        @GetMapping("/model-validation")
+        fun modelValidation(
+            @Valid @ModelAttribute request: QueryValidationRequest,
+        ): Map<String, Any> = mapOf("name" to request.name, "page" to request.page)
 
         @GetMapping("/bind-exception")
         fun bindException(): Nothing {
@@ -120,5 +176,12 @@ class InfrastructureMvcTest(
 
     data class BindingRequest(
         val age: Int = 0,
+    )
+
+    data class QueryValidationRequest(
+        @field:NotBlank(message = "name must not be blank")
+        val name: String = "",
+        @field:Min(value = 1, message = "page must be greater than or equal to 1")
+        val page: Int = 0,
     )
 }
