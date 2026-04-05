@@ -23,7 +23,7 @@ class GardenService(
         userNo: Int,
         request: CreateGardenRequest,
     ): CreateGardenResponse {
-        userRepository.findByUserNo(userNo)
+        userRepository.findByUserNoForUpdate(userNo)
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 사용자 정보가 없습니다.")
 
         if (gardenUserRepository.countByUserNo(userNo) >= MAX_GARDEN_COUNT) {
