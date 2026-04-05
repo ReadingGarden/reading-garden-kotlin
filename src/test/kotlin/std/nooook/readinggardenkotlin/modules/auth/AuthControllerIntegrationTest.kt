@@ -431,6 +431,54 @@ class AuthControllerIntegrationTest(
     }
 
     @Test
+    fun `reissuing password reset should keep latest auth number valid until latest ttl`() {
+        signup("reissue@example.com", "before-password", "fcm-reissue")
+
+        mockMvc.perform(
+            post("/api/v1/auth/find-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"user_email":"reissue@example.com"}"""),
+        )
+            .andExpect(status().isOk)
+
+        val firstAuthNumber = checkNotNull(userRepository.findByUserEmail("reissue@example.com")?.userAuthNumber)
+
+        Thread.sleep(1_400)
+
+        mockMvc.perform(
+            post("/api/v1/auth/find-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"user_email":"reissue@example.com"}"""),
+        )
+            .andExpect(status().isOk)
+
+        val secondAuthNumber = checkNotNull(userRepository.findByUserEmail("reissue@example.com")?.userAuthNumber)
+        kotlin.test.assertNotEquals(firstAuthNumber, secondAuthNumber)
+
+        Thread.sleep(900)
+
+        mockMvc.perform(
+            post("/api/v1/auth/find-password/check")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"user_email":"reissue@example.com","auth_number":"$secondAuthNumber"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("인증 성공"))
+
+        Thread.sleep(1_300)
+
+        mockMvc.perform(
+            post("/api/v1/auth/find-password/check")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"user_email":"reissue@example.com","auth_number":"$secondAuthNumber"}"""),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("인증번호 불일치"))
+    }
+
+    @Test
     fun `delete user should remove auth garden book and memo data`() {
         val signupBody = signup("delete@example.com", "pw1234", "fcm-delete")
         val accessToken = signupBody.path("data").path("access_token").asText()

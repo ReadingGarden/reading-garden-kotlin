@@ -5,6 +5,8 @@ import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.event.EventListener
 import org.springframework.scheduling.TaskScheduler
 import org.springframework.stereotype.Service
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import std.nooook.readinggardenkotlin.modules.auth.repository.UserRepository
 import std.nooook.readinggardenkotlin.modules.scheduler.entity.ApschedulerJobEntity
 import std.nooook.readinggardenkotlin.modules.scheduler.repository.ApschedulerJobRepository
@@ -25,7 +27,7 @@ class AuthPasswordResetExpiryJobService(
     @Value("\${app.auth.password-reset-auth-ttl:PT5M}")
     private val passwordResetAuthTtl: Duration,
 ) {
-    private val scheduledJobs = ConcurrentHashMap<String, ScheduledFuture<*>>()
+    private val scheduledJobs = ConcurrentHashMap<String, ScheduledJobHandle>()
 
     @EventListener(ApplicationReadyEvent::class)
     fun onApplicationReady() {
@@ -87,21 +89,29 @@ class AuthPasswordResetExpiryJobService(
     }
 
     private fun upsertAndSchedule(job: PasswordResetExpiryJob) {
-        cancelScheduledJob(job.id)
         apschedulerJobRepository.save(job.toEntity())
-        schedule(job)
+        scheduleAfterCommit(job)
     }
 
     private fun schedule(job: PasswordResetExpiryJob) {
         cancelScheduledJob(job.id)
-        scheduledJobs[job.id] = taskScheduler.schedule(
-            { expire(job) },
-            job.runAt,
+        scheduledJobs[job.id] = ScheduledJobHandle(
+            job = job,
+            future = taskScheduler.schedule(
+                { expire(job) },
+                job.runAt,
+            ),
         )
     }
 
     private fun expire(job: PasswordResetExpiryJob) {
-        cancelScheduledJob(job.id)
+        val persistedJob = findPasswordResetExpiryJob(job.userNo)
+        if (persistedJob != job) {
+            clearScheduledJobHandle(job)
+            return
+        }
+
+        clearScheduledJobHandle(job)
         val user = userRepository.findByUserNo(job.userNo)
         if (user != null && user.userAuthNumber == job.authNumber) {
             user.userAuthNumber = null
@@ -110,8 +120,33 @@ class AuthPasswordResetExpiryJobService(
         apschedulerJobRepository.deleteById(job.id)
     }
 
+    private fun scheduleAfterCommit(job: PasswordResetExpiryJob) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            schedule(job)
+            return
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(
+            object : TransactionSynchronization {
+                override fun afterCommit() {
+                    schedule(job)
+                }
+            },
+        )
+    }
+
+    private fun clearScheduledJobHandle(job: PasswordResetExpiryJob) {
+        val handle = scheduledJobs[job.id] ?: return
+        if (handle.job != job) {
+            return
+        }
+        if (scheduledJobs.remove(job.id, handle)) {
+            handle.future.cancel(false)
+        }
+    }
+
     private fun cancelScheduledJob(jobId: String) {
-        scheduledJobs.remove(jobId)?.cancel(false)
+        scheduledJobs.remove(jobId)?.future?.cancel(false)
     }
 
     private fun ApschedulerJobEntity.toPasswordResetJobOrNull(): PasswordResetExpiryJob? {
@@ -153,6 +188,11 @@ class AuthPasswordResetExpiryJobService(
 
         fun isExpired(now: Instant): Boolean = !now.isBefore(runAt)
     }
+
+    private data class ScheduledJobHandle(
+        val job: PasswordResetExpiryJob,
+        val future: ScheduledFuture<*>,
+    )
 
     private data class PasswordResetExpiryPayload(
         val type: String,
