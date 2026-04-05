@@ -1,5 +1,6 @@
 package std.nooook.readinggardenkotlin.modules.auth.controller
 
+import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
@@ -22,7 +23,7 @@ class AuthController(
 ) {
     @PostMapping("", "/")
     fun signup(
-        @RequestBody request: CreateUserRequest,
+        @Valid @RequestBody request: CreateUserRequest,
     ): ResponseEntity<LegacyDataResponse<SignupResponse>> =
         ResponseEntity.status(HttpStatus.CREATED).body(
             LegacyDataResponse(

@@ -36,6 +36,9 @@ import std.nooook.readinggardenkotlin.modules.memo.entity.MemoImageEntity
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoImageRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
 import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
+import java.time.LocalDateTime
+import java.time.ZoneOffset
+import java.util.TimeZone
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -119,6 +122,23 @@ class AuthControllerIntegrationTest(
     }
 
     @Test
+    fun `signup should reject invalid email format with legacy validation envelope`() {
+        mockMvc.perform(
+            post("/api/v1/auth")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """{"user_email":"invalid-email","user_password":"pw","user_fcm":"fcm-2","user_social_id":"","user_social_type":""}""",
+                ),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("Request body validation failed."))
+            .andExpect(jsonPath("$.errors[0].field").value("user_email"))
+
+        kotlin.test.assertNull(userRepository.findByUserEmail("invalid-email"))
+    }
+
+    @Test
     fun `login profile refresh and logout should preserve legacy auth flow`() {
         signup("flow@example.com", "pw1234", "fcm-1")
 
@@ -186,6 +206,44 @@ class AuthControllerIntegrationTest(
     }
 
     @Test
+    fun `refresh should accept expiry stored in utc local time`() {
+        val originalTimeZone = TimeZone.getDefault()
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Seoul"))
+        try {
+            signup("tz@example.com", "pw1234", "fcm-tz")
+
+            val loginResponse = mockMvc.perform(
+                post("/api/v1/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """{"user_email":"tz@example.com","user_password":"pw1234","user_fcm":"fcm-tz-2","user_social_id":"","user_social_type":""}""",
+                    ),
+            )
+                .andExpect(status().isOk)
+                .andReturn()
+
+            val loginBody = objectMapper.readTree(loginResponse.response.contentAsString)
+            val refreshToken = loginBody.path("data").path("refresh_token").asText()
+            val userNo = checkNotNull(userRepository.findByUserEmail("tz@example.com")?.userNo)
+            val storedToken = checkNotNull(refreshTokenRepository.findByUserNo(userNo))
+            storedToken.exp = LocalDateTime.now(ZoneOffset.UTC).plusMinutes(30)
+            refreshTokenRepository.save(storedToken)
+
+            mockMvc.perform(
+                post("/api/v1/auth/refresh")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"refresh_token":"$refreshToken"}"""),
+            )
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.resp_code").value(200))
+                .andExpect(jsonPath("$.resp_msg").value("토큰 발급 성공"))
+                .andExpect(jsonPath("$.data").isString)
+        } finally {
+            TimeZone.setDefault(originalTimeZone)
+        }
+    }
+
+    @Test
     fun `find password flow should send mail verify auth code and update password`() {
         signup("reset@example.com", "before-password", "fcm-reset")
 
@@ -243,6 +301,7 @@ class AuthControllerIntegrationTest(
         val user = userRepository.findByUserEmail("delete@example.com")
         checkNotNull(user)
         val userNo = checkNotNull(user.userNo)
+        val gardenNo = checkNotNull(gardenUserRepository.findAllByUserNo(userNo).singleOrNull()?.gardenNo)
 
         val book = bookRepository.save(
             BookEntity(
@@ -283,6 +342,7 @@ class AuthControllerIntegrationTest(
         kotlin.test.assertTrue(bookRepository.findAllByUserNo(userNo).isEmpty())
         kotlin.test.assertTrue(memoRepository.findAllByUserNo(userNo).isEmpty())
         kotlin.test.assertEquals(0L, gardenUserRepository.countByUserNo(userNo))
+        kotlin.test.assertTrue(gardenRepository.findById(gardenNo).isPresent)
     }
 
     private fun signup(

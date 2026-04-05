@@ -1,6 +1,12 @@
 package std.nooook.readinggardenkotlin.modules.auth.controller
 
+import jakarta.validation.constraints.Pattern
+
 data class CreateUserRequest(
+    @field:Pattern(
+        regexp = "^\\w+@[a-zA-Z_]+?\\.[a-zA-Z]{2,3}$",
+        message = "must match legacy email format",
+    )
     val user_email: String,
     val user_password: String,
     val user_fcm: String,

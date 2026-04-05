@@ -27,6 +27,7 @@ import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
 import std.nooook.readinggardenkotlin.modules.push.entity.PushEntity
 import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
 import java.time.LocalDateTime
+import java.time.ZoneOffset
 
 @Service
 class AuthService(
@@ -142,7 +143,7 @@ class AuthService(
             val storedToken = refreshTokenRepository.findByUserNoAndToken(userNo, refreshToken)
                 ?: throw unauthorized("Unauthorized")
 
-            if (storedToken.exp?.isBefore(LocalDateTime.now()) == true) {
+            if (storedToken.exp?.isBefore(LocalDateTime.now(UTC_ZONE_OFFSET)) == true) {
                 refreshTokenRepository.delete(storedToken)
                 throw unauthorized("Unauthorized")
             }
@@ -170,8 +171,6 @@ class AuthService(
                         nextLeader.gardenLeader = true
                         gardenUserRepository.save(nextLeader)
                     }
-                } else {
-                    gardenRepository.findById(membership.gardenNo).ifPresent(gardenRepository::delete)
                 }
             }
             gardenUserRepository.delete(membership)
@@ -308,7 +307,7 @@ class AuthService(
             RefreshTokenEntity(
                 userNo = userNo,
                 token = refreshToken,
-                exp = LocalDateTime.ofInstant(jwtService.refreshTokenExpiry(), KST_ZONE_ID),
+                exp = LocalDateTime.ofInstant(jwtService.refreshTokenExpiry(), UTC_ZONE_OFFSET),
             ),
         )
 
@@ -347,7 +346,7 @@ class AuthService(
         private const val DEFAULT_USER_IMAGE = "데이지"
         private const val READ_BOOK_STATUS = 1
         private const val LIKE_BOOK_STATUS = 2
-        private val KST_ZONE_ID = java.time.ZoneId.of("Asia/Seoul")
+        private val UTC_ZONE_OFFSET = ZoneOffset.UTC
         private const val RANDOM_STRING_SOURCE = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
         private val RANDOM_NICK_FIRST = listOf(
             "눈부신", "따뜻한", "우수한", "은밀한", "침착한",
