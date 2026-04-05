@@ -18,12 +18,12 @@ import std.nooook.readinggardenkotlin.common.exception.ErrorCode
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@WithMockUser
 @Import(LegacyErrorEnvelopeMvcTest.ErrorController::class)
 class LegacyErrorEnvelopeMvcTest(
     @Autowired private val mockMvc: MockMvc,
 ) {
     @Test
+    @WithMockUser
     fun `api exception should return legacy envelope`() {
         mockMvc.perform(get("/api/test/error"))
             .andExpect(status().isBadRequest)
@@ -32,6 +32,7 @@ class LegacyErrorEnvelopeMvcTest(
     }
 
     @Test
+    @WithMockUser
     fun `unhandled exception should not expose internal message`() {
         mockMvc.perform(get("/api/test/internal-error"))
             .andExpect(status().isInternalServerError)

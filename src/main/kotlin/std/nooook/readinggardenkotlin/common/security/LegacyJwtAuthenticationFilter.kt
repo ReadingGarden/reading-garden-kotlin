@@ -12,6 +12,7 @@ import org.springframework.security.core.AuthenticationException
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.core.userdetails.UsernameNotFoundException
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource
+import org.springframework.security.web.util.matcher.RequestMatcher
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 import std.nooook.readinggardenkotlin.modules.auth.repository.UserRepository
@@ -22,7 +23,11 @@ class LegacyJwtAuthenticationFilter(
     private val legacyJwtService: LegacyJwtService,
     private val userRepository: UserRepository,
     private val legacyAuthenticationEntryPoint: LegacyAuthenticationEntryPoint,
+    private val publicEndpointRequestMatcher: RequestMatcher,
 ) : OncePerRequestFilter() {
+
+    override fun shouldNotFilter(request: HttpServletRequest): Boolean =
+        publicEndpointRequestMatcher.matches(request)
 
     override fun doFilterInternal(
         request: HttpServletRequest,

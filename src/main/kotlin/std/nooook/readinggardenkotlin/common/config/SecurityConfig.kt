@@ -2,7 +2,6 @@ package std.nooook.readinggardenkotlin.common.config
 
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.http.HttpMethod
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.core.userdetails.UserDetailsService
@@ -11,6 +10,7 @@ import org.springframework.security.web.AuthenticationEntryPoint
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.access.AccessDeniedHandler
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
+import org.springframework.security.web.util.matcher.RequestMatcher
 import std.nooook.readinggardenkotlin.common.security.LegacyJwtAuthenticationFilter
 
 @Configuration
@@ -21,7 +21,10 @@ class SecurityConfig(
 ) {
 
     @Bean
-    fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
+    fun securityFilterChain(
+        http: HttpSecurity,
+        publicEndpointRequestMatcher: RequestMatcher,
+    ): SecurityFilterChain {
         http
             .csrf { it.disable() }
             .sessionManagement { session ->
@@ -32,19 +35,7 @@ class SecurityConfig(
                 it.accessDeniedHandler(legacyAccessDeniedHandler)
             }
             .authorizeHttpRequests { auth ->
-                auth.requestMatchers(
-                    "/api/health",
-                    "/v3/api-docs/**",
-                    "/v3/api-docs.yaml",
-                    "/swagger-ui/**",
-                    "/swagger-ui.html",
-                ).permitAll()
-                auth.requestMatchers(HttpMethod.POST, "/api/v1/auth", "/api/v1/auth/").permitAll()
-                auth.requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
-                auth.requestMatchers(HttpMethod.POST, "/api/v1/auth/refresh").permitAll()
-                auth.requestMatchers(HttpMethod.POST, "/api/v1/auth/find-password").permitAll()
-                auth.requestMatchers(HttpMethod.POST, "/api/v1/auth/find-password/check").permitAll()
-                auth.requestMatchers(HttpMethod.PUT, "/api/v1/auth/find-password/update-password").permitAll()
+                auth.requestMatchers(publicEndpointRequestMatcher).permitAll()
                 auth.anyRequest().authenticated()
             }
             .formLogin { it.disable() }

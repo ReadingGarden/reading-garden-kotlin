@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
+import org.springframework.http.HttpHeaders
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
@@ -21,14 +22,24 @@ class JwtSecurityMvcTest(
 ) {
     @Test
     fun `protected auth profile should reject missing bearer token`() {
-        mockMvc.perform(get("/api/v1/auth"))
+        mockMvc.perform(get("/api/test/protected-auth"))
             .andExpect(status().isUnauthorized)
             .andExpect(jsonPath("$.resp_code").value(401))
             .andExpect(jsonPath("$.resp_msg").value("Unauthorized"))
     }
 
+    @Test
+    fun `public docs endpoint should ignore malformed authorization header`() {
+        mockMvc.perform(
+            get("/v3/api-docs")
+                .header(HttpHeaders.AUTHORIZATION, "Token broken"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.openapi").exists())
+    }
+
     @RestController
-    @RequestMapping("/api/v1/auth")
+    @RequestMapping("/api/test/protected-auth")
     class ProtectedAuthTestController {
         @GetMapping
         fun profile(): Map<String, String> = mapOf("user_nick" to "tester")

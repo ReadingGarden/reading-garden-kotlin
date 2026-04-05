@@ -30,7 +30,6 @@ import org.springframework.web.bind.annotation.RestController
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@WithMockUser
 @Import(InfrastructureMvcTest.ValidationTestController::class)
 class InfrastructureMvcTest(
     @Autowired private val mockMvc: MockMvc,
@@ -45,6 +44,7 @@ class InfrastructureMvcTest(
     }
 
     @Test
+    @WithMockUser
     fun `request body validation errors should return legacy envelope`() {
         mockMvc.perform(
             post("/api/test/validation")
@@ -59,6 +59,7 @@ class InfrastructureMvcTest(
     }
 
     @Test
+    @WithMockUser
     fun `request parameter validation errors should return legacy envelope`() {
         mockMvc.perform(get("/api/test/validation").param("count", "0"))
             .andExpect(status().isBadRequest)
@@ -68,6 +69,7 @@ class InfrastructureMvcTest(
     }
 
     @Test
+    @WithMockUser
     fun `malformed json should return legacy envelope`() {
         mockMvc.perform(
             post("/api/test/validation")
@@ -80,6 +82,7 @@ class InfrastructureMvcTest(
     }
 
     @Test
+    @WithMockUser
     fun `missing request parameter should return legacy envelope`() {
         mockMvc.perform(get("/api/test/required-param"))
             .andExpect(status().isBadRequest)
@@ -89,6 +92,7 @@ class InfrastructureMvcTest(
     }
 
     @Test
+    @WithMockUser
     fun `type mismatch should return legacy envelope`() {
         mockMvc.perform(get("/api/test/type-mismatch").param("count", "abc"))
             .andExpect(status().isBadRequest)
@@ -99,6 +103,7 @@ class InfrastructureMvcTest(
     }
 
     @Test
+    @WithMockUser
     fun `missing request header should return legacy envelope`() {
         mockMvc.perform(get("/api/test/required-header"))
             .andExpect(status().isBadRequest)
@@ -109,6 +114,7 @@ class InfrastructureMvcTest(
     }
 
     @Test
+    @WithMockUser
     fun `validated model attribute errors should return structured legacy envelope`() {
         mockMvc.perform(get("/api/test/model-validation").param("name", "").param("page", "0"))
             .andExpect(status().isBadRequest)
@@ -119,6 +125,7 @@ class InfrastructureMvcTest(
     }
 
     @Test
+    @WithMockUser
     fun `bind exception should return legacy envelope`() {
         mockMvc.perform(get("/api/test/bind-exception"))
             .andExpect(status().isBadRequest)
