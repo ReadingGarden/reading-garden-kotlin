@@ -9,11 +9,50 @@ import org.springframework.core.io.support.ResourcePatternResolver
 
 class HibernateNativeHints : RuntimeHintsRegistrar {
 
+    private val hibernateEventListenerTypes = listOf(
+        "org.hibernate.event.spi.AutoFlushEventListener",
+        "org.hibernate.event.spi.ClearEventListener",
+        "org.hibernate.event.spi.DeleteEventListener",
+        "org.hibernate.event.spi.DirtyCheckEventListener",
+        "org.hibernate.event.spi.EvictEventListener",
+        "org.hibernate.event.spi.FlushEntityEventListener",
+        "org.hibernate.event.spi.FlushEventListener",
+        "org.hibernate.event.spi.InitializeCollectionEventListener",
+        "org.hibernate.event.spi.LoadEventListener",
+        "org.hibernate.event.spi.LockEventListener",
+        "org.hibernate.event.spi.MergeEventListener",
+        "org.hibernate.event.spi.PersistEventListener",
+        "org.hibernate.event.spi.PostActionEventListener",
+        "org.hibernate.event.spi.PostCollectionRecreateEventListener",
+        "org.hibernate.event.spi.PostCollectionRemoveEventListener",
+        "org.hibernate.event.spi.PostCollectionUpdateEventListener",
+        "org.hibernate.event.spi.PostCommitDeleteEventListener",
+        "org.hibernate.event.spi.PostCommitInsertEventListener",
+        "org.hibernate.event.spi.PostCommitUpdateEventListener",
+        "org.hibernate.event.spi.PostDeleteEventListener",
+        "org.hibernate.event.spi.PostInsertEventListener",
+        "org.hibernate.event.spi.PostLoadEventListener",
+        "org.hibernate.event.spi.PostUpdateEventListener",
+        "org.hibernate.event.spi.PostUpsertEventListener",
+        "org.hibernate.event.spi.PreCollectionRecreateEventListener",
+        "org.hibernate.event.spi.PreCollectionRemoveEventListener",
+        "org.hibernate.event.spi.PreCollectionUpdateEventListener",
+        "org.hibernate.event.spi.PreDeleteEventListener",
+        "org.hibernate.event.spi.PreFlushEventListener",
+        "org.hibernate.event.spi.PreInsertEventListener",
+        "org.hibernate.event.spi.PreLoadEventListener",
+        "org.hibernate.event.spi.PreUpdateEventListener",
+        "org.hibernate.event.spi.PreUpsertEventListener",
+        "org.hibernate.event.spi.RefreshEventListener",
+        "org.hibernate.event.spi.ReplicateEventListener",
+    )
+
     override fun registerHints(hints: RuntimeHints, classLoader: ClassLoader?) {
         val loader = classLoader ?: return
         val resolver = PathMatchingResourcePatternResolver(loader)
 
         registerHibernateLoggerImplementations(hints, resolver)
+        registerHibernateEventListenerArrays(hints)
         registerHibernateI18nResources(hints)
     }
 
@@ -46,6 +85,12 @@ class HibernateNativeHints : RuntimeHintsRegistrar {
                     MemberCategory.INVOKE_PUBLIC_CONSTRUCTORS,
                 )
             }
+    }
+
+    private fun registerHibernateEventListenerArrays(hints: RuntimeHints) {
+        hibernateEventListenerTypes.forEach { className ->
+            hints.reflection().registerType(TypeReference.of("$className[]"))
+        }
     }
 
     private fun registerHibernateI18nResources(hints: RuntimeHints) {
