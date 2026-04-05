@@ -15,6 +15,6 @@ class ApschedulerJobEntity(
     @Column(name = "next_run_time")
     var nextRunTime: Double? = null,
     @Lob
-    @Column(name = "job_state", nullable = false)
+    @Column(name = "job_state", nullable = false, columnDefinition = "blob")
     var jobState: ByteArray = byteArrayOf(),
 )
