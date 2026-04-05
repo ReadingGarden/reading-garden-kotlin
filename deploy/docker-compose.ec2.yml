@@ -1,0 +1,12 @@
+services:
+  app:
+    image: ${IMAGE_REF:?IMAGE_REF is required}
+    container_name: reading-garden
+    restart: unless-stopped
+    pull_policy: always
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    env_file:
+      - /opt/reading-garden/.env
+    volumes:
+      - /opt/reading-garden/secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro

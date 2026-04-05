@@ -1,6 +1,20 @@
+server:
+  port: ${SERVER_PORT:8080}
+
 spring:
   application:
     name: reading-garden-kotlin
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:default}
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://${DB_HOST:localhost}:3306/${DB_NAME:reading_garden}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
+    username: ${SPRING_DATASOURCE_USERNAME:${DB_USER:root}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD:}}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:4}
+      minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:1}
+      connection-timeout: ${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:30000}
   mvc:
     problemdetails:
       enabled: true
@@ -12,3 +26,16 @@ springdoc:
     path: /swagger-ui.html
     operations-sorter: method
     tags-sorter: alpha
+
+app:
+  security:
+    secret-key: ${APP_SECRET_KEY:${SECRET_KEY:}}
+    hs256-key: ${APP_HS256_KEY:${HS256_KEY:}}
+  firebase:
+    project-id: ${APP_FIREBASE_PROJECT_ID:${FIREBASE_PROJECT_ID:}}
+    service-account-file: ${APP_SERVICE_ACCOUNT_FILE:${SERVICE_ACCOUNT_FILE:}}
+  email:
+    account: ${APP_EMAIL_ACCOUNT:${EMAIL_ACCOUNT:}}
+    password: ${APP_EMAIL_PASSWORD:${EMAIL_PASSWORD:}}
+  integrations:
+    aladin-ttbkey: ${APP_ALADIN_TTBKEY:${ALADIN_TTBKEY:}}
