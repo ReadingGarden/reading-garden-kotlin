@@ -38,25 +38,23 @@ class InfrastructureMvcTest(
     }
 
     @Test
-    fun `request body validation errors should return problem detail`() {
+    fun `request body validation errors should return legacy envelope`() {
         mockMvc.perform(
             post("/api/test/validation")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":""}"""),
         )
             .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.title").value("Validation failed"))
-            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-            .andExpect(jsonPath("$.errors[0].field").value("name"))
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("Request body validation failed."))
     }
 
     @Test
-    fun `request parameter validation errors should return problem detail`() {
+    fun `request parameter validation errors should return legacy envelope`() {
         mockMvc.perform(get("/api/test/validation").param("count", "0"))
             .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.title").value("Validation failed"))
-            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-            .andExpect(jsonPath("$.errors[0].parameter").value("count"))
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("Request parameter validation failed."))
     }
 
     @Validated
