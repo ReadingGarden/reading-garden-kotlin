@@ -74,7 +74,7 @@ class InfrastructureMvcTest(
         )
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.resp_code").value(400))
-            .andExpect(jsonPath("$.resp_msg").value("Request body is unreadable."))
+            .andExpect(jsonPath("$.resp_msg").value("Failed to read request"))
     }
 
     @Test
@@ -82,7 +82,7 @@ class InfrastructureMvcTest(
         mockMvc.perform(get("/api/test/required-param"))
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.resp_code").value(400))
-            .andExpect(jsonPath("$.resp_msg").value("Required request parameter is missing."))
+            .andExpect(jsonPath("$.resp_msg").value("Required parameter 'name' is not present."))
             .andExpect(jsonPath("$.errors[0].parameter").value("name"))
     }
 
@@ -101,7 +101,9 @@ class InfrastructureMvcTest(
         mockMvc.perform(get("/api/test/required-header"))
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.resp_code").value(400))
-            .andExpect(jsonPath("$.resp_msg").value("Request binding failed."))
+            .andExpect(jsonPath("$.resp_msg").value("Required header 'X-Trace-Id' is not present."))
+            .andExpect(jsonPath("$.errors[0].parameter").value("X-Trace-Id"))
+            .andExpect(jsonPath("$.errors[0].source").value("header"))
     }
 
     @Test
@@ -110,8 +112,8 @@ class InfrastructureMvcTest(
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.resp_code").value(400))
             .andExpect(jsonPath("$.resp_msg").value("Request parameter validation failed."))
-            .andExpect(jsonPath("$.errors[?(@.field=='name')]").isNotEmpty)
-            .andExpect(jsonPath("$.errors[?(@.field=='page')]").isNotEmpty)
+            .andExpect(jsonPath("$.errors[?(@.parameter=='request' && @.field=='name')]").isNotEmpty)
+            .andExpect(jsonPath("$.errors[?(@.parameter=='request' && @.field=='page')]").isNotEmpty)
     }
 
     @Test

@@ -25,6 +25,7 @@ import org.springframework.web.context.request.WebRequest
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 import org.springframework.web.method.annotation.HandlerMethodValidationException
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler
+import org.springframework.web.ErrorResponse
 import std.nooook.readinggardenkotlin.common.api.LegacyHttpResponse
 import std.nooook.readinggardenkotlin.common.api.LegacyResponses
 
@@ -83,7 +84,13 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
                 } else {
                     "Request parameter validation failed."
                 },
-                errors = ex.bindingResult.toBindingErrorItems(),
+                errors = ex.bindingResult.toBindingErrorItems(
+                    parameter = if (ex.parameter.hasParameterAnnotation(RequestBody::class.java)) {
+                        null
+                    } else {
+                        ex.parameter.parameterName
+                    },
+                ),
             ),
             headers,
             status,
@@ -129,11 +136,12 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
         status: HttpStatusCode,
         request: WebRequest,
     ): ResponseEntity<Any> {
+        val detail = resolveDetail(ex, body, defaultMessage(status))
         val legacyBody = when {
             body is LegacyHttpResponse -> body
             ex is MissingServletRequestParameterException -> LegacyResponses.error(
                 status = status.value(),
-                message = "Required request parameter is missing.",
+                message = detail,
                 errors = listOf(
                     mapOf(
                         "parameter" to ex.parameterName,
@@ -143,7 +151,7 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
             )
             ex is HttpMessageNotReadableException -> LegacyResponses.error(
                 status = status.value(),
-                message = "Request body is unreadable.",
+                message = detail,
             )
             ex is TypeMismatchException -> LegacyResponses.error(
                 status = status.value(),
@@ -152,16 +160,16 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
             )
             ex is ServletRequestBindingException -> LegacyResponses.error(
                 status = status.value(),
-                message = "Request binding failed.",
+                message = detail,
                 errors = ex.toRequestBindingErrorItems(),
             )
             body is ProblemDetail -> LegacyResponses.error(
                 status = status.value(),
-                message = body.detail ?: defaultMessage(status),
+                message = detail,
             )
             else -> LegacyResponses.error(
                 status = status.value(),
-                message = defaultMessage(status),
+                message = detail,
             )
         }
 
@@ -182,8 +190,8 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
         return super.createResponseEntity(legacyBody, headers, status, request)
     }
 
-    private fun BindingResult.toBindingErrorItems(): List<Map<String, Any?>> =
-        fieldErrors.toFieldErrorItems() + globalErrors.toGlobalErrorItems()
+    private fun BindingResult.toBindingErrorItems(parameter: String? = null): List<Map<String, Any?>> =
+        fieldErrors.toFieldErrorItems(parameter) + globalErrors.toGlobalErrorItems(parameter)
 
     private fun List<FieldError>.toFieldErrorItems(parameter: String? = null): List<Map<String, Any?>> = map { fieldError ->
         linkedMapOf(
@@ -245,6 +253,16 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
 
     private fun defaultMessage(status: HttpStatusCode): String =
         if (status.value() >= 500) ErrorCode.INTERNAL_SERVER_ERROR.detail else "Bad Request"
+
+    private fun resolveDetail(
+        ex: Exception,
+        body: Any?,
+        fallback: String,
+    ): String = when {
+        body is ProblemDetail && !body.detail.isNullOrBlank() -> body.detail!!
+        ex is ErrorResponse && !ex.body.detail.isNullOrBlank() -> ex.body.detail!!
+        else -> fallback
+    }
 
     private fun Map<String, Any?>.withoutNullValues(): Map<String, Any?> =
         entries
