@@ -10,11 +10,11 @@ import javax.crypto.spec.SecretKeySpec
 
 @Service
 class LegacyJwtService(
-    @Value("\${app.security.secret-key:}") private val secretKey: String,
+    @Value("\${app.security.hs256-key:}") private val hs256Key: String,
 ) {
     private val signingKey: SecretKey by lazy {
-        require(secretKey.isNotBlank()) { "app.security.secret-key must not be blank" }
-        SecretKeySpec(Decoders.BASE64.decode(secretKey), "HmacSHA256")
+        require(hs256Key.isNotBlank()) { "app.security.hs256-key must not be blank" }
+        SecretKeySpec(Decoders.BASE64.decode(hs256Key), "HmacSHA256")
     }
 
     fun parseAccessToken(token: String): Claims =

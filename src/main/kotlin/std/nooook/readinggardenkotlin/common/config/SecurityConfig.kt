@@ -2,6 +2,7 @@ package std.nooook.readinggardenkotlin.common.config
 
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.http.HttpMethod
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.core.userdetails.UserDetailsService
@@ -37,13 +38,13 @@ class SecurityConfig(
                     "/v3/api-docs.yaml",
                     "/swagger-ui/**",
                     "/swagger-ui.html",
-                    "/api/v1/auth",
-                    "/api/v1/auth/login",
-                    "/api/v1/auth/refresh",
-                    "/api/v1/auth/find-password",
-                    "/api/v1/auth/find-password/check",
-                    "/api/v1/auth/find-password/update-password",
                 ).permitAll()
+                auth.requestMatchers(HttpMethod.POST, "/api/v1/auth", "/api/v1/auth/").permitAll()
+                auth.requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
+                auth.requestMatchers(HttpMethod.POST, "/api/v1/auth/refresh").permitAll()
+                auth.requestMatchers(HttpMethod.POST, "/api/v1/auth/find-password").permitAll()
+                auth.requestMatchers(HttpMethod.POST, "/api/v1/auth/find-password/check").permitAll()
+                auth.requestMatchers(HttpMethod.PUT, "/api/v1/auth/find-password/update-password").permitAll()
                 auth.anyRequest().authenticated()
             }
             .formLogin { it.disable() }
