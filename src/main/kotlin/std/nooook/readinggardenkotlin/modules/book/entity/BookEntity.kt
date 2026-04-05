@@ -5,7 +5,6 @@ import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
-import jakarta.persistence.Lob
 import jakarta.persistence.Table
 
 @Entity
@@ -33,10 +32,8 @@ class BookEntity(
     var bookIsbn: String? = null,
     @Column(name = "book_tree", length = 30)
     var bookTree: String? = null,
-    @Lob
-    @Column(name = "book_image_url")
+    @Column(name = "book_image_url", columnDefinition = "text")
     var bookImageUrl: String? = null,
-    @Lob
-    @Column(name = "book_info", nullable = false)
+    @Column(name = "book_info", nullable = false, columnDefinition = "text")
     var bookInfo: String = "",
 )

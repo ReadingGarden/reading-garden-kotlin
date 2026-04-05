@@ -5,7 +5,6 @@ import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
-import jakarta.persistence.Lob
 import jakarta.persistence.Table
 import java.time.LocalDateTime
 
@@ -18,8 +17,7 @@ class RefreshTokenEntity(
     var id: Int? = null,
     @Column(name = "user_no", nullable = false)
     var userNo: Int = 0,
-    @Lob
-    @Column(name = "token")
+    @Column(name = "token", columnDefinition = "text")
     var token: String? = null,
     @Column(name = "exp")
     var exp: LocalDateTime? = null,

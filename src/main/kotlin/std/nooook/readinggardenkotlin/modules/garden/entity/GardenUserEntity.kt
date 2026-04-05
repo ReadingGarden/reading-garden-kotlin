@@ -19,10 +19,10 @@ class GardenUserEntity(
     var gardenNo: Int = 0,
     @Column(name = "user_no", nullable = false)
     var userNo: Int = 0,
-    @Column(name = "garden_leader", nullable = false)
+    @Column(name = "garden_leader", nullable = false, columnDefinition = "tinyint(1)")
     var gardenLeader: Boolean = false,
     @Column(name = "garden_sign_date", nullable = false)
     var gardenSignDate: LocalDateTime = LocalDateTime.now(),
-    @Column(name = "garden_main", nullable = false)
+    @Column(name = "garden_main", nullable = false, columnDefinition = "tinyint(1)")
     var gardenMain: Boolean = false,
 )

@@ -5,7 +5,6 @@ import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
-import jakarta.persistence.Lob
 import jakarta.persistence.Table
 import java.time.LocalDateTime
 
@@ -18,8 +17,7 @@ class UserEntity(
     var userNo: Int? = null,
     @Column(name = "user_email", nullable = false, length = 300)
     var userEmail: String = "",
-    @Lob
-    @Column(name = "user_password", nullable = false)
+    @Column(name = "user_password", nullable = false, columnDefinition = "text")
     var userPassword: String = "",
     @Column(name = "user_created_at", nullable = false)
     var userCreatedAt: LocalDateTime = LocalDateTime.now(),
@@ -27,8 +25,7 @@ class UserEntity(
     var userNick: String = "",
     @Column(name = "user_image", nullable = false, length = 30)
     var userImage: String = "",
-    @Lob
-    @Column(name = "user_fcm", nullable = false)
+    @Column(name = "user_fcm", nullable = false, columnDefinition = "text")
     var userFcm: String = "",
     @Column(name = "user_social_id", nullable = false, length = 100)
     var userSocialId: String = "",

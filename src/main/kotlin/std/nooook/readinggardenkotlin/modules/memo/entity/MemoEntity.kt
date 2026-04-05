@@ -5,7 +5,6 @@ import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
-import jakarta.persistence.Lob
 import jakarta.persistence.Table
 import java.time.LocalDateTime
 
@@ -18,16 +17,14 @@ class MemoEntity(
     var id: Int? = null,
     @Column(name = "book_no", nullable = false)
     var bookNo: Int = 0,
-    @Lob
-    @Column(name = "memo_content", nullable = false)
+    @Column(name = "memo_content", nullable = false, columnDefinition = "text")
     var memoContent: String = "",
     @Column(name = "memo_created_at", nullable = false)
     var memoCreatedAt: LocalDateTime = LocalDateTime.now(),
     @Column(name = "user_no", nullable = false)
     var userNo: Int = 0,
-    @Column(name = "memo_like", nullable = false)
+    @Column(name = "memo_like", nullable = false, columnDefinition = "tinyint(1)")
     var memoLike: Boolean = false,
-    @Lob
-    @Column(name = "memo_quote")
+    @Column(name = "memo_quote", columnDefinition = "text")
     var memoQuote: String? = null,
 )
