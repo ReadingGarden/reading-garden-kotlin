@@ -25,6 +25,13 @@ class LegacyJwtServiceConfigurationTest {
         }.cause().hasMessageContaining("app.security.hs256-key must be valid Base64")
     }
 
+    @Test
+    fun `too short hs256 key should fail fast at startup`() {
+        assertThatThrownBy {
+            startContext("app.security.hs256-key=YQ==")
+        }.cause().hasMessageContaining("app.security.hs256-key must decode to at least 256 bits for HS256")
+    }
+
     private fun startContext(vararg properties: String) =
         AnnotationConfigWebApplicationContext().apply {
             TestPropertySourceUtils.addInlinedPropertiesToEnvironment(this, *properties)
