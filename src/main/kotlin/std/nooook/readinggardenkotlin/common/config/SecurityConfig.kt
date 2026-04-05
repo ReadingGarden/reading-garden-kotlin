@@ -6,10 +6,18 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.core.userdetails.UserDetailsService
 import org.springframework.security.core.userdetails.UsernameNotFoundException
+import org.springframework.security.web.AuthenticationEntryPoint
 import org.springframework.security.web.SecurityFilterChain
+import org.springframework.security.web.access.AccessDeniedHandler
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
+import std.nooook.readinggardenkotlin.common.security.LegacyJwtAuthenticationFilter
 
 @Configuration
-class SecurityConfig {
+class SecurityConfig(
+    private val legacyJwtAuthenticationFilter: LegacyJwtAuthenticationFilter,
+    private val legacyAuthenticationEntryPoint: AuthenticationEntryPoint,
+    private val legacyAccessDeniedHandler: AccessDeniedHandler,
+) {
 
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
@@ -18,20 +26,29 @@ class SecurityConfig {
             .sessionManagement { session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             }
+            .exceptionHandling {
+                it.authenticationEntryPoint(legacyAuthenticationEntryPoint)
+                it.accessDeniedHandler(legacyAccessDeniedHandler)
+            }
             .authorizeHttpRequests { auth ->
-                auth
-                    .requestMatchers(
-                        "/v3/api-docs/**",
-                        "/v3/api-docs.yaml",
-                        "/swagger-ui/**",
-                        "/swagger-ui.html",
-                        "/api/health",
-                    ).permitAll()
-                    // Auth is not migrated yet, so keep API routes open during the transition.
-                    .anyRequest().permitAll()
+                auth.requestMatchers(
+                    "/api/health",
+                    "/v3/api-docs/**",
+                    "/v3/api-docs.yaml",
+                    "/swagger-ui/**",
+                    "/swagger-ui.html",
+                    "/api/v1/auth",
+                    "/api/v1/auth/login",
+                    "/api/v1/auth/refresh",
+                    "/api/v1/auth/find-password",
+                    "/api/v1/auth/find-password/check",
+                    "/api/v1/auth/find-password/update-password",
+                ).permitAll()
+                auth.anyRequest().authenticated()
             }
             .formLogin { it.disable() }
             .httpBasic { it.disable() }
+            .addFilterBefore(legacyJwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
 
         return http.build()
     }
