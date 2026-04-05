@@ -6,7 +6,11 @@ import std.nooook.readinggardenkotlin.modules.auth.entity.RefreshTokenEntity
 interface RefreshTokenRepository : JpaRepository<RefreshTokenEntity, Int> {
     fun findByUserNo(userNo: Int): RefreshTokenEntity?
 
+    fun findAllByUserNo(userNo: Int): List<RefreshTokenEntity>
+
     fun findByUserNoAndToken(userNo: Int, token: String): RefreshTokenEntity?
 
     fun deleteByUserNo(userNo: Int)
+
+    fun deleteAllByUserNo(userNo: Int)
 }

@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import std.nooook.readinggardenkotlin.modules.auth.entity.RefreshTokenEntity
 import std.nooook.readinggardenkotlin.modules.auth.integration.MailSender
 import std.nooook.readinggardenkotlin.modules.auth.repository.RefreshTokenRepository
 import std.nooook.readinggardenkotlin.modules.auth.repository.UserRepository
@@ -39,8 +40,13 @@ import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.TimeZone
+import kotlin.test.assertEquals
 
-@SpringBootTest
+@SpringBootTest(
+    properties = [
+        "app.auth.password-reset-auth-ttl=PT2S",
+    ],
+)
 @AutoConfigureMockMvc
 @Import(AuthControllerIntegrationTest.TestConfig::class)
 class AuthControllerIntegrationTest(
@@ -244,6 +250,44 @@ class AuthControllerIntegrationTest(
     }
 
     @Test
+    fun `login should delete all previous refresh tokens before issuing a new one`() {
+        signup("refreshcleanup@example.com", "pw1234", "fcm-a")
+        val userNo = checkNotNull(userRepository.findByUserEmail("refreshcleanup@example.com")?.userNo)
+
+        refreshTokenRepository.save(
+            RefreshTokenEntity(
+                userNo = userNo,
+                token = "stale-token-1",
+                exp = LocalDateTime.now(ZoneOffset.UTC).plusDays(1),
+            ),
+        )
+        refreshTokenRepository.save(
+            RefreshTokenEntity(
+                userNo = userNo,
+                token = "stale-token-2",
+                exp = LocalDateTime.now(ZoneOffset.UTC).plusDays(1),
+            ),
+        )
+
+        val loginResponse = mockMvc.perform(
+            post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """{"user_email":"refreshcleanup@example.com","user_password":"pw1234","user_fcm":"fcm-b","user_social_id":"","user_social_type":""}""",
+                ),
+        )
+            .andExpect(status().isOk)
+            .andReturn()
+
+        val loginBody = objectMapper.readTree(loginResponse.response.contentAsString)
+        val newRefreshToken = loginBody.path("data").path("refresh_token").asText()
+        val storedTokens = refreshTokenRepository.findAllByUserNo(userNo)
+
+        assertEquals(1, storedTokens.size)
+        assertEquals(newRefreshToken, storedTokens.single().token)
+    }
+
+    @Test
     fun `find password flow should send mail verify auth code and update password`() {
         signup("reset@example.com", "before-password", "fcm-reset")
 
@@ -292,6 +336,32 @@ class AuthControllerIntegrationTest(
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.resp_msg").value("로그인 성공"))
+    }
+
+    @Test
+    fun `find password auth number should expire and be cleared after ttl`() {
+        signup("resetexpire@example.com", "before-password", "fcm-reset-expire")
+
+        mockMvc.perform(
+            post("/api/v1/auth/find-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"user_email":"resetexpire@example.com"}"""),
+        )
+            .andExpect(status().isOk)
+
+        val authNumber = checkNotNull(userRepository.findByUserEmail("resetexpire@example.com")?.userAuthNumber)
+        Thread.sleep(2500)
+
+        mockMvc.perform(
+            post("/api/v1/auth/find-password/check")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"user_email":"resetexpire@example.com","auth_number":"$authNumber"}"""),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("인증번호 불일치"))
+
+        kotlin.test.assertNull(userRepository.findByUserEmail("resetexpire@example.com")?.userAuthNumber)
     }
 
     @Test
