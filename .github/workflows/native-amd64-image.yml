@@ -13,8 +13,8 @@ jobs:
   build-native-amd64:
     runs-on: ubuntu-latest
     env:
-      NATIVE_IMAGE_NAME: ghcr.io/${{ github.repository }}:native-${{ github.sha }}
-      REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
+      NATIVE_IMAGE_NAME: ghcr.io/readinggarden/reading-garden-kotlin:native-${{ github.sha }}
+      REGISTRY_IMAGE: ghcr.io/readinggarden/reading-garden-kotlin
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -59,7 +59,7 @@ jobs:
     permissions:
       contents: read
     env:
-      IMAGE_REF: ghcr.io/${{ github.repository }}:native-${{ github.sha }}
+      IMAGE_REF: ghcr.io/readinggarden/reading-garden-kotlin:native-${{ github.sha }}
       REMOTE_APP_DIR: /opt/reading-garden
       APP_PORT: ${{ vars.EC2_APP_PORT || '8080' }}
       EC2_PORT: ${{ vars.EC2_PORT || '22' }}
