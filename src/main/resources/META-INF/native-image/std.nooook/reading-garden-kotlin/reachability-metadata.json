@@ -1,0 +1,109 @@
+{
+  "reflection": [
+    {
+      "type": "org.hibernate.event.spi.AutoFlushEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.ClearEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.DeleteEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.DirtyCheckEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.EvictEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.FlushEntityEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.FlushEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.InitializeCollectionEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.LoadEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.LockEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.MergeEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.PersistEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.PostActionEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.PostCollectionRecreateEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.PostCollectionRemoveEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.PostCollectionUpdateEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.PostCommitDeleteEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.PostCommitInsertEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.PostCommitUpdateEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.PostDeleteEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.PostInsertEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.PostLoadEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.PostUpdateEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.PostUpsertEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.PreCollectionRecreateEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.PreCollectionRemoveEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.PreCollectionUpdateEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.PreDeleteEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.PreFlushEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.PreInsertEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.PreLoadEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.PreUpdateEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.PreUpsertEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.RefreshEventListener[]"
+    },
+    {
+      "type": "org.hibernate.event.spi.ReplicateEventListener[]"
+    }
+  ]
+}
