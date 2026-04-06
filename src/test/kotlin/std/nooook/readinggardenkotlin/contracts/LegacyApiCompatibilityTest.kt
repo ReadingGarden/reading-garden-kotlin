@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import std.nooook.readinggardenkotlin.modules.auth.entity.UserEntity
 import std.nooook.readinggardenkotlin.modules.auth.repository.RefreshTokenRepository
 import std.nooook.readinggardenkotlin.modules.auth.repository.UserRepository
 import std.nooook.readinggardenkotlin.modules.book.entity.BookEntity
@@ -33,6 +34,7 @@ import std.nooook.readinggardenkotlin.modules.memo.entity.MemoEntity
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoImageRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
 import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
+import java.time.LocalDateTime
 import kotlin.test.assertNotNull
 
 @SpringBootTest
@@ -117,6 +119,179 @@ class LegacyApiCompatibilityTest(
     }
 
     @Test
+    fun `get garden list should match legacy contract shape`() {
+        val accessToken = signupAndGetAccessToken("gardenlist@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("gardenlist@example.com")?.userNo)
+        removeSignupGarden(userNo)
+
+        val mainGarden = gardenRepository.save(
+            GardenEntity(
+                gardenTitle = "메인 가든",
+                gardenInfo = "첫 번째",
+                gardenColor = "green",
+                gardenCreatedAt = LocalDateTime.of(2024, 1, 5, 8, 30, 0),
+            ),
+        )
+        val secondaryGarden = gardenRepository.save(
+            GardenEntity(
+                gardenTitle = "서브 가든",
+                gardenInfo = "두 번째",
+                gardenColor = "blue",
+                gardenCreatedAt = LocalDateTime.of(2024, 1, 10, 9, 0, 0),
+            ),
+        )
+        gardenUserRepository.save(
+            GardenUserEntity(
+                gardenNo = checkNotNull(mainGarden.gardenNo),
+                userNo = userNo,
+                gardenLeader = true,
+                gardenMain = true,
+                gardenSignDate = LocalDateTime.of(2024, 1, 6, 7, 0, 0),
+            ),
+        )
+        gardenUserRepository.save(
+            GardenUserEntity(
+                gardenNo = checkNotNull(secondaryGarden.gardenNo),
+                userNo = userNo,
+                gardenLeader = false,
+                gardenMain = false,
+                gardenSignDate = LocalDateTime.of(2024, 1, 11, 10, 0, 0),
+            ),
+        )
+        bookRepository.save(
+            BookEntity(
+                gardenNo = checkNotNull(mainGarden.gardenNo),
+                bookTitle = "메인 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookStatus = 1,
+                userNo = userNo,
+                bookPage = 100,
+                bookIsbn = "9781111111111",
+                bookTree = "소설",
+                bookImageUrl = "https://example.com/main.jpg",
+                bookInfo = "메인 책 소개",
+            ),
+        )
+        bookRepository.save(
+            BookEntity(
+                gardenNo = checkNotNull(secondaryGarden.gardenNo),
+                bookTitle = "서브 책",
+                bookAuthor = "저자2",
+                bookPublisher = "출판사2",
+                bookStatus = 0,
+                userNo = userNo,
+                bookPage = 200,
+                bookIsbn = "9782222222222",
+                bookTree = "에세이",
+                bookImageUrl = "https://example.com/sub.jpg",
+                bookInfo = "서브 책 소개",
+            ),
+        )
+
+        val response = mockMvc.perform(
+            get("/api/v1/garden/list")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken"),
+        )
+            .andExpect(status().isOk)
+            .andReturn()
+
+        assertSameShape(
+            fixture = readFixture("contracts/legacy/garden/list-success.json"),
+            actual = objectMapper.readTree(response.response.contentAsString),
+        )
+    }
+
+    @Test
+    fun `get garden detail should match legacy contract shape`() {
+        val accessToken = signupAndGetAccessToken("gardendetail@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("gardendetail@example.com")?.userNo)
+        removeSignupGarden(userNo)
+
+        val garden = gardenRepository.save(
+            GardenEntity(
+                gardenTitle = "상세 가든",
+                gardenInfo = "상세 설명",
+                gardenColor = "orange",
+                gardenCreatedAt = LocalDateTime.of(2024, 2, 1, 12, 0, 0),
+            ),
+        )
+        gardenUserRepository.save(
+            GardenUserEntity(
+                gardenNo = checkNotNull(garden.gardenNo),
+                userNo = userNo,
+                gardenLeader = true,
+                gardenMain = true,
+                gardenSignDate = LocalDateTime.of(2024, 2, 1, 12, 5, 0),
+            ),
+        )
+        val member = userRepository.save(
+            UserEntity(
+                userEmail = "gardendetail-member@example.com",
+                userPassword = "pw1234",
+                userCreatedAt = LocalDateTime.of(2024, 2, 1, 12, 10, 0),
+                userNick = "멤버",
+                userImage = "member.png",
+                userFcm = "fcm-member",
+                userSocialId = "",
+                userSocialType = "",
+            ),
+        )
+        gardenUserRepository.save(
+            GardenUserEntity(
+                gardenNo = checkNotNull(garden.gardenNo),
+                userNo = checkNotNull(member.userNo),
+                gardenLeader = false,
+                gardenMain = false,
+                gardenSignDate = LocalDateTime.of(2024, 2, 2, 9, 0, 0),
+            ),
+        )
+        bookRepository.save(
+            BookEntity(
+                gardenNo = checkNotNull(garden.gardenNo),
+                bookTitle = "가든 책",
+                bookAuthor = "작가",
+                bookPublisher = "출판사",
+                bookStatus = 1,
+                userNo = userNo,
+                bookPage = 400,
+                bookIsbn = "9783333333333",
+                bookTree = "인문",
+                bookImageUrl = "https://example.com/detail.jpg",
+                bookInfo = "가든 책 소개",
+            ),
+        )
+        bookRepository.save(
+            BookEntity(
+                gardenNo = checkNotNull(garden.gardenNo),
+                bookTitle = "보조 책",
+                bookAuthor = "작가2",
+                bookPublisher = "출판사2",
+                bookStatus = 0,
+                userNo = userNo,
+                bookPage = 0,
+                bookIsbn = null,
+                bookTree = null,
+                bookImageUrl = null,
+                bookInfo = "보조 책 소개",
+            ),
+        )
+
+        val response = mockMvc.perform(
+            get("/api/v1/garden/detail")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("garden_no", checkNotNull(garden.gardenNo).toString()),
+        )
+            .andExpect(status().isOk)
+            .andReturn()
+
+        assertSameShape(
+            fixture = readFixture("contracts/legacy/garden/detail-success.json"),
+            actual = objectMapper.readTree(response.response.contentAsString),
+        )
+    }
+
+    @Test
     fun `get memo list should match legacy contract shape`() {
         val accessToken = signupAndGetAccessToken("memocontract@example.com")
         val userNo = checkNotNull(userRepository.findByUserEmail("memocontract@example.com")?.userNo)
@@ -181,6 +356,13 @@ class LegacyApiCompatibilityTest(
             .asText()
     }
 
+    private fun removeSignupGarden(userNo: Int) {
+        gardenUserRepository.findAllByUserNo(userNo).forEach { membership ->
+            gardenUserRepository.delete(membership)
+            gardenRepository.deleteById(membership.gardenNo)
+        }
+    }
+
     private fun readFixture(path: String): JsonNode =
         ClassPathResource(path).inputStream.use(objectMapper::readTree)
 
@@ -204,8 +386,12 @@ class LegacyApiCompatibilityTest(
             fixture.isArray -> {
                 assertThat(actual.isArray).withFailMessage("$path should be an array").isTrue()
                 if (fixture.size() > 0) {
-                    assertThat(actual.size()).withFailMessage("$path should contain at least one element").isGreaterThan(0)
-                    assertSameShape(fixture[0], actual[0], "$path[0]")
+                    assertThat(actual.size())
+                        .withFailMessage("$path should contain at least ${fixture.size()} elements")
+                        .isGreaterThanOrEqualTo(fixture.size())
+                    for (index in 0 until fixture.size()) {
+                        assertSameShape(fixture[index], actual[index], "$path[$index]")
+                    }
                 }
             }
 

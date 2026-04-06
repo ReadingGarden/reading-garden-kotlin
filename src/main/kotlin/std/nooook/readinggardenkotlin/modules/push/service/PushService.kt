@@ -23,4 +23,11 @@ class PushService(
     fun sendBookPush() {
         // Minimum implementation for the first migration slice.
     }
+
+    fun sendNewMemberPush(
+        userNo: Int,
+        gardenNo: Int,
+    ) {
+        // Garden membership flow only needs a stable integration point for now.
+    }
 }
