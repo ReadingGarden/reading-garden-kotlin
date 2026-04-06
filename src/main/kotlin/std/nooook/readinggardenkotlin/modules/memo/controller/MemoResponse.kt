@@ -1,5 +1,9 @@
 package std.nooook.readinggardenkotlin.modules.memo.controller
 
+data class CreateMemoResponse(
+    val id: Int,
+)
+
 data class MemoListItemResponse(
     val id: Int,
     val book_no: Int,

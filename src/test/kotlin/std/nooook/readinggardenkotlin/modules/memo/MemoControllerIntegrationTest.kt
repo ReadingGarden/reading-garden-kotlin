@@ -2,6 +2,9 @@ package std.nooook.readinggardenkotlin.modules.memo
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.json.JsonMapper
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -10,8 +13,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import std.nooook.readinggardenkotlin.modules.auth.repository.RefreshTokenRepository
@@ -365,6 +370,408 @@ class MemoControllerIntegrationTest(
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.resp_code").value(400))
             .andExpect(jsonPath("$.resp_msg").value("일치하는 메모가 없습니다."))
+    }
+
+    @Test
+    fun `create memo should create memo for owned book`() {
+        val accessToken = signupAndGetAccessToken("memocreate@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("memocreate@example.com")?.userNo)
+        val book = bookRepository.save(
+            BookEntity(
+                bookTitle = "생성용 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookStatus = 1,
+                userNo = userNo,
+                bookPage = 101,
+                bookImageUrl = "https://example.com/create-book.jpg",
+                bookInfo = "책 소개",
+            ),
+        )
+
+        val response = mockMvc.perform(
+            post("/api/v1/memo/")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """{"book_no":${checkNotNull(book.bookNo)},"memo_content":"새 메모"}""",
+                ),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.resp_code").value(201))
+            .andExpect(jsonPath("$.resp_msg").value("메모 추가 성공"))
+            .andExpect(jsonPath("$.data.id").isNumber)
+            .andReturn()
+
+        val memoId = objectMapper.readTree(response.response.contentAsString)
+            .path("data")
+            .path("id")
+            .asInt()
+
+        val saved = checkNotNull(memoRepository.findById(memoId).orElse(null))
+        assertEquals(userNo, saved.userNo)
+        assertEquals(book.bookNo, saved.bookNo)
+        assertEquals("새 메모", saved.memoContent)
+        assertFalse(saved.memoLike)
+    }
+
+    @Test
+    fun `create memo should return bad request when book belongs to another user`() {
+        signupAndGetAccessToken("memo_owner_book@example.com")
+        val accessToken = signupAndGetAccessToken("memo_create_visitor@example.com")
+        val ownerUserNo = checkNotNull(userRepository.findByUserEmail("memo_owner_book@example.com")?.userNo)
+        val ownerBook = bookRepository.save(
+            BookEntity(
+                bookTitle = "타인 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookStatus = 1,
+                userNo = ownerUserNo,
+                bookPage = 202,
+                bookImageUrl = "https://example.com/owner-book.jpg",
+                bookInfo = "책 소개",
+            ),
+        )
+
+        mockMvc.perform(
+            post("/api/v1/memo/")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """{"book_no":${checkNotNull(ownerBook.bookNo)},"memo_content":"실패 메모"}""",
+                ),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("일치하는 책 정보가 없습니다."))
+    }
+
+    @Test
+    fun `update memo should update memo when memo exists and book is owned`() {
+        val accessToken = signupAndGetAccessToken("memoupdate@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("memoupdate@example.com")?.userNo)
+        val sourceBook = bookRepository.save(
+            BookEntity(
+                bookTitle = "원본 책",
+                bookAuthor = "저자 A",
+                bookPublisher = "출판사 A",
+                bookStatus = 1,
+                userNo = userNo,
+                bookPage = 111,
+                bookImageUrl = "https://example.com/update-book-a.jpg",
+                bookInfo = "소개 A",
+            ),
+        )
+        val targetBook = bookRepository.save(
+            BookEntity(
+                bookTitle = "수정 대상 책",
+                bookAuthor = "저자 B",
+                bookPublisher = "출판사 B",
+                bookStatus = 1,
+                userNo = userNo,
+                bookPage = 222,
+                bookImageUrl = "https://example.com/update-book-b.jpg",
+                bookInfo = "소개 B",
+            ),
+        )
+        val memo = memoRepository.save(
+            MemoEntity(
+                bookNo = checkNotNull(sourceBook.bookNo),
+                memoContent = "기존 메모",
+                userNo = userNo,
+                memoLike = false,
+            ),
+        )
+
+        mockMvc.perform(
+            put("/api/v1/memo/")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("id", checkNotNull(memo.id).toString())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """{"book_no":${checkNotNull(targetBook.bookNo)},"memo_content":"수정된 메모"}""",
+                ),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("메모 수정 성공"))
+
+        val updated = checkNotNull(memoRepository.findById(checkNotNull(memo.id)).orElse(null))
+        assertEquals(targetBook.bookNo, updated.bookNo)
+        assertEquals("수정된 메모", updated.memoContent)
+    }
+
+    @Test
+    fun `update memo should return bad request when target book belongs to another user`() {
+        val accessToken = signupAndGetAccessToken("memoupdate_book_owner@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("memoupdate_book_owner@example.com")?.userNo)
+        signupAndGetAccessToken("memoupdate_book_other@example.com")
+        val otherUserNo = checkNotNull(userRepository.findByUserEmail("memoupdate_book_other@example.com")?.userNo)
+
+        val ownedBook = bookRepository.save(
+            BookEntity(
+                bookTitle = "내 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookStatus = 1,
+                userNo = userNo,
+                bookPage = 123,
+                bookImageUrl = "https://example.com/owned-book.jpg",
+                bookInfo = "내 책 소개",
+            ),
+        )
+        val otherBook = bookRepository.save(
+            BookEntity(
+                bookTitle = "타인 책",
+                bookAuthor = "타인 저자",
+                bookPublisher = "타인 출판사",
+                bookStatus = 1,
+                userNo = otherUserNo,
+                bookPage = 456,
+                bookImageUrl = "https://example.com/other-book.jpg",
+                bookInfo = "타인 책 소개",
+            ),
+        )
+        val memo = memoRepository.save(
+            MemoEntity(
+                bookNo = checkNotNull(ownedBook.bookNo),
+                memoContent = "업데이트 전",
+                userNo = userNo,
+                memoLike = false,
+            ),
+        )
+
+        mockMvc.perform(
+            put("/api/v1/memo/")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("id", checkNotNull(memo.id).toString())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """{"book_no":${checkNotNull(otherBook.bookNo)},"memo_content":"실패"}""",
+                ),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("일치하는 책 정보가 없습니다."))
+    }
+
+    @Test
+    fun `update memo should update another users memo like legacy behavior`() {
+        signupAndGetAccessToken("memo_update_owner@example.com")
+        val visitorAccessToken = signupAndGetAccessToken("memo_update_visitor@example.com")
+        val ownerUserNo = checkNotNull(userRepository.findByUserEmail("memo_update_owner@example.com")?.userNo)
+        val visitorUserNo = checkNotNull(userRepository.findByUserEmail("memo_update_visitor@example.com")?.userNo)
+
+        val ownerBook = bookRepository.save(
+            BookEntity(
+                bookTitle = "소유자 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookStatus = 1,
+                userNo = ownerUserNo,
+                bookPage = 123,
+                bookImageUrl = "https://example.com/owner-update-book.jpg",
+                bookInfo = "소유자 책 소개",
+            ),
+        )
+        val visitorBook = bookRepository.save(
+            BookEntity(
+                bookTitle = "방문자 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookStatus = 1,
+                userNo = visitorUserNo,
+                bookPage = 321,
+                bookImageUrl = "https://example.com/visitor-update-book.jpg",
+                bookInfo = "방문자 책 소개",
+            ),
+        )
+        val ownerMemo = memoRepository.save(
+            MemoEntity(
+                bookNo = checkNotNull(ownerBook.bookNo),
+                memoContent = "소유자 메모",
+                userNo = ownerUserNo,
+                memoLike = false,
+            ),
+        )
+
+        mockMvc.perform(
+            put("/api/v1/memo/")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $visitorAccessToken")
+                .queryParam("id", checkNotNull(ownerMemo.id).toString())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """{"book_no":${checkNotNull(visitorBook.bookNo)},"memo_content":"타인 메모 수정"}""",
+                ),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("메모 수정 성공"))
+
+        val updated = checkNotNull(memoRepository.findById(checkNotNull(ownerMemo.id)).orElse(null))
+        assertEquals(ownerUserNo, updated.userNo)
+        assertEquals(visitorBook.bookNo, updated.bookNo)
+        assertEquals("타인 메모 수정", updated.memoContent)
+    }
+
+    @Test
+    fun `delete memo should delete memo without deleting images`() {
+        val accessToken = signupAndGetAccessToken("memodelete@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("memodelete@example.com")?.userNo)
+        val book = bookRepository.save(
+            BookEntity(
+                bookTitle = "삭제용 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookStatus = 1,
+                userNo = userNo,
+                bookPage = 303,
+                bookImageUrl = "https://example.com/delete-book.jpg",
+                bookInfo = "책 소개",
+            ),
+        )
+        val memo = memoRepository.save(
+            MemoEntity(
+                bookNo = checkNotNull(book.bookNo),
+                memoContent = "삭제 메모",
+                userNo = userNo,
+                memoLike = false,
+            ),
+        )
+        memoImageRepository.save(
+            MemoImageEntity(
+                imageName = "memo-delete.png",
+                imageUrl = "https://example.com/memo-delete.png",
+                memoNo = checkNotNull(memo.id),
+            ),
+        )
+
+        mockMvc.perform(
+            delete("/api/v1/memo/")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("id", checkNotNull(memo.id).toString()),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("메모 삭제 성공"))
+
+        assertTrue(memoRepository.findById(checkNotNull(memo.id)).isEmpty)
+        assertEquals(1, memoImageRepository.findAllByMemoNoIn(listOf(checkNotNull(memo.id))).size)
+    }
+
+    @Test
+    fun `delete memo should delete another users memo like legacy behavior`() {
+        signupAndGetAccessToken("memo_delete_owner@example.com")
+        val visitorAccessToken = signupAndGetAccessToken("memo_delete_visitor@example.com")
+        val ownerUserNo = checkNotNull(userRepository.findByUserEmail("memo_delete_owner@example.com")?.userNo)
+
+        val ownerBook = bookRepository.save(
+            BookEntity(
+                bookTitle = "삭제 소유자 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookStatus = 1,
+                userNo = ownerUserNo,
+                bookPage = 404,
+                bookImageUrl = "https://example.com/delete-owner-book.jpg",
+                bookInfo = "책 소개",
+            ),
+        )
+        val ownerMemo = memoRepository.save(
+            MemoEntity(
+                bookNo = checkNotNull(ownerBook.bookNo),
+                memoContent = "삭제 대상 메모",
+                userNo = ownerUserNo,
+                memoLike = false,
+            ),
+        )
+
+        mockMvc.perform(
+            delete("/api/v1/memo/")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $visitorAccessToken")
+                .queryParam("id", checkNotNull(ownerMemo.id).toString()),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("메모 삭제 성공"))
+
+        assertTrue(memoRepository.findById(checkNotNull(ownerMemo.id)).isEmpty)
+    }
+
+    @Test
+    fun `like memo should toggle memo like`() {
+        val accessToken = signupAndGetAccessToken("memolike@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("memolike@example.com")?.userNo)
+        val book = bookRepository.save(
+            BookEntity(
+                bookTitle = "좋아요 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookStatus = 1,
+                userNo = userNo,
+                bookPage = 505,
+                bookImageUrl = "https://example.com/like-book.jpg",
+                bookInfo = "책 소개",
+            ),
+        )
+        val memo = memoRepository.save(
+            MemoEntity(
+                bookNo = checkNotNull(book.bookNo),
+                memoContent = "좋아요 메모",
+                userNo = userNo,
+                memoLike = false,
+            ),
+        )
+
+        mockMvc.perform(
+            put("/api/v1/memo/like")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("id", checkNotNull(memo.id).toString()),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("메모 즐겨찾기 추가/해제"))
+
+        assertTrue(checkNotNull(memoRepository.findById(checkNotNull(memo.id)).orElse(null)).memoLike)
+    }
+
+    @Test
+    fun `like memo should toggle another users memo like legacy behavior`() {
+        signupAndGetAccessToken("memo_like_owner@example.com")
+        val visitorAccessToken = signupAndGetAccessToken("memo_like_visitor@example.com")
+        val ownerUserNo = checkNotNull(userRepository.findByUserEmail("memo_like_owner@example.com")?.userNo)
+
+        val ownerBook = bookRepository.save(
+            BookEntity(
+                bookTitle = "좋아요 소유자 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookStatus = 1,
+                userNo = ownerUserNo,
+                bookPage = 606,
+                bookImageUrl = "https://example.com/like-owner-book.jpg",
+                bookInfo = "책 소개",
+            ),
+        )
+        val ownerMemo = memoRepository.save(
+            MemoEntity(
+                bookNo = checkNotNull(ownerBook.bookNo),
+                memoContent = "타인 좋아요 메모",
+                userNo = ownerUserNo,
+                memoLike = false,
+            ),
+        )
+
+        mockMvc.perform(
+            put("/api/v1/memo/like")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $visitorAccessToken")
+                .queryParam("id", checkNotNull(ownerMemo.id).toString()),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("메모 즐겨찾기 추가/해제"))
+
+        assertTrue(checkNotNull(memoRepository.findById(checkNotNull(ownerMemo.id)).orElse(null)).memoLike)
     }
 
     private fun signupAndGetAccessToken(email: String): String {
