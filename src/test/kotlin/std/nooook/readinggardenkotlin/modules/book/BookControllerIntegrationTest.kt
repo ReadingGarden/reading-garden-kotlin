@@ -2,6 +2,7 @@ package std.nooook.readinggardenkotlin.modules.book
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.json.JsonMapper
+import jakarta.servlet.MultipartConfigElement
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -56,6 +57,7 @@ import org.springframework.test.context.DynamicPropertySource
 @Import(BookControllerIntegrationTest.TestConfig::class)
 class BookControllerIntegrationTest(
     @Autowired private val mockMvc: MockMvc,
+    @Autowired private val multipartConfigElement: MultipartConfigElement,
     @Autowired private val userRepository: UserRepository,
     @Autowired private val refreshTokenRepository: RefreshTokenRepository,
     @Autowired private val pushRepository: PushRepository,
@@ -138,6 +140,13 @@ class BookControllerIntegrationTest(
         )
             .andExpect(status().isUnauthorized)
             .andExpect(jsonPath("$.resp_code").value(401))
+    }
+
+    @Test
+    fun `multipart temp location should use external images root`() {
+        assertEquals(imagesRoot.resolve("multipart-temp").toString(), multipartConfigElement.location)
+        assertEquals(10L * 1024L * 1024L, multipartConfigElement.maxFileSize)
+        assertEquals(10L * 1024L * 1024L, multipartConfigElement.maxRequestSize)
     }
 
     @Test
