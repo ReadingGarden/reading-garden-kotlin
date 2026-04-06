@@ -23,6 +23,10 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
 
 springdoc:
   api-docs:
@@ -42,5 +46,7 @@ app:
   email:
     account: ${APP_EMAIL_ACCOUNT:${EMAIL_ACCOUNT:}}
     password: ${APP_EMAIL_PASSWORD:${EMAIL_PASSWORD:}}
+  storage:
+    images-root: ${APP_STORAGE_IMAGES_ROOT:/opt/reading-garden/data/images}
   integrations:
     aladin-ttbkey: ${APP_ALADIN_TTBKEY:${ALADIN_TTBKEY:}}

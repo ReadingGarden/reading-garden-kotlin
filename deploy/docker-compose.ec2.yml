@@ -10,3 +10,4 @@ services:
       - /opt/reading-garden/.env
     volumes:
       - /opt/reading-garden/secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
+      - /opt/reading-garden/data/images:/opt/reading-garden/data/images

@@ -10,6 +10,10 @@ import std.nooook.readinggardenkotlin.modules.memo.entity.MemoEntity
 interface MemoRepository : JpaRepository<MemoEntity, Int> {
     fun findAllByUserNo(userNo: Int): List<MemoEntity>
 
+    fun findAllByBookNo(bookNo: Int): List<MemoEntity>
+
+    fun findAllByBookNoOrderByMemoLikeDescMemoCreatedAtDesc(bookNo: Int): List<MemoEntity>
+
     @Query(
         value = """
             select memo
