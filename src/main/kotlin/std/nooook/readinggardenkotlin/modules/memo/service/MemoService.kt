@@ -19,7 +19,7 @@ class MemoService(
         page: Int = 1,
         pageSize: Int = 10,
     ): MemoListResponse {
-        val memoPage = memoRepository.findAllByUserNoOrderByMemoLikeDescMemoCreatedAtDesc(
+        val memoPage = memoRepository.findAllByUserNoJoinBookOrderByMemoLikeDescMemoCreatedAtDesc(
             userNo = userNo,
             pageable = PageRequest.of(page - 1, pageSize),
         )

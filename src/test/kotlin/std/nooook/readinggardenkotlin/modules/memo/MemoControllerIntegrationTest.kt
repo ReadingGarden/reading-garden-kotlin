@@ -166,6 +166,57 @@ class MemoControllerIntegrationTest(
             .andExpect(jsonPath("$.data.list[2].memo_created_at").exists())
     }
 
+    @Test
+    fun `get memo should ignore orphan memos in result and total`() {
+        val accessToken = signupAndGetAccessToken("memoorphan@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("memoorphan@example.com")?.userNo)
+
+        val book = bookRepository.save(
+            BookEntity(
+                bookTitle = "정상 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookStatus = 1,
+                userNo = userNo,
+                bookPage = 100,
+                bookImageUrl = "https://example.com/book.jpg",
+                bookInfo = "소개",
+            ),
+        )
+
+        memoRepository.save(
+            MemoEntity(
+                bookNo = checkNotNull(book.bookNo),
+                memoContent = "정상 메모",
+                userNo = userNo,
+                memoLike = true,
+            ),
+        )
+        memoRepository.save(
+            MemoEntity(
+                bookNo = 999999,
+                memoContent = "고아 메모",
+                userNo = userNo,
+                memoLike = true,
+            ),
+        )
+
+        mockMvc.perform(
+            get("/api/v1/memo/")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("메모 리스트 조회 성공"))
+            .andExpect(jsonPath("$.data.current_page").value(1))
+            .andExpect(jsonPath("$.data.max_page").value(1))
+            .andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.page_size").value(10))
+            .andExpect(jsonPath("$.data.list.length()").value(1))
+            .andExpect(jsonPath("$.data.list[0].memo_content").value("정상 메모"))
+            .andExpect(jsonPath("$.data.list[0].book_title").value("정상 책"))
+    }
+
     private fun signupAndGetAccessToken(email: String): String {
         val signupResponse = mockMvc.perform(
             post("/api/v1/auth")
