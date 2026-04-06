@@ -217,6 +217,124 @@ class MemoControllerIntegrationTest(
             .andExpect(jsonPath("$.data.list[0].book_title").value("정상 책"))
     }
 
+    @Test
+    fun `get memo detail should return latest image and legacy payload`() {
+        val accessToken = signupAndGetAccessToken("memodetail@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("memodetail@example.com")?.userNo)
+        val now = java.time.LocalDateTime.of(2026, 4, 6, 12, 0, 0)
+
+        val book = bookRepository.save(
+            BookEntity(
+                bookTitle = "상세 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookStatus = 1,
+                userNo = userNo,
+                bookPage = 123,
+                bookImageUrl = "https://example.com/book-detail.jpg",
+                bookInfo = "책 소개",
+            ),
+        )
+        val memo = memoRepository.save(
+            MemoEntity(
+                bookNo = checkNotNull(book.bookNo),
+                memoContent = "상세 메모",
+                memoCreatedAt = now,
+                userNo = userNo,
+                memoLike = true,
+            ),
+        )
+        val memoNo = checkNotNull(memo.id)
+
+        memoImageRepository.save(
+            MemoImageEntity(
+                imageName = "memo-old.png",
+                imageUrl = "https://example.com/memo-old.png",
+                imageCreatedAt = now.minusHours(1),
+                memoNo = memoNo,
+            ),
+        )
+        memoImageRepository.save(
+            MemoImageEntity(
+                imageName = "memo-new.png",
+                imageUrl = "https://example.com/memo-new.png",
+                imageCreatedAt = now,
+                memoNo = memoNo,
+            ),
+        )
+
+        mockMvc.perform(
+            get("/api/v1/memo/detail")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("id", memoNo.toString()),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("메모 상세 조회 성공"))
+            .andExpect(jsonPath("$.data.id").value(memoNo))
+            .andExpect(jsonPath("$.data.book_no").value(checkNotNull(book.bookNo)))
+            .andExpect(jsonPath("$.data.book_title").value("상세 책"))
+            .andExpect(jsonPath("$.data.book_author").value("저자"))
+            .andExpect(jsonPath("$.data.book_publisher").value("출판사"))
+            .andExpect(jsonPath("$.data.book_info").value("책 소개"))
+            .andExpect(jsonPath("$.data.memo_content").value("상세 메모"))
+            .andExpect(jsonPath("$.data.image_url").value("https://example.com/memo-new.png"))
+            .andExpect(jsonPath("$.data.memo_created_at").value("2026-04-06T12:00:00"))
+    }
+
+    @Test
+    fun `get memo detail should return bad request when memo belongs to another user`() {
+        signupAndGetAccessToken("memoowner@example.com")
+        val visitorAccessToken = signupAndGetAccessToken("memovisitor@example.com")
+        val ownerUserNo = checkNotNull(userRepository.findByUserEmail("memoowner@example.com")?.userNo)
+        val now = java.time.LocalDateTime.of(2026, 4, 6, 12, 0, 0)
+
+        val book = bookRepository.save(
+            BookEntity(
+                bookTitle = "타인 메모 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookStatus = 1,
+                userNo = ownerUserNo,
+                bookPage = 123,
+                bookImageUrl = "https://example.com/book-owner.jpg",
+                bookInfo = "책 소개",
+            ),
+        )
+        val memo = memoRepository.save(
+            MemoEntity(
+                bookNo = checkNotNull(book.bookNo),
+                memoContent = "타인 메모",
+                memoCreatedAt = now,
+                userNo = ownerUserNo,
+                memoLike = false,
+            ),
+        )
+
+        mockMvc.perform(
+            get("/api/v1/memo/detail")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $visitorAccessToken")
+                .queryParam("id", checkNotNull(memo.id).toString()),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("일치하는 메모가 없습니다."))
+    }
+
+    @Test
+    fun `get memo detail should return bad request when memo does not exist`() {
+        val accessToken = signupAndGetAccessToken("memomissing@example.com")
+
+        mockMvc.perform(
+            get("/api/v1/memo/detail")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("id", "999999"),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("일치하는 메모가 없습니다."))
+    }
+
     private fun signupAndGetAccessToken(email: String): String {
         val signupResponse = mockMvc.perform(
             post("/api/v1/auth")

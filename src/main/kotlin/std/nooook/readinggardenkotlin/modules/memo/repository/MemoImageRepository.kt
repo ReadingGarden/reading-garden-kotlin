@@ -11,6 +11,4 @@ interface MemoImageRepository : JpaRepository<MemoImageEntity, Int> {
     fun findByMemoNo(memoNo: Int): MemoImageEntity?
 
     fun findFirstByMemoNoOrderByImageCreatedAtDesc(memoNo: Int): MemoImageEntity?
-
-    fun findTopByMemoNoOrderByImageCreatedAtDesc(memoNo: Int): MemoImageEntity?
 }
