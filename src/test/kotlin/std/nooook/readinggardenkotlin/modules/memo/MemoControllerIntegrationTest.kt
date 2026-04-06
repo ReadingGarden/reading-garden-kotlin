@@ -246,17 +246,6 @@ class MemoControllerIntegrationTest(
                 bookInfo = "책 소개",
             ),
         )
-        val memo = memoRepository.save(
-            MemoEntity(
-                bookNo = checkNotNull(book.bookNo),
-                memoContent = "상세 메모",
-                memoCreatedAt = now,
-                userNo = userNo,
-                memoLike = true,
-            ),
-        )
-        val memoNo = checkNotNull(memo.id)
-
         val otherBook = bookRepository.save(
             BookEntity(
                 bookTitle = "다른 책",
@@ -272,12 +261,22 @@ class MemoControllerIntegrationTest(
         memoRepository.save(
             MemoEntity(
                 bookNo = checkNotNull(otherBook.bookNo),
-                memoContent = "다른 메모",
-                memoCreatedAt = now.minusDays(1),
+                memoContent = "첫 메모",
+                memoCreatedAt = now.minusHours(1),
                 userNo = userNo,
                 memoLike = false,
             ),
         )
+        val memo = memoRepository.save(
+            MemoEntity(
+                bookNo = checkNotNull(book.bookNo),
+                memoContent = "상세 메모",
+                memoCreatedAt = now,
+                userNo = userNo,
+                memoLike = true,
+            ),
+        )
+        val memoNo = checkNotNull(memo.id)
 
         memoImageRepository.save(
             MemoImageEntity(
