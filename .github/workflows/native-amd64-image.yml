@@ -91,10 +91,20 @@ jobs:
           cd "$REMOTE_APP_DIR"
           test -f .env
           test -f secrets/firebase-service-account.json
+          PREVIOUS_IMAGE=""
+          if docker ps -a --format '{{.Names}}' | grep -qx 'reading-garden'; then
+            PREVIOUS_IMAGE="$(docker inspect --format='{{.Config.Image}}' reading-garden)"
+          fi
           export IMAGE_REF="$IMAGE_REF"
           export APP_PORT="$APP_PORT"
           docker compose -f docker-compose.yml pull
-          docker compose -f docker-compose.yml up -d --wait --wait-timeout 60
+          docker compose -f docker-compose.yml up -d
+          if ! TIMEOUT_SECONDS=90 ./cutover-smoke-check.sh "http://127.0.0.1:${APP_PORT}"; then
+            if [ -n "$PREVIOUS_IMAGE" ]; then
+              export IMAGE_REF="$PREVIOUS_IMAGE"
+              docker compose -f docker-compose.yml up -d
+            fi
+            exit 1
+          fi
           docker image prune -f
-          ./cutover-smoke-check.sh "http://127.0.0.1:${APP_PORT}"
           EOF
