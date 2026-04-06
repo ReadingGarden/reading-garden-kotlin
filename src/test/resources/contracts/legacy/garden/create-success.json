@@ -1,0 +1,10 @@
+{
+  "resp_code": 201,
+  "resp_msg": "가든 추가 성공",
+  "data": {
+    "garden_no": 10,
+    "garden_title": "새 가든",
+    "garden_info": "소개",
+    "garden_color": "blue"
+  }
+}
