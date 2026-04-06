@@ -10,6 +10,8 @@ import std.nooook.readinggardenkotlin.modules.auth.entity.UserEntity
 interface UserRepository : JpaRepository<UserEntity, Int> {
     fun findByUserNo(userNo: Int): UserEntity?
 
+    fun findAllByUserNoIn(userNos: Collection<Int>): List<UserEntity>
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select user from UserEntity user where user.userNo = :userNo")
     fun findByUserNoForUpdate(

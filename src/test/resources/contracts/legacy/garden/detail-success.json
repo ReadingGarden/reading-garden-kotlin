@@ -1,0 +1,57 @@
+{
+  "resp_code": 200,
+  "resp_msg": "가든 상세 조회 성공",
+  "data": {
+    "garden_no": 10,
+    "garden_title": "상세 가든",
+    "garden_info": "상세 설명",
+    "garden_color": "orange",
+    "garden_created_at": "2024-02-01T12:00:00",
+    "book_list": [
+      {
+        "book_no": 31,
+        "book_isbn": "9783333333333",
+        "book_title": "가든 책",
+        "book_author": "작가",
+        "book_publisher": "출판사",
+        "book_info": "가든 책 소개",
+        "book_image_url": "https://example.com/detail.jpg",
+        "book_tree": "인문",
+        "book_status": 1,
+        "percent": 50.0,
+        "user_no": 1,
+        "book_page": 400
+      },
+      {
+        "book_no": 32,
+        "book_isbn": null,
+        "book_title": "보조 책",
+        "book_author": "작가2",
+        "book_publisher": "출판사2",
+        "book_info": "보조 책 소개",
+        "book_image_url": null,
+        "book_tree": null,
+        "book_status": 0,
+        "percent": 0.0,
+        "user_no": 1,
+        "book_page": 0
+      }
+    ],
+    "garden_members": [
+      {
+        "user_no": 1,
+        "user_nick": "테스터",
+        "user_image": "user.png",
+        "garden_leader": true,
+        "garden_sign_date": "2024-02-01T12:05:00"
+      },
+      {
+        "user_no": 2,
+        "user_nick": "멤버",
+        "user_image": "member.png",
+        "garden_leader": false,
+        "garden_sign_date": "2024-02-02T09:00:00"
+      }
+    ]
+  }
+}
