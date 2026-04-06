@@ -5,4 +5,8 @@ import std.nooook.readinggardenkotlin.modules.book.entity.BookReadEntity
 
 interface BookReadRepository : JpaRepository<BookReadEntity, Int> {
     fun deleteAllByBookNo(bookNo: Int)
+
+    fun findTopByBookNoOrderByCreatedAtDesc(bookNo: Int): BookReadEntity?
+
+    fun findAllByBookNoOrderByCreatedAtDesc(bookNo: Int): List<BookReadEntity>
 }
