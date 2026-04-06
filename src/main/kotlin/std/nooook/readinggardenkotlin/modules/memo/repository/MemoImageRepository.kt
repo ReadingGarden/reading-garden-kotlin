@@ -8,7 +8,5 @@ interface MemoImageRepository : JpaRepository<MemoImageEntity, Int> {
 
     fun findAllByMemoNoIn(memoNos: Collection<Int>): List<MemoImageEntity>
 
-    fun findByMemoNo(memoNo: Int): MemoImageEntity?
-
-    fun findTopByMemoNoOrderByImageCreatedAtDesc(memoNo: Int): MemoImageEntity?
+    fun findFirstByMemoNoOrderByImageCreatedAtDesc(memoNo: Int): MemoImageEntity?
 }
