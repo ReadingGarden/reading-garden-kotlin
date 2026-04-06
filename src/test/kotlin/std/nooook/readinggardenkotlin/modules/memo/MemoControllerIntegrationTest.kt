@@ -618,7 +618,7 @@ class MemoControllerIntegrationTest(
 
     @Test
     fun `update memo should update another users memo like legacy behavior`() {
-        signupAndGetAccessToken("memo_update_owner@example.com")
+        val ownerAccessToken = signupAndGetAccessToken("memo_update_owner@example.com")
         val visitorAccessToken = signupAndGetAccessToken("memo_update_visitor@example.com")
         val ownerUserNo = checkNotNull(userRepository.findByUserEmail("memo_update_owner@example.com")?.userNo)
         val visitorUserNo = checkNotNull(userRepository.findByUserEmail("memo_update_visitor@example.com")?.userNo)
@@ -673,6 +673,15 @@ class MemoControllerIntegrationTest(
         assertEquals(ownerUserNo, updated.userNo)
         assertEquals(visitorBook.bookNo, updated.bookNo)
         assertEquals("타인 메모 수정", updated.memoContent)
+
+        mockMvc.perform(
+            get("/api/v1/memo/detail")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $ownerAccessToken")
+                .queryParam("id", checkNotNull(ownerMemo.id).toString()),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("일치하는 메모가 없습니다."))
     }
 
     @Test
