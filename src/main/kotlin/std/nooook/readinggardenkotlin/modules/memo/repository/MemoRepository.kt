@@ -35,9 +35,4 @@ interface MemoRepository : JpaRepository<MemoEntity, Int> {
         @Param("userNo") userNo: Int,
         pageable: Pageable,
     ): Page<MemoEntity>
-
-    fun findAllByUserNoOrderByMemoLikeDescMemoCreatedAtDesc(
-        userNo: Int,
-        pageable: Pageable,
-    ): Page<MemoEntity>
 }
