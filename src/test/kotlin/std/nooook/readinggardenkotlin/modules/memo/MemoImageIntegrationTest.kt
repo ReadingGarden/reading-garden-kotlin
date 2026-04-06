@@ -167,6 +167,27 @@ class MemoImageIntegrationTest(
     }
 
     @Test
+    fun `upload memo image should return bad request when memo is missing`() {
+        val accessToken = signupAndGetAccessToken("memoimagemissingupload@example.com")
+        val file = MockMultipartFile(
+            "file",
+            "missing.png",
+            MediaType.IMAGE_PNG_VALUE,
+            "image-bytes".toByteArray(),
+        )
+
+        mockMvc.perform(
+            multipart("/api/v1/memo/image")
+                .file(file)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .param("id", "999999"),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("일치하는 메모가 없습니다."))
+    }
+
+    @Test
     fun `delete memo image should remove file and record`() {
         val accessToken = signupAndGetAccessToken("memoimagedelete@example.com")
         val userNo = checkNotNull(userRepository.findByUserEmail("memoimagedelete@example.com")?.userNo)
