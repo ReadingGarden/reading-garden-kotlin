@@ -1,9 +1,11 @@
 package std.nooook.readinggardenkotlin.modules.book.service
 
 import jakarta.transaction.Transactional
-import java.nio.file.NoSuchFileException
+import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.server.ResponseStatusException
 import std.nooook.readinggardenkotlin.common.storage.ImageStorage
 import std.nooook.readinggardenkotlin.modules.book.controller.CreateBookRequest
@@ -96,36 +98,84 @@ class BookCommandService(
         val book = bookRepository.findByBookNoAndUserNo(bookNo, userNo)
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 책 정보가 없습니다.")
 
-        bookReadRepository.deleteAllByBookNo(bookNo)
+        val stagedDeletes = mutableListOf<ImageStorage.StagedDelete>()
+        try {
+            bookReadRepository.deleteAllByBookNo(bookNo)
 
-        bookImageRepository.findAllByBookNo(bookNo).forEach { image ->
-            deleteStoredImageIgnoringMissing(image.imageUrl)
-            bookImageRepository.delete(image)
-        }
+            bookImageRepository.findAllByBookNo(bookNo).forEach { image ->
+                stagedDeletes += imageStorage.stageDelete(image.imageUrl)
+                bookImageRepository.delete(image)
+            }
 
-        val memos = memoRepository.findAllByBookNo(bookNo)
-        val memoIds = memos.mapNotNull { it.id }
-        if (memoIds.isNotEmpty()) {
-            memoImageRepository.findAllByMemoNoIn(memoIds).forEach { memoImage ->
-                deleteStoredImageIgnoringMissing(memoImage.imageUrl)
-                memoImageRepository.delete(memoImage)
+            val memos = memoRepository.findAllByBookNo(bookNo)
+            val memoIds = memos.mapNotNull { it.id }
+            if (memoIds.isNotEmpty()) {
+                memoImageRepository.findAllByMemoNoIn(memoIds).forEach { memoImage ->
+                    stagedDeletes += imageStorage.stageDelete(memoImage.imageUrl)
+                    memoImageRepository.delete(memoImage)
+                }
+            }
+            memos.forEach { memoRepository.delete(it) }
+
+            bookRepository.delete(book)
+            finalizeStagedDeletes(stagedDeletes)
+            return "책 삭제 성공"
+        } catch (exception: Exception) {
+            rollbackStagedDeletes(stagedDeletes)
+            throw when (exception) {
+                is RuntimeException -> exception
+                else -> IllegalStateException("Failed to delete book resources.", exception)
             }
         }
-        memos.forEach { memoRepository.delete(it) }
-
-        bookRepository.delete(book)
-        return "책 삭제 성공"
     }
 
-    private fun deleteStoredImageIgnoringMissing(relativePath: String) {
-        try {
-            imageStorage.delete(relativePath)
-        } catch (_: NoSuchFileException) {
-            // Legacy delete ignores missing files during cascade cleanup.
+    private fun finalizeStagedDeletes(stagedDeletes: List<ImageStorage.StagedDelete>) {
+        if (stagedDeletes.isEmpty()) {
+            return
         }
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            commitStagedDeletes(stagedDeletes)
+            return
+        }
+        TransactionSynchronizationManager.registerSynchronization(
+            object : TransactionSynchronization {
+                override fun afterCommit() {
+                    commitStagedDeletes(stagedDeletes)
+                }
+
+                override fun afterCompletion(status: Int) {
+                    if (status != TransactionSynchronization.STATUS_COMMITTED) {
+                        rollbackStagedDeletes(stagedDeletes)
+                    }
+                }
+            },
+        )
+    }
+
+    private fun commitStagedDeletes(stagedDeletes: List<ImageStorage.StagedDelete>) {
+        stagedDeletes.forEach { stagedDelete ->
+            try {
+                stagedDelete.commit()
+            } catch (exception: Exception) {
+                logger.warn("Failed to finalize staged image deletion.", exception)
+            }
+        }
+    }
+
+    private fun rollbackStagedDeletes(stagedDeletes: List<ImageStorage.StagedDelete>) {
+        stagedDeletes
+            .asReversed()
+            .forEach { stagedDelete ->
+                try {
+                    stagedDelete.rollback()
+                } catch (exception: Exception) {
+                    logger.warn("Failed to restore staged image deletion.", exception)
+                }
+            }
     }
 
     companion object {
         private const val MAX_GARDEN_BOOK_COUNT = 30L
+        private val logger = LoggerFactory.getLogger(BookCommandService::class.java)
     }
 }
