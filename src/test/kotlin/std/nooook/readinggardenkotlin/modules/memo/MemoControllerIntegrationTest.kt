@@ -262,18 +262,18 @@ class MemoControllerIntegrationTest(
             MemoEntity(
                 bookNo = checkNotNull(otherBook.bookNo),
                 memoContent = "첫 메모",
-                memoCreatedAt = now.minusHours(1),
+                memoCreatedAt = now.plusHours(1),
                 userNo = userNo,
-                memoLike = false,
+                memoLike = true,
             ),
         )
         val memo = memoRepository.save(
             MemoEntity(
                 bookNo = checkNotNull(book.bookNo),
                 memoContent = "상세 메모",
-                memoCreatedAt = now,
+                memoCreatedAt = now.minusHours(1),
                 userNo = userNo,
-                memoLike = true,
+                memoLike = false,
             ),
         )
         val memoNo = checkNotNull(memo.id)
@@ -311,7 +311,7 @@ class MemoControllerIntegrationTest(
             .andExpect(jsonPath("$.data.book_info").value("책 소개"))
             .andExpect(jsonPath("$.data.memo_content").value("상세 메모"))
             .andExpect(jsonPath("$.data.image_url").value("https://example.com/memo-new.png"))
-            .andExpect(jsonPath("$.data.memo_created_at").value("2026-04-06T12:00:00"))
+            .andExpect(jsonPath("$.data.memo_created_at").value("2026-04-06T11:00:00"))
     }
 
     @Test
