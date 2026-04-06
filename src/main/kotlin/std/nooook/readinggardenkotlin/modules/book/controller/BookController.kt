@@ -27,4 +27,24 @@ class BookController(
                 maxResults = maxResults,
             ),
         )
+
+    @GetMapping("/search-isbn")
+    fun searchBookByIsbn(
+        @RequestParam query: String,
+    ): LegacyDataResponse<BookLookupResponse> =
+        LegacyDataResponse(
+            resp_code = 200,
+            resp_msg = "책 검색(ISBN) 성공",
+            data = bookService.searchBookByIsbn(query),
+        )
+
+    @GetMapping("/detail-isbn")
+    fun getBookDetailByIsbn(
+        @RequestParam query: String,
+    ): LegacyDataResponse<BookDetailResponse> =
+        LegacyDataResponse(
+            resp_code = 200,
+            resp_msg = "책 상세 조회 성공",
+            data = bookService.getBookDetailByIsbn(query),
+        )
 }

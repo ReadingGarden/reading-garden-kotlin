@@ -54,6 +54,40 @@ class AladinRestClient(
             .build(true)
             .toUri()
 
+        return fetch(uri)
+    }
+
+    override fun searchBookByIsbn(query: String): Map<String, Any?> =
+        fetchItemLookup(
+            itemIdType = "ISBN",
+            query = query,
+        )
+
+    override fun getBookDetailByIsbn(query: String): Map<String, Any?> =
+        fetchItemLookup(
+            itemIdType = "ISBN13",
+            query = query,
+        )
+
+    private fun fetchItemLookup(
+        itemIdType: String,
+        query: String,
+    ): Map<String, Any?> {
+        val uri = UriComponentsBuilder
+            .fromUriString(ALADIN_ITEM_LOOKUP_URL)
+            .queryParam("ttbkey", aladinTtbKey)
+            .queryParam("ItemIdType", itemIdType)
+            .queryParam("ItemId", query)
+            .queryParam("Cover", "Big")
+            .queryParam("output", "js")
+            .queryParam("Version", "20131101")
+            .build(true)
+            .toUri()
+
+        return fetch(uri)
+    }
+
+    private fun fetch(uri: java.net.URI): Map<String, Any?> {
         val body = restClient.get()
             .uri(uri)
             .accept(MediaType.APPLICATION_JSON)
@@ -66,6 +100,7 @@ class AladinRestClient(
 
     companion object {
         private const val ALADIN_ITEM_SEARCH_URL = "http://www.aladin.co.kr/ttb/api/ItemSearch.aspx"
+        private const val ALADIN_ITEM_LOOKUP_URL = "http://www.aladin.co.kr/ttb/api/ItemLookUp.aspx"
         private val CONNECT_TIMEOUT: Duration = Duration.ofSeconds(3)
         private val READ_TIMEOUT: Duration = Duration.ofSeconds(5)
     }

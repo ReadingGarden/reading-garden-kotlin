@@ -50,6 +50,24 @@ class BookControllerIntegrationTest(
         recordingAladinClient.lastQuery = null
         recordingAladinClient.lastStart = null
         recordingAladinClient.lastMaxResults = null
+        recordingAladinClient.searchIsbnResponse = mapOf(
+            "item" to listOf(mapOf("isbn13" to "9788937462788")),
+        )
+        recordingAladinClient.detailResponse = mapOf(
+            "searchCategoryId" to 1,
+            "searchCategoryName" to "소설",
+            "item" to listOf(
+                mapOf(
+                    "title" to "상세 책",
+                    "author" to "저자",
+                    "description" to "소개",
+                    "isbn13" to "9788937462788",
+                    "cover" to "https://example.com/book.jpg",
+                    "publisher" to "출판사",
+                    "subInfo" to mapOf("itemPage" to 321),
+                ),
+            ),
+        )
     }
 
     @Test
@@ -84,6 +102,68 @@ class BookControllerIntegrationTest(
         assertEquals(100, recordingAladinClient.lastMaxResults)
     }
 
+    @Test
+    fun `search isbn should return adapter payload`() {
+        val accessToken = signupAndGetAccessToken("bookisbn@example.com")
+
+        mockMvc.perform(
+            get("/api/v1/book/search-isbn")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("query", "9788937462788"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("책 검색(ISBN) 성공"))
+            .andExpect(jsonPath("$.data.item[0].isbn13").value("9788937462788"))
+
+        assertEquals("9788937462788", recordingAladinClient.lastIsbnQuery)
+    }
+
+    @Test
+    fun `detail isbn should shape response like legacy`() {
+        val accessToken = signupAndGetAccessToken("bookdetail@example.com")
+
+        mockMvc.perform(
+            get("/api/v1/book/detail-isbn")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("query", "9788937462788"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("책 상세 조회 성공"))
+            .andExpect(jsonPath("$.data.searchCategoryId").value(1))
+            .andExpect(jsonPath("$.data.searchCategoryName").value("소설"))
+            .andExpect(jsonPath("$.data.title").value("상세 책"))
+            .andExpect(jsonPath("$.data.author").value("저자"))
+            .andExpect(jsonPath("$.data.description").value("소개"))
+            .andExpect(jsonPath("$.data.isbn13").value("9788937462788"))
+            .andExpect(jsonPath("$.data.cover").value("https://example.com/book.jpg"))
+            .andExpect(jsonPath("$.data.publisher").value("출판사"))
+            .andExpect(jsonPath("$.data.itemPage").value(321))
+            .andExpect(jsonPath("$.data.record").isMap)
+            .andExpect(jsonPath("$.data.memo").isMap)
+
+        assertEquals("9788937462788", recordingAladinClient.lastDetailQuery)
+    }
+
+    @Test
+    fun `detail isbn should fail loudly when required fields are missing`() {
+        val accessToken = signupAndGetAccessToken("bookdetailfail@example.com")
+        recordingAladinClient.detailResponse = mapOf(
+            "searchCategoryId" to 1,
+            "searchCategoryName" to "소설",
+            "item" to listOf(emptyMap<String, Any>()),
+        )
+
+        mockMvc.perform(
+            get("/api/v1/book/detail-isbn")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("query", "9788937462788"),
+        )
+            .andExpect(status().isInternalServerError)
+            .andExpect(jsonPath("$.resp_code").value(500))
+    }
+
     private fun signupAndGetAccessToken(email: String): String {
         val signupResponse = mockMvc.perform(
             post("/api/v1/auth")
@@ -105,6 +185,10 @@ class BookControllerIntegrationTest(
         var lastQuery: String? = null
         var lastStart: Int? = null
         var lastMaxResults: Int? = null
+        var lastIsbnQuery: String? = null
+        var lastDetailQuery: String? = null
+        var searchIsbnResponse: Map<String, Any?> = emptyMap()
+        var detailResponse: Map<String, Any?> = emptyMap()
 
         override fun searchBooks(
             query: String,
@@ -120,6 +204,16 @@ class BookControllerIntegrationTest(
                 "itemsPerPage" to maxResults,
                 "item" to listOf(mapOf("title" to "${query} 결과")),
             )
+        }
+
+        override fun searchBookByIsbn(query: String): Map<String, Any?> {
+            lastIsbnQuery = query
+            return searchIsbnResponse
+        }
+
+        override fun getBookDetailByIsbn(query: String): Map<String, Any?> {
+            lastDetailQuery = query
+            return detailResponse
         }
     }
 

@@ -5,3 +5,7 @@ data class SearchBooksRequest(
     val start: Int = 1,
     val maxResults: Int = 100,
 )
+
+data class IsbnQueryRequest(
+    val query: String,
+)
