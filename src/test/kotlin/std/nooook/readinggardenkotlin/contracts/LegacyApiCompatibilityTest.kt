@@ -209,6 +209,22 @@ class LegacyApiCompatibilityTest(
                 }
             }
 
+            fixture.isTextual -> {
+                assertThat(actual.isTextual).withFailMessage("$path should be a string").isTrue()
+            }
+
+            fixture.isNumber -> {
+                assertThat(actual.isNumber).withFailMessage("$path should be a number").isTrue()
+            }
+
+            fixture.isBoolean -> {
+                assertThat(actual.isBoolean).withFailMessage("$path should be a boolean").isTrue()
+            }
+
+            fixture.isNull -> {
+                assertThat(actual.isNull).withFailMessage("$path should be null").isTrue()
+            }
+
             else -> {
                 assertNotNull(actual, "$path should exist")
             }
