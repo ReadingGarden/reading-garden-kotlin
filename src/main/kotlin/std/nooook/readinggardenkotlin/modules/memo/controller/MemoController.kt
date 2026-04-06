@@ -1,6 +1,7 @@
 package std.nooook.readinggardenkotlin.modules.memo.controller
 
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -11,11 +12,13 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.multipart.MultipartFile
 import std.nooook.readinggardenkotlin.common.api.LegacyDataResponse
 import std.nooook.readinggardenkotlin.common.api.LegacyHttpResponse
 import std.nooook.readinggardenkotlin.common.api.LegacyResponses
 import std.nooook.readinggardenkotlin.common.security.LegacyAuthenticationPrincipal
 import std.nooook.readinggardenkotlin.modules.memo.service.MemoCommandService
+import std.nooook.readinggardenkotlin.modules.memo.service.MemoImageService
 import std.nooook.readinggardenkotlin.modules.memo.service.MemoQueryService
 import std.nooook.readinggardenkotlin.modules.memo.service.MemoService
 
@@ -25,6 +28,7 @@ class MemoController(
     private val memoService: MemoService,
     private val memoQueryService: MemoQueryService,
     private val memoCommandService: MemoCommandService,
+    private val memoImageService: MemoImageService,
 ) {
     @GetMapping("", "/")
     fun getMemoList(
@@ -95,6 +99,31 @@ class MemoController(
             memoCommandService.deleteMemo(
                 userNo = principal.userNo.toInt(),
                 id = id,
+            ),
+        )
+
+    @PostMapping("/image", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
+    fun uploadMemoImage(
+        @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
+        @RequestParam id: Int,
+        @RequestParam(name = "file") file: MultipartFile,
+    ): ResponseEntity<LegacyHttpResponse> =
+        ResponseEntity.status(HttpStatus.CREATED).body(
+            LegacyResponses.error(
+                status = 201,
+                message = memoImageService.uploadMemoImage(id, file),
+            ),
+        )
+
+    @DeleteMapping("/image")
+    fun deleteMemoImage(
+        @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
+        @RequestParam id: Int,
+    ): ResponseEntity<LegacyHttpResponse> =
+        ResponseEntity.status(HttpStatus.CREATED).body(
+            LegacyResponses.error(
+                status = 201,
+                message = memoImageService.deleteMemoImage(id),
             ),
         )
 
