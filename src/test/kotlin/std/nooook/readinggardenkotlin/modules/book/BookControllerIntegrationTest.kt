@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import std.nooook.readinggardenkotlin.modules.auth.repository.RefreshTokenRepository
 import std.nooook.readinggardenkotlin.modules.auth.repository.UserRepository
 import std.nooook.readinggardenkotlin.modules.book.entity.BookEntity
+import std.nooook.readinggardenkotlin.modules.book.entity.BookImageEntity
 import std.nooook.readinggardenkotlin.modules.book.entity.BookReadEntity
 import std.nooook.readinggardenkotlin.modules.book.integration.AladinClient
 import std.nooook.readinggardenkotlin.modules.book.repository.BookImageRepository
@@ -34,6 +35,7 @@ import std.nooook.readinggardenkotlin.modules.garden.entity.GardenEntity
 import std.nooook.readinggardenkotlin.modules.garden.repository.GardenRepository
 import std.nooook.readinggardenkotlin.modules.garden.repository.GardenUserRepository
 import std.nooook.readinggardenkotlin.modules.memo.entity.MemoEntity
+import std.nooook.readinggardenkotlin.modules.memo.entity.MemoImageEntity
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoImageRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
 import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
@@ -1165,6 +1167,146 @@ class BookControllerIntegrationTest(
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.resp_code").value(400))
             .andExpect(jsonPath("$.resp_msg").value("일치하는 이미지가 없습니다."))
+    }
+
+    @Test
+    fun `delete book should cascade delete related rows and files`() {
+        val accessToken = signupAndGetAccessToken("bookdeletecascade@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("bookdeletecascade@example.com")?.userNo)
+        val bookNo = bookRepository.save(
+            BookEntity(
+                userNo = userNo,
+                bookTitle = "삭제 대상 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookInfo = "소개",
+                bookStatus = 0,
+                bookPage = 100,
+            ),
+        ).bookNo ?: error("bookNo was not generated")
+        bookReadRepository.save(
+            BookReadEntity(
+                bookNo = bookNo,
+                bookCurrentPage = 20,
+                userNo = userNo,
+            ),
+        )
+        val bookImageRelativePath = "book/delete-book-image.png"
+        val bookImagePath = imagesRoot.resolve(bookImageRelativePath)
+        Files.createDirectories(bookImagePath.parent)
+        Files.writeString(bookImagePath, "book-image")
+        bookImageRepository.save(
+            BookImageEntity(
+                bookNo = bookNo,
+                imageName = "delete-book-image.png",
+                imageUrl = bookImageRelativePath,
+            ),
+        )
+        val memo = memoRepository.save(
+            MemoEntity(
+                bookNo = bookNo,
+                memoContent = "메모",
+                memoCreatedAt = LocalDateTime.of(2026, 4, 6, 13, 0, 0),
+                userNo = userNo,
+                memoLike = true,
+            ),
+        )
+        val memoId = checkNotNull(memo.id)
+        val memoImageRelativePath = "memo/delete-memo-image.png"
+        val memoImagePath = imagesRoot.resolve(memoImageRelativePath)
+        Files.createDirectories(memoImagePath.parent)
+        Files.writeString(memoImagePath, "memo-image")
+        memoImageRepository.save(
+            MemoImageEntity(
+                memoNo = memoId,
+                imageName = "delete-memo-image.png",
+                imageUrl = memoImageRelativePath,
+            ),
+        )
+
+        mockMvc.perform(
+            delete("/api/v1/book/")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("book_no", bookNo.toString()),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("책 삭제 성공"))
+
+        assertFalse(bookRepository.findById(bookNo).isPresent)
+        assertTrue(bookReadRepository.findAllByBookNoOrderByCreatedAtDesc(bookNo).isEmpty())
+        assertTrue(bookImageRepository.findAllByBookNo(bookNo).isEmpty())
+        assertTrue(memoRepository.findAllByBookNo(bookNo).isEmpty())
+        assertTrue(memoImageRepository.findAllByMemoNoIn(listOf(memoId)).isEmpty())
+        assertFalse(Files.exists(bookImagePath))
+        assertFalse(Files.exists(memoImagePath))
+    }
+
+    @Test
+    fun `delete book should ignore missing related image files`() {
+        val accessToken = signupAndGetAccessToken("bookdeletefilemissing@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("bookdeletefilemissing@example.com")?.userNo)
+        val bookNo = bookRepository.save(
+            BookEntity(
+                userNo = userNo,
+                bookTitle = "누락 파일 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookInfo = "소개",
+                bookStatus = 0,
+                bookPage = 100,
+            ),
+        ).bookNo ?: error("bookNo was not generated")
+        bookImageRepository.save(
+            BookImageEntity(
+                bookNo = bookNo,
+                imageName = "missing-book.png",
+                imageUrl = "book/missing-book.png",
+            ),
+        )
+        val memo = memoRepository.save(
+            MemoEntity(
+                bookNo = bookNo,
+                memoContent = "메모",
+                memoCreatedAt = LocalDateTime.of(2026, 4, 6, 14, 0, 0),
+                userNo = userNo,
+                memoLike = false,
+            ),
+        )
+        memoImageRepository.save(
+            MemoImageEntity(
+                memoNo = checkNotNull(memo.id),
+                imageName = "missing-memo.png",
+                imageUrl = "memo/missing-memo.png",
+            ),
+        )
+
+        mockMvc.perform(
+            delete("/api/v1/book/")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("book_no", bookNo.toString()),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("책 삭제 성공"))
+
+        assertFalse(bookRepository.findById(bookNo).isPresent)
+        assertTrue(bookImageRepository.findAllByBookNo(bookNo).isEmpty())
+        assertTrue(memoRepository.findAllByBookNo(bookNo).isEmpty())
+    }
+
+    @Test
+    fun `delete book should return bad request when book is missing`() {
+        val accessToken = signupAndGetAccessToken("bookdeletemissing@example.com")
+
+        mockMvc.perform(
+            delete("/api/v1/book/")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("book_no", "999999"),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("일치하는 책 정보가 없습니다."))
     }
 
     private fun signupAndGetAccessToken(email: String): String {

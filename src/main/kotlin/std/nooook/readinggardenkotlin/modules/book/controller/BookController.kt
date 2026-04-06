@@ -90,6 +90,15 @@ class BookController(
             ),
         )
 
+    @DeleteMapping("", "/")
+    fun deleteBook(
+        @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
+        @RequestParam(name = "book_no") bookNo: Int,
+    ): LegacyHttpResponse =
+        LegacyResponses.ok(
+            bookCommandService.deleteBook(principal.userNo.toInt(), bookNo),
+        )
+
     @GetMapping("/status")
     fun getBookStatus(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,

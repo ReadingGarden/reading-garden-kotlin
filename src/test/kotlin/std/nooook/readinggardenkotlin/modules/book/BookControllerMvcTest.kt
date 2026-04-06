@@ -183,6 +183,22 @@ class BookControllerMvcTest(
     }
 
     @Test
+    fun `delete book should return legacy success envelope`() {
+        doReturn("책 삭제 성공")
+            .`when`(bookCommandService)
+            .deleteBook(1, 10)
+
+        mockMvc.perform(
+            delete("/api/v1/book/")
+                .with(bookAuth())
+                .queryParam("book_no", "10"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("책 삭제 성공"))
+    }
+
+    @Test
     fun `create should return 400 when book status is missing`() {
         mockMvc.perform(
             post("/api/v1/book/")
