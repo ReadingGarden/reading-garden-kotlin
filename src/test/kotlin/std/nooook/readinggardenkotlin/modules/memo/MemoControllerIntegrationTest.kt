@@ -19,6 +19,8 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import org.springframework.test.context.DynamicPropertyRegistry
+import org.springframework.test.context.DynamicPropertySource
 import std.nooook.readinggardenkotlin.modules.auth.repository.RefreshTokenRepository
 import std.nooook.readinggardenkotlin.modules.auth.repository.UserRepository
 import std.nooook.readinggardenkotlin.modules.book.entity.BookEntity
@@ -28,6 +30,9 @@ import std.nooook.readinggardenkotlin.modules.memo.entity.MemoImageEntity
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoImageRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
 import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.Comparator
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -42,14 +47,39 @@ class MemoControllerIntegrationTest(
 ) {
     private val objectMapper: ObjectMapper = JsonMapper.builder().findAndAddModules().build()
 
+    companion object {
+        private val imagesRoot: Path = Files.createTempDirectory("reading-garden-memo-images")
+
+        @JvmStatic
+        @DynamicPropertySource
+        fun registerStorageProperties(registry: DynamicPropertyRegistry) {
+            registry.add("app.storage.images-root") { imagesRoot.toString() }
+        }
+    }
+
     @BeforeEach
     fun setUp() {
+        cleanImagesRoot()
         memoImageRepository.deleteAll()
         memoRepository.deleteAll()
         bookRepository.deleteAll()
         refreshTokenRepository.deleteAll()
         pushRepository.deleteAll()
         userRepository.deleteAll()
+    }
+
+    private fun cleanImagesRoot() {
+        if (!Files.exists(imagesRoot)) {
+            Files.createDirectories(imagesRoot)
+            return
+        }
+
+        Files.walk(imagesRoot).use { paths ->
+            paths
+                .sorted(Comparator.reverseOrder())
+                .filter { it != imagesRoot }
+                .forEach { Files.deleteIfExists(it) }
+        }
     }
 
     @Test
@@ -556,6 +586,37 @@ class MemoControllerIntegrationTest(
     }
 
     @Test
+    fun `update memo should return bad request when memo does not exist`() {
+        val accessToken = signupAndGetAccessToken("memoupdate_missing@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("memoupdate_missing@example.com")?.userNo)
+        val book = bookRepository.save(
+            BookEntity(
+                bookTitle = "업데이트 대상 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookStatus = 1,
+                userNo = userNo,
+                bookPage = 777,
+                bookImageUrl = "https://example.com/update-missing-book.jpg",
+                bookInfo = "책 소개",
+            ),
+        )
+
+        mockMvc.perform(
+            put("/api/v1/memo/")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("id", "999999")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """{"book_no":${checkNotNull(book.bookNo)},"memo_content":"없는 메모 수정"}""",
+                ),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("일치하는 메모가 없습니다."))
+    }
+
+    @Test
     fun `update memo should update another users memo like legacy behavior`() {
         signupAndGetAccessToken("memo_update_owner@example.com")
         val visitorAccessToken = signupAndGetAccessToken("memo_update_visitor@example.com")
@@ -615,7 +676,7 @@ class MemoControllerIntegrationTest(
     }
 
     @Test
-    fun `delete memo should delete memo without deleting images`() {
+    fun `delete memo should delete memo images rows and files`() {
         val accessToken = signupAndGetAccessToken("memodelete@example.com")
         val userNo = checkNotNull(userRepository.findByUserEmail("memodelete@example.com")?.userNo)
         val book = bookRepository.save(
@@ -638,25 +699,31 @@ class MemoControllerIntegrationTest(
                 memoLike = false,
             ),
         )
+        val memoNo = checkNotNull(memo.id)
+        val imageRelativePath = "memo/delete/memo-delete.png"
+        val storedPath = imagesRoot.resolve(imageRelativePath)
+        Files.createDirectories(storedPath.parent)
+        Files.writeString(storedPath, "memo image")
         memoImageRepository.save(
             MemoImageEntity(
                 imageName = "memo-delete.png",
-                imageUrl = "https://example.com/memo-delete.png",
-                memoNo = checkNotNull(memo.id),
+                imageUrl = imageRelativePath,
+                memoNo = memoNo,
             ),
         )
 
         mockMvc.perform(
             delete("/api/v1/memo/")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                .queryParam("id", checkNotNull(memo.id).toString()),
+                .queryParam("id", memoNo.toString()),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.resp_code").value(200))
             .andExpect(jsonPath("$.resp_msg").value("메모 삭제 성공"))
 
-        assertTrue(memoRepository.findById(checkNotNull(memo.id)).isEmpty)
-        assertEquals(1, memoImageRepository.findAllByMemoNoIn(listOf(checkNotNull(memo.id))).size)
+        assertTrue(memoRepository.findById(memoNo).isEmpty)
+        assertTrue(memoImageRepository.findAllByMemoNoIn(listOf(memoNo)).isEmpty())
+        assertFalse(Files.exists(storedPath))
     }
 
     @Test
@@ -699,7 +766,21 @@ class MemoControllerIntegrationTest(
     }
 
     @Test
-    fun `like memo should toggle memo like`() {
+    fun `delete memo should return bad request when memo does not exist`() {
+        val accessToken = signupAndGetAccessToken("memodelete_missing@example.com")
+
+        mockMvc.perform(
+            delete("/api/v1/memo/")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("id", "999999"),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("일치하는 메모가 없습니다."))
+    }
+
+    @Test
+    fun `like memo should toggle memo like both directions`() {
         val accessToken = signupAndGetAccessToken("memolike@example.com")
         val userNo = checkNotNull(userRepository.findByUserEmail("memolike@example.com")?.userNo)
         val book = bookRepository.save(
@@ -722,17 +803,29 @@ class MemoControllerIntegrationTest(
                 memoLike = false,
             ),
         )
+        val memoNo = checkNotNull(memo.id)
 
         mockMvc.perform(
             put("/api/v1/memo/like")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                .queryParam("id", checkNotNull(memo.id).toString()),
+                .queryParam("id", memoNo.toString()),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.resp_code").value(200))
             .andExpect(jsonPath("$.resp_msg").value("메모 즐겨찾기 추가/해제"))
 
-        assertTrue(checkNotNull(memoRepository.findById(checkNotNull(memo.id)).orElse(null)).memoLike)
+        assertTrue(checkNotNull(memoRepository.findById(memoNo).orElse(null)).memoLike)
+
+        mockMvc.perform(
+            put("/api/v1/memo/like")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("id", memoNo.toString()),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("메모 즐겨찾기 추가/해제"))
+
+        assertFalse(checkNotNull(memoRepository.findById(memoNo).orElse(null)).memoLike)
     }
 
     @Test
@@ -772,6 +865,20 @@ class MemoControllerIntegrationTest(
             .andExpect(jsonPath("$.resp_msg").value("메모 즐겨찾기 추가/해제"))
 
         assertTrue(checkNotNull(memoRepository.findById(checkNotNull(ownerMemo.id)).orElse(null)).memoLike)
+    }
+
+    @Test
+    fun `like memo should return bad request when memo does not exist`() {
+        val accessToken = signupAndGetAccessToken("memolike_missing@example.com")
+
+        mockMvc.perform(
+            put("/api/v1/memo/like")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("id", "999999"),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("일치하는 메모가 없습니다."))
     }
 
     private fun signupAndGetAccessToken(email: String): String {
