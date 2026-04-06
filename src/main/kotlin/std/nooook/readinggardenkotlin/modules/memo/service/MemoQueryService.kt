@@ -29,8 +29,8 @@ class MemoQueryService(
         val memo = memoRepository.findByIdAndUserNo(id, userNo)
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 메모가 없습니다.")
 
-        val book = bookRepository.findById(memo.bookNo)
-            .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 메모가 없습니다.") }
+        val book = bookRepository.findByBookNoAndUserNo(memo.bookNo, userNo)
+            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 메모가 없습니다.")
 
         val imageUrl = memoImageRepository.findFirstByMemoNoOrderByImageCreatedAtDesc(memo.id ?: id)?.imageUrl
 
