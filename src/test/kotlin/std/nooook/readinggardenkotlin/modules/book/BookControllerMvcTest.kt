@@ -2,18 +2,22 @@ package std.nooook.readinggardenkotlin.modules.book
 
 import org.junit.jupiter.api.Test
 import org.mockito.BDDMockito.given
+import org.mockito.Mockito.doReturn
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
+import org.springframework.mock.web.MockMultipartFile
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import std.nooook.readinggardenkotlin.common.security.LegacyAuthenticationPrincipal
@@ -28,6 +32,7 @@ import std.nooook.readinggardenkotlin.modules.book.controller.CreateBookResponse
 import std.nooook.readinggardenkotlin.modules.book.controller.CreateReadResponse
 import std.nooook.readinggardenkotlin.modules.book.controller.CreateReadRequest
 import std.nooook.readinggardenkotlin.modules.book.service.BookCommandService
+import std.nooook.readinggardenkotlin.modules.book.service.BookImageService
 import std.nooook.readinggardenkotlin.modules.book.service.BookQueryService
 import std.nooook.readinggardenkotlin.modules.book.service.BookReadService
 import std.nooook.readinggardenkotlin.modules.book.service.BookService
@@ -49,6 +54,9 @@ class BookControllerMvcTest(
 
     @MockitoBean
     private lateinit var bookReadService: BookReadService
+
+    @MockitoBean
+    private lateinit var bookImageService: BookImageService
 
     @Test
     fun `search should return legacy success envelope`() {
@@ -216,6 +224,46 @@ class BookControllerMvcTest(
             .andExpect(jsonPath("$.data.percent").value(20.0))
             .andExpect(jsonPath("$.data.id").doesNotExist())
             .andExpect(jsonPath("$.data.book_read_no").doesNotExist())
+    }
+
+    @Test
+    fun `upload image should return legacy created envelope`() {
+        val file = MockMultipartFile(
+            "file",
+            "cover.png",
+            MediaType.IMAGE_PNG_VALUE,
+            "image-bytes".toByteArray(),
+        )
+
+        doReturn("이미지 업로드 성공")
+            .`when`(bookImageService)
+            .uploadBookImage(10, file)
+
+        mockMvc.perform(
+            multipart("/api/v1/book/image")
+                .file(file)
+                .with(bookAuth())
+                .param("book_no", "10"),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.resp_code").value(201))
+            .andExpect(jsonPath("$.resp_msg").value("이미지 업로드 성공"))
+    }
+
+    @Test
+    fun `delete image should return legacy created envelope`() {
+        doReturn("이미지 삭제 성공")
+            .`when`(bookImageService)
+            .deleteBookImage(10)
+
+        mockMvc.perform(
+            delete("/api/v1/book/image")
+                .with(bookAuth())
+                .queryParam("book_no", "10"),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.resp_code").value(201))
+            .andExpect(jsonPath("$.resp_msg").value("이미지 삭제 성공"))
     }
 
     @Test

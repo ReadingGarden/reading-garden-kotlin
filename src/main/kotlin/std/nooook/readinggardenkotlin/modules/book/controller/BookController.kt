@@ -2,6 +2,7 @@ package std.nooook.readinggardenkotlin.modules.book.controller
 
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.http.MediaType
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -11,11 +12,13 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.multipart.MultipartFile
 import std.nooook.readinggardenkotlin.common.api.LegacyDataResponse
 import std.nooook.readinggardenkotlin.common.api.LegacyHttpResponse
 import std.nooook.readinggardenkotlin.common.api.LegacyResponses
 import std.nooook.readinggardenkotlin.common.security.LegacyAuthenticationPrincipal
 import std.nooook.readinggardenkotlin.modules.book.service.BookCommandService
+import std.nooook.readinggardenkotlin.modules.book.service.BookImageService
 import std.nooook.readinggardenkotlin.modules.book.service.BookQueryService
 import std.nooook.readinggardenkotlin.modules.book.service.BookReadService
 import std.nooook.readinggardenkotlin.modules.book.service.BookService
@@ -27,6 +30,7 @@ class BookController(
     private val bookQueryService: BookQueryService,
     private val bookCommandService: BookCommandService,
     private val bookReadService: BookReadService,
+    private val bookImageService: BookImageService,
 ) {
     @GetMapping("", "/")
     fun checkBookDuplication(
@@ -147,6 +151,31 @@ class BookController(
     ): LegacyHttpResponse =
         LegacyResponses.ok(
             bookReadService.deleteRead(id),
+        )
+
+    @PostMapping("/image", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
+    fun uploadBookImage(
+        @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
+        @RequestParam(name = "book_no") bookNo: Int,
+        @RequestParam(name = "file") file: MultipartFile,
+    ): ResponseEntity<LegacyHttpResponse> =
+        ResponseEntity.status(HttpStatus.CREATED).body(
+            LegacyResponses.error(
+                status = 201,
+                message = bookImageService.uploadBookImage(bookNo, file),
+            ),
+        )
+
+    @DeleteMapping("/image")
+    fun deleteBookImage(
+        @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
+        @RequestParam(name = "book_no") bookNo: Int,
+    ): ResponseEntity<LegacyHttpResponse> =
+        ResponseEntity.status(HttpStatus.CREATED).body(
+            LegacyResponses.error(
+                status = 201,
+                message = bookImageService.deleteBookImage(bookNo),
+            ),
         )
 
     @PutMapping("", "/")
