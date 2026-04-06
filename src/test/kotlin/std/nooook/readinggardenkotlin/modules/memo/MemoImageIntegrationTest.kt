@@ -1,0 +1,453 @@
+package std.nooook.readinggardenkotlin.modules.memo
+
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.json.JsonMapper
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.http.HttpHeaders
+import org.springframework.http.MediaType
+import org.springframework.mock.web.MockMultipartFile
+import org.springframework.test.context.DynamicPropertyRegistry
+import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
+import std.nooook.readinggardenkotlin.modules.auth.repository.RefreshTokenRepository
+import std.nooook.readinggardenkotlin.modules.auth.repository.UserRepository
+import std.nooook.readinggardenkotlin.modules.book.entity.BookEntity
+import std.nooook.readinggardenkotlin.modules.book.repository.BookRepository
+import std.nooook.readinggardenkotlin.modules.memo.entity.MemoEntity
+import std.nooook.readinggardenkotlin.modules.memo.entity.MemoImageEntity
+import std.nooook.readinggardenkotlin.modules.memo.repository.MemoImageRepository
+import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
+import std.nooook.readinggardenkotlin.modules.memo.service.MemoImageService
+import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.Comparator
+
+@SpringBootTest
+@AutoConfigureMockMvc
+class MemoImageIntegrationTest(
+    @Autowired private val mockMvc: MockMvc,
+    @Autowired private val userRepository: UserRepository,
+    @Autowired private val refreshTokenRepository: RefreshTokenRepository,
+    @Autowired private val pushRepository: PushRepository,
+    @Autowired private val bookRepository: BookRepository,
+    @Autowired private val memoRepository: MemoRepository,
+    @Autowired private val memoImageRepository: MemoImageRepository,
+    @Autowired private val memoImageService: MemoImageService,
+    @Autowired private val transactionManager: PlatformTransactionManager,
+) {
+    private val objectMapper: ObjectMapper = JsonMapper.builder().findAndAddModules().build()
+
+    companion object {
+        private val imagesRoot: Path = Files.createTempDirectory("reading-garden-memo-images")
+
+        @JvmStatic
+        @DynamicPropertySource
+        fun registerStorageProperties(registry: DynamicPropertyRegistry) {
+            registry.add("app.storage.images-root") { imagesRoot.toString() }
+        }
+    }
+
+    @BeforeEach
+    fun setUp() {
+        cleanImagesRoot()
+        memoImageRepository.deleteAll()
+        memoRepository.deleteAll()
+        bookRepository.deleteAll()
+        refreshTokenRepository.deleteAll()
+        pushRepository.deleteAll()
+        userRepository.deleteAll()
+    }
+
+    @Test
+    fun `upload memo image should persist file and row`() {
+        val accessToken = signupAndGetAccessToken("memoimageupload@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("memoimageupload@example.com")?.userNo)
+        val memoId = createMemo(userNo, "이미지 업로드 메모")
+        val file = MockMultipartFile(
+            "file",
+            "cover.png",
+            MediaType.IMAGE_PNG_VALUE,
+            "image-bytes".toByteArray(),
+        )
+
+        mockMvc.perform(
+            multipart("/api/v1/memo/image")
+                .file(file)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .param("id", memoId.toString()),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.resp_code").value(201))
+            .andExpect(jsonPath("$.resp_msg").value("이미지 업로드 성공"))
+
+        val image = memoImagesFor(memoId).single()
+        assertTrue(image.imageUrl.startsWith("memo/"))
+        assertTrue(Files.exists(imagesRoot.resolve(image.imageUrl)))
+    }
+
+    @Test
+    fun `upload memo image should replace existing file and keep one row`() {
+        val accessToken = signupAndGetAccessToken("memoimagereplace@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("memoimagereplace@example.com")?.userNo)
+        val memoId = createMemo(userNo, "이미지 교체 메모")
+        val firstFile = MockMultipartFile(
+            "file",
+            "first.png",
+            MediaType.IMAGE_PNG_VALUE,
+            "first-image".toByteArray(),
+        )
+        val secondFile = MockMultipartFile(
+            "file",
+            "second.png",
+            MediaType.IMAGE_PNG_VALUE,
+            "second-image".toByteArray(),
+        )
+
+        mockMvc.perform(
+            multipart("/api/v1/memo/image")
+                .file(firstFile)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .param("id", memoId.toString()),
+        )
+            .andExpect(status().isCreated)
+
+        val firstImage = memoImagesFor(memoId).single()
+        val firstStoredPath = imagesRoot.resolve(firstImage.imageUrl)
+        assertTrue(Files.exists(firstStoredPath))
+
+        mockMvc.perform(
+            multipart("/api/v1/memo/image")
+                .file(secondFile)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .param("id", memoId.toString()),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.resp_msg").value("이미지 업로드 성공"))
+
+        val replacedImage = memoImagesFor(memoId).single()
+        assertFalse(Files.exists(firstStoredPath))
+        assertTrue(Files.exists(imagesRoot.resolve(replacedImage.imageUrl)))
+        assertEquals(1, memoImageRepository.count())
+        assertFalse(firstImage.imageUrl == replacedImage.imageUrl)
+    }
+
+    @Test
+    fun `upload memo image should clean up saved file when outer transaction rolls back`() {
+        val accessToken = signupAndGetAccessToken("memoimageuploadrollback@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("memoimageuploadrollback@example.com")?.userNo)
+        val memoId = createMemo(userNo, "롤백 메모")
+        val originalFile = MockMultipartFile(
+            "file",
+            "original.png",
+            MediaType.IMAGE_PNG_VALUE,
+            "original-image".toByteArray(),
+        )
+        val replacementFile = MockMultipartFile(
+            "file",
+            "replacement.png",
+            MediaType.IMAGE_PNG_VALUE,
+            "replacement-image".toByteArray(),
+        )
+
+        mockMvc.perform(
+            multipart("/api/v1/memo/image")
+                .file(originalFile)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .param("id", memoId.toString()),
+        )
+            .andExpect(status().isCreated)
+
+        val beforeImage = memoImagesFor(memoId).single()
+        val beforePath = imagesRoot.resolve(beforeImage.imageUrl)
+        assertTrue(Files.exists(beforePath))
+
+        assertThrows(IllegalStateException::class.java) {
+            TransactionTemplate(transactionManager).executeWithoutResult {
+                memoImageService.uploadMemoImage(memoId, replacementFile)
+                error("rollback")
+            }
+        }
+
+        val afterImage = memoImagesFor(memoId).single()
+        assertEquals(beforeImage.imageUrl, afterImage.imageUrl)
+        assertTrue(Files.exists(beforePath))
+        assertEquals(setOf(beforeImage.imageUrl), listRegularFiles())
+    }
+
+    @Test
+    fun `upload memo image should clean duplicate rows and files before storing one image`() {
+        val accessToken = signupAndGetAccessToken("memoimageduplicateupload@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("memoimageduplicateupload@example.com")?.userNo)
+        val memoId = createMemo(userNo, "중복 업로드 메모")
+        seedMemoImage(memoId, "memo/duplicate-1.png", "duplicate-one")
+        seedMemoImage(memoId, "memo/duplicate-2.png", "duplicate-two")
+        val replacementFile = MockMultipartFile(
+            "file",
+            "replacement.png",
+            MediaType.IMAGE_PNG_VALUE,
+            "replacement-image".toByteArray(),
+        )
+
+        mockMvc.perform(
+            multipart("/api/v1/memo/image")
+                .file(replacementFile)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .param("id", memoId.toString()),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.resp_msg").value("이미지 업로드 성공"))
+
+        val images = memoImagesFor(memoId)
+        assertEquals(1, images.size)
+        assertTrue(images.single().imageUrl.startsWith("memo/"))
+        assertFalse(Files.exists(imagesRoot.resolve("memo/duplicate-1.png")))
+        assertFalse(Files.exists(imagesRoot.resolve("memo/duplicate-2.png")))
+        assertTrue(Files.exists(imagesRoot.resolve(images.single().imageUrl)))
+    }
+
+    @Test
+    fun `delete memo image should remove duplicate rows and files`() {
+        val accessToken = signupAndGetAccessToken("memoimageduplicatedelete@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("memoimageduplicatedelete@example.com")?.userNo)
+        val memoId = createMemo(userNo, "중복 삭제 메모")
+        seedMemoImage(memoId, "memo/delete-duplicate-1.png", "delete-duplicate-one")
+        seedMemoImage(memoId, "memo/delete-duplicate-2.png", "delete-duplicate-two")
+
+        mockMvc.perform(
+            delete("/api/v1/memo/image")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("id", memoId.toString()),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.resp_code").value(201))
+            .andExpect(jsonPath("$.resp_msg").value("이미지 삭제 성공"))
+
+        assertTrue(memoImagesFor(memoId).isEmpty())
+        assertFalse(Files.exists(imagesRoot.resolve("memo/delete-duplicate-1.png")))
+        assertFalse(Files.exists(imagesRoot.resolve("memo/delete-duplicate-2.png")))
+    }
+
+    @Test
+    fun `upload memo image should reject files over five megabytes`() {
+        val accessToken = signupAndGetAccessToken("memoimageoversize@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("memoimageoversize@example.com")?.userNo)
+        val memoId = createMemo(userNo, "큰 이미지 메모")
+        val oversizedBytes = ByteArray(5 * 1024 * 1024 + 1)
+        val file = MockMultipartFile(
+            "file",
+            "too-big.png",
+            MediaType.IMAGE_PNG_VALUE,
+            oversizedBytes,
+        )
+
+        mockMvc.perform(
+            multipart("/api/v1/memo/image")
+                .file(file)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .param("id", memoId.toString()),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("이미지 용량은 5MB를 초과할 수 없습니다."))
+
+        assertTrue(memoImagesFor(memoId).isEmpty())
+    }
+
+    @Test
+    fun `upload memo image should return bad request when memo is missing`() {
+        val accessToken = signupAndGetAccessToken("memoimagemissingupload@example.com")
+        val file = MockMultipartFile(
+            "file",
+            "missing.png",
+            MediaType.IMAGE_PNG_VALUE,
+            "image-bytes".toByteArray(),
+        )
+
+        mockMvc.perform(
+            multipart("/api/v1/memo/image")
+                .file(file)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .param("id", "999999"),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("일치하는 메모가 없습니다."))
+    }
+
+    @Test
+    fun `delete memo image should remove file and record`() {
+        val accessToken = signupAndGetAccessToken("memoimagedelete@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("memoimagedelete@example.com")?.userNo)
+        val memoId = createMemo(userNo, "이미지 삭제 메모")
+        val file = MockMultipartFile(
+            "file",
+            "delete.png",
+            MediaType.IMAGE_PNG_VALUE,
+            "delete-image".toByteArray(),
+        )
+
+        mockMvc.perform(
+            multipart("/api/v1/memo/image")
+                .file(file)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .param("id", memoId.toString()),
+        )
+            .andExpect(status().isCreated)
+
+        val storedImage = memoImagesFor(memoId).single()
+        val storedPath = imagesRoot.resolve(storedImage.imageUrl)
+        assertTrue(Files.exists(storedPath))
+
+        mockMvc.perform(
+            delete("/api/v1/memo/image")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("id", memoId.toString()),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.resp_code").value(201))
+            .andExpect(jsonPath("$.resp_msg").value("이미지 삭제 성공"))
+
+        assertTrue(memoImagesFor(memoId).isEmpty())
+        assertFalse(Files.exists(storedPath))
+    }
+
+    @Test
+    fun `delete memo image should return bad request when image is missing`() {
+        val accessToken = signupAndGetAccessToken("memoimagemissing@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("memoimagemissing@example.com")?.userNo)
+        val memoId = createMemo(userNo, "이미지 없는 메모")
+
+        mockMvc.perform(
+            delete("/api/v1/memo/image")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("id", memoId.toString()),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("일치하는 이미지가 없습니다."))
+    }
+
+    @Test
+    fun `delete memo image should return bad request when memo is missing`() {
+        val accessToken = signupAndGetAccessToken("memoimagemissingmemo@example.com")
+
+        mockMvc.perform(
+            delete("/api/v1/memo/image")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("id", "999999"),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("일치하는 메모가 없습니다."))
+    }
+
+    private fun createMemo(
+        userNo: Int,
+        memoContent: String,
+    ): Int {
+        val bookNo = bookRepository.save(
+            BookEntity(
+                userNo = userNo,
+                bookTitle = "$memoContent 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookInfo = "소개",
+                bookStatus = 0,
+                bookPage = 100,
+            ),
+        ).bookNo ?: error("bookNo was not generated")
+
+        return checkNotNull(
+            memoRepository.save(
+                MemoEntity(
+                    bookNo = bookNo,
+                    memoContent = memoContent,
+                    userNo = userNo,
+                    memoLike = false,
+                ),
+            ).id,
+        )
+    }
+
+    private fun cleanImagesRoot() {
+        if (!Files.exists(imagesRoot)) {
+            Files.createDirectories(imagesRoot)
+            return
+        }
+
+        Files.walk(imagesRoot).use { paths ->
+            paths
+                .sorted(Comparator.reverseOrder())
+                .filter { it != imagesRoot }
+                .forEach { Files.deleteIfExists(it) }
+        }
+    }
+
+    private fun memoImagesFor(memoId: Int): List<MemoImageEntity> {
+        return memoImageRepository.findAllByMemoNoIn(listOf(memoId))
+    }
+
+    private fun seedMemoImage(
+        memoId: Int,
+        relativePath: String,
+        content: String,
+    ) {
+        val targetPath = imagesRoot.resolve(relativePath)
+        Files.createDirectories(targetPath.parent)
+        Files.write(targetPath, content.toByteArray())
+        memoImageRepository.save(
+            MemoImageEntity(
+                memoNo = memoId,
+                imageName = relativePath.substringAfterLast('/'),
+                imageUrl = relativePath,
+            ),
+        )
+    }
+
+    private fun listRegularFiles(): Set<String> {
+        if (!Files.exists(imagesRoot)) {
+            return emptySet()
+        }
+
+        Files.walk(imagesRoot).use { paths ->
+            return paths
+                .filter { Files.isRegularFile(it) }
+                .map { imagesRoot.relativize(it).toString().replace('\\', '/') }
+                .toList()
+                .toSet()
+        }
+    }
+
+    private fun signupAndGetAccessToken(email: String): String {
+        val signupResponse = mockMvc.perform(
+            post("/api/v1/auth")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """{"user_email":"$email","user_password":"pw1234","user_fcm":"fcm-token","user_social_id":"","user_social_type":""}""",
+                ),
+        )
+            .andExpect(status().isCreated)
+            .andReturn()
+
+        return objectMapper.readTree(signupResponse.response.contentAsString)
+            .path("data")
+            .path("access_token")
+            .asText()
+    }
+}

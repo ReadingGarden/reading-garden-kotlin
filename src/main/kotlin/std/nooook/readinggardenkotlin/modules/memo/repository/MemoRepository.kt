@@ -12,6 +12,8 @@ interface MemoRepository : JpaRepository<MemoEntity, Int> {
 
     fun findAllByBookNo(bookNo: Int): List<MemoEntity>
 
+    fun findByIdAndUserNo(id: Int, userNo: Int): MemoEntity?
+
     fun findAllByBookNoOrderByMemoLikeDescMemoCreatedAtDesc(bookNo: Int): List<MemoEntity>
 
     @Query(
@@ -31,11 +33,6 @@ interface MemoRepository : JpaRepository<MemoEntity, Int> {
     )
     fun findAllByUserNoJoinBookOrderByMemoLikeDescMemoCreatedAtDesc(
         @Param("userNo") userNo: Int,
-        pageable: Pageable,
-    ): Page<MemoEntity>
-
-    fun findAllByUserNoOrderByMemoLikeDescMemoCreatedAtDesc(
-        userNo: Int,
         pageable: Pageable,
     ): Page<MemoEntity>
 }
