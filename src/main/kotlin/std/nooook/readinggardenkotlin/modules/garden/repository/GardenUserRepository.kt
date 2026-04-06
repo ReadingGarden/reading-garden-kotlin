@@ -8,7 +8,17 @@ interface GardenUserRepository : JpaRepository<GardenUserEntity, Int> {
 
     fun countByGardenNo(gardenNo: Int): Long
 
+    fun existsByGardenNoAndUserNo(gardenNo: Int, userNo: Int): Boolean
+
+    fun findByGardenNoAndUserNo(gardenNo: Int, userNo: Int): GardenUserEntity?
+
+    fun findFirstByUserNoAndGardenMainTrue(userNo: Int): GardenUserEntity?
+
     fun findAllByUserNo(userNo: Int): List<GardenUserEntity>
 
+    fun findAllByUserNoOrderByGardenMainDescGardenSignDateAsc(userNo: Int): List<GardenUserEntity>
+
     fun findAllByGardenNoOrderByGardenSignDateAsc(gardenNo: Int): List<GardenUserEntity>
+
+    fun findAllByGardenNoOrderByGardenLeaderDescGardenSignDateAsc(gardenNo: Int): List<GardenUserEntity>
 }
