@@ -14,8 +14,10 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import std.nooook.readinggardenkotlin.common.security.LegacyAuthenticationPrincipal
+import std.nooook.readinggardenkotlin.modules.memo.controller.MemoDetailResponse
 import std.nooook.readinggardenkotlin.modules.memo.controller.MemoListItemResponse
 import std.nooook.readinggardenkotlin.modules.memo.controller.MemoListResponse
+import std.nooook.readinggardenkotlin.modules.memo.service.MemoQueryService
 import std.nooook.readinggardenkotlin.modules.memo.service.MemoService
 
 @SpringBootTest
@@ -25,6 +27,9 @@ class MemoControllerMvcTest(
 ) {
     @MockitoBean
     private lateinit var memoService: MemoService
+
+    @MockitoBean
+    private lateinit var memoQueryService: MemoQueryService
 
     @Test
     fun `get memo should return legacy success envelope`() {
@@ -75,5 +80,43 @@ class MemoControllerMvcTest(
             .andExpect(jsonPath("$.data.list[0].id").value(9))
             .andExpect(jsonPath("$.data.list[0].book_no").value(17))
             .andExpect(jsonPath("$.data.list[0].image_url").value(""))
+    }
+
+    @Test
+    fun `get memo detail should return legacy success envelope`() {
+        given(memoQueryService.getMemoDetail(userNo = 1, id = 9))
+            .willReturn(
+                MemoDetailResponse(
+                    id = 9,
+                    book_no = 17,
+                    book_title = "책 제목",
+                    book_author = "저자",
+                    book_publisher = "출판사",
+                    book_info = "책 소개",
+                    memo_content = "메모 내용",
+                    image_url = "https://example.com/memo.jpg",
+                    memo_created_at = "2026-04-06T12:00:00",
+                ),
+            )
+
+        mockMvc.perform(
+            get("/api/v1/memo/detail")
+                .with(
+                    authentication(
+                        UsernamePasswordAuthenticationToken(
+                            LegacyAuthenticationPrincipal(1, "테스터"),
+                            null,
+                            listOf(SimpleGrantedAuthority("ROLE_USER")),
+                        ),
+                    ),
+                )
+                .queryParam("id", "9"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("메모 상세 조회 성공"))
+            .andExpect(jsonPath("$.data.id").value(9))
+            .andExpect(jsonPath("$.data.book_no").value(17))
+            .andExpect(jsonPath("$.data.image_url").value("https://example.com/memo.jpg"))
     }
 }
