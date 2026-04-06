@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -16,6 +17,7 @@ import std.nooook.readinggardenkotlin.common.api.LegacyResponses
 import std.nooook.readinggardenkotlin.common.security.LegacyAuthenticationPrincipal
 import std.nooook.readinggardenkotlin.modules.book.service.BookCommandService
 import std.nooook.readinggardenkotlin.modules.book.service.BookQueryService
+import std.nooook.readinggardenkotlin.modules.book.service.BookReadService
 import std.nooook.readinggardenkotlin.modules.book.service.BookService
 
 @RequestMapping("/api/v1/book")
@@ -24,6 +26,7 @@ class BookController(
     private val bookService: BookService,
     private val bookQueryService: BookQueryService,
     private val bookCommandService: BookCommandService,
+    private val bookReadService: BookReadService,
 ) {
     @GetMapping("", "/")
     fun checkBookDuplication(
@@ -101,6 +104,49 @@ class BookController(
                 page = page,
                 pageSize = pageSize,
             ),
+        )
+
+    @GetMapping("/read")
+    fun getBookRead(
+        @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
+        @RequestParam(name = "book_no") bookNo: Int,
+    ): LegacyDataResponse<BookReadDetailResponse> =
+        LegacyDataResponse(
+            resp_code = 200,
+            resp_msg = "독서 기록 조회 성공",
+            data = bookQueryService.getBookRead(bookNo),
+        )
+
+    @PostMapping("/read")
+    fun createBookRead(
+        @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
+        @RequestBody request: CreateReadRequest,
+    ): ResponseEntity<LegacyDataResponse<CreateReadResponse>> =
+        ResponseEntity.status(HttpStatus.CREATED).body(
+            LegacyDataResponse(
+                resp_code = 201,
+                resp_msg = "책 기록 성공",
+                data = bookReadService.createRead(principal.userNo.toInt(), request),
+            ),
+        )
+
+    @PutMapping("/read")
+    fun updateBookRead(
+        @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
+        @RequestParam id: Int,
+        @RequestBody request: UpdateReadRequest,
+    ): LegacyHttpResponse =
+        LegacyResponses.ok(
+            bookReadService.updateRead(id, request),
+        )
+
+    @DeleteMapping("/read")
+    fun deleteBookRead(
+        @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
+        @RequestParam id: Int,
+    ): LegacyHttpResponse =
+        LegacyResponses.ok(
+            bookReadService.deleteRead(id),
         )
 
     @PutMapping("", "/")

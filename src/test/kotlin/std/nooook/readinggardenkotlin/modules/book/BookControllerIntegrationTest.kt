@@ -16,6 +16,7 @@ import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -30,12 +31,14 @@ import std.nooook.readinggardenkotlin.modules.book.repository.BookRepository
 import std.nooook.readinggardenkotlin.modules.garden.entity.GardenEntity
 import std.nooook.readinggardenkotlin.modules.garden.repository.GardenRepository
 import std.nooook.readinggardenkotlin.modules.garden.repository.GardenUserRepository
+import std.nooook.readinggardenkotlin.modules.memo.entity.MemoEntity
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoImageRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
 import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
 import java.time.LocalDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -424,6 +427,495 @@ class BookControllerIntegrationTest(
         assertEquals(40.0, percentByTitle.getValue("읽는중"))
         assertEquals(100.0, percentByTitle.getValue("읽음"))
         assertFalse(titles.contains("읽고싶음"))
+
+        val firstPageResponse = mockMvc.perform(
+            get("/api/v1/book/status")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("status", "3")
+                .queryParam("page", "1")
+                .queryParam("page_size", "1"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.data.list.length()").value(1))
+            .andExpect(jsonPath("$.data.list[0].book_title").value("읽는중"))
+            .andReturn()
+
+        assertEquals(
+            "읽는중",
+            objectMapper.readTree(firstPageResponse.response.contentAsString)
+                .path("data")
+                .path("list")
+                .get(0)
+                .path("book_title")
+                .asText(),
+        )
+    }
+
+    @Test
+    fun `status should keep legacy internal error for zero page percent`() {
+        val accessToken = signupAndGetAccessToken("statuszeropage@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("statuszeropage@example.com")?.userNo)
+        val bookNo = bookRepository.save(
+            BookEntity(
+                userNo = userNo,
+                bookTitle = "제로 페이지 상태 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookInfo = "소개",
+                bookStatus = 0,
+                bookPage = 0,
+            ),
+        ).bookNo ?: error("bookNo was not generated")
+        bookReadRepository.save(
+            BookReadEntity(
+                bookNo = bookNo,
+                bookCurrentPage = 1,
+                userNo = userNo,
+            ),
+        )
+
+        mockMvc.perform(
+            get("/api/v1/book/status")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("status", "0"),
+        )
+            .andExpect(status().isInternalServerError)
+            .andExpect(jsonPath("$.resp_code").value(500))
+            .andExpect(jsonPath("$.resp_msg").value("An unexpected error occurred."))
+    }
+
+    @Test
+    fun `status should keep legacy internal error for zero page size`() {
+        val accessToken = signupAndGetAccessToken("statuszeropagesize@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("statuszeropagesize@example.com")?.userNo)
+        bookRepository.save(
+            BookEntity(
+                userNo = userNo,
+                bookTitle = "페이지사이즈 제로 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookInfo = "소개",
+                bookStatus = 0,
+                bookPage = 100,
+            ),
+        )
+
+        mockMvc.perform(
+            get("/api/v1/book/status")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("status", "0")
+                .queryParam("page_size", "0"),
+        )
+            .andExpect(status().isInternalServerError)
+            .andExpect(jsonPath("$.resp_code").value(500))
+            .andExpect(jsonPath("$.resp_msg").value("An unexpected error occurred."))
+    }
+
+    @Test
+    fun `read detail should keep legacy shape and ordering`() {
+        val accessToken = signupAndGetAccessToken("readshape@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("readshape@example.com")?.userNo)
+        val gardenNo = gardenRepository.save(
+            GardenEntity(
+                gardenTitle = "읽기 가든",
+                gardenInfo = "소개",
+                gardenColor = "blue",
+            ),
+        ).gardenNo ?: error("gardenNo was not generated")
+        val bookNo = bookRepository.save(
+            BookEntity(
+                gardenNo = gardenNo,
+                userNo = userNo,
+                bookTitle = "읽기 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookInfo = "소개",
+                bookStatus = 0,
+                bookPage = 100,
+            ),
+        ).bookNo ?: error("bookNo was not generated")
+        val now = LocalDateTime.of(2026, 4, 6, 12, 0, 0)
+
+        memoRepository.save(
+            MemoEntity(
+                bookNo = bookNo,
+                memoContent = "늦은 메모",
+                memoCreatedAt = now.minusMinutes(10),
+                userNo = userNo,
+                memoLike = true,
+            ),
+        )
+        memoRepository.save(
+            MemoEntity(
+                bookNo = bookNo,
+                memoContent = "빠른 메모",
+                memoCreatedAt = now.minusHours(1),
+                userNo = userNo,
+                memoLike = true,
+            ),
+        )
+        memoRepository.save(
+            MemoEntity(
+                bookNo = bookNo,
+                memoContent = "싫어요 메모",
+                memoCreatedAt = now,
+                userNo = userNo,
+                memoLike = false,
+            ),
+        )
+
+        mockMvc.perform(
+            get("/api/v1/book/read")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("book_no", bookNo.toString()),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("독서 기록 조회 성공"))
+            .andExpect(jsonPath("$.data.book_no").doesNotExist())
+            .andExpect(jsonPath("$.data.user_no").value(userNo))
+            .andExpect(jsonPath("$.data.book_current_page").value(0))
+            .andExpect(jsonPath("$.data.percent").value(0.0))
+            .andExpect(jsonPath("$.data.book_read_list.length()").value(0))
+
+        val firstRead = bookReadRepository.save(
+            BookReadEntity(
+                bookNo = bookNo,
+                bookCurrentPage = 20,
+                bookStartDate = LocalDateTime.of(2026, 4, 6, 10, 0, 0),
+                bookEndDate = LocalDateTime.of(2026, 4, 6, 10, 30, 0),
+                createdAt = LocalDateTime.of(2026, 4, 6, 10, 0, 0),
+                userNo = userNo,
+            ),
+        )
+        bookReadRepository.save(
+            BookReadEntity(
+                bookNo = bookNo,
+                bookCurrentPage = 40,
+                bookStartDate = LocalDateTime.of(2026, 4, 6, 11, 0, 0),
+                bookEndDate = LocalDateTime.of(2026, 4, 6, 11, 30, 0),
+                createdAt = LocalDateTime.of(2026, 4, 6, 11, 0, 0),
+                userNo = userNo,
+            ),
+        )
+
+        val response = mockMvc.perform(
+            get("/api/v1/book/read")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("book_no", bookNo.toString()),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("독서 기록 조회 성공"))
+            .andExpect(jsonPath("$.data.book_no").doesNotExist())
+            .andExpect(jsonPath("$.data.user_no").value(userNo))
+            .andExpect(jsonPath("$.data.book_current_page").value(40))
+            .andExpect(jsonPath("$.data.percent").value(40.0))
+            .andExpect(jsonPath("$.data.book_read_list.length()").value(2))
+            .andExpect(jsonPath("$.data.book_read_list[0].created_ad").value("2026-04-06T11:00:00"))
+            .andExpect(jsonPath("$.data.book_read_list[0].book_start_date").value("2026-04-06T11:00:00"))
+            .andExpect(jsonPath("$.data.book_read_list[0].book_end_date").value("2026-04-06T11:30:00"))
+            .andExpect(jsonPath("$.data.book_read_list[0].created_at").doesNotExist())
+            .andExpect(jsonPath("$.data.book_read_list[0].book_read_no").doesNotExist())
+            .andExpect(jsonPath("$.data.book_read_list[0].book_current_page").value(40))
+            .andExpect(jsonPath("$.data.book_read_list[1].book_current_page").value(20))
+            .andExpect(jsonPath("$.data.memo_list[0].memo_content").value("늦은 메모"))
+            .andExpect(jsonPath("$.data.memo_list[0].memo_created_at").value("2026-04-06T11:50:00"))
+            .andExpect(jsonPath("$.data.memo_list[0].book_no").doesNotExist())
+            .andExpect(jsonPath("$.data.memo_list[0].book_title").doesNotExist())
+            .andExpect(jsonPath("$.data.memo_list[0].image_url").doesNotExist())
+            .andExpect(jsonPath("$.data.memo_list[1].memo_content").value("빠른 메모"))
+            .andExpect(jsonPath("$.data.memo_list[1].memo_created_at").value("2026-04-06T11:00:00"))
+            .andExpect(jsonPath("$.data.memo_list[2].memo_content").value("싫어요 메모"))
+            .andExpect(jsonPath("$.data.memo_list[2].memo_created_at").value("2026-04-06T12:00:00"))
+            .andReturn()
+
+        val body = objectMapper.readTree(response.response.contentAsString).path("data")
+        assertEquals(40.0, body.path("percent").asDouble())
+        assertEquals("늦은 메모", body.path("memo_list").get(0).path("memo_content").asText())
+        assertEquals("2026-04-06T11:50:00", body.path("memo_list").get(0).path("memo_created_at").asText())
+        assertEquals("빠른 메모", body.path("memo_list").get(1).path("memo_content").asText())
+        assertEquals("2026-04-06T11:00:00", body.path("memo_list").get(1).path("memo_created_at").asText())
+        assertEquals("싫어요 메모", body.path("memo_list").get(2).path("memo_content").asText())
+        assertEquals("2026-04-06T12:00:00", body.path("memo_list").get(2).path("memo_created_at").asText())
+        assertNotNull(firstRead.id)
+    }
+
+    @Test
+    fun `read detail should return bad request when garden is missing`() {
+        val accessToken = signupAndGetAccessToken("readnogarden1@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("readnogarden1@example.com")?.userNo)
+        val bookNo = bookRepository.save(
+            BookEntity(
+                gardenNo = null,
+                userNo = userNo,
+                bookTitle = "가든 없는 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookInfo = "소개",
+                bookStatus = 0,
+                bookPage = 100,
+            ),
+        ).bookNo ?: error("bookNo was not generated")
+
+        mockMvc.perform(
+            get("/api/v1/book/read")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("book_no", bookNo.toString()),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("일치하는 책 정보가 없습니다."))
+    }
+
+    @Test
+    fun `read detail should return bad request when linked garden is deleted`() {
+        val accessToken = signupAndGetAccessToken("readmissing1@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("readmissing1@example.com")?.userNo)
+        val gardenNo = gardenRepository.save(
+            GardenEntity(
+                gardenTitle = "임시 가든",
+                gardenInfo = "소개",
+                gardenColor = "green",
+            ),
+        ).gardenNo ?: error("gardenNo was not generated")
+        val bookNo = bookRepository.save(
+            BookEntity(
+                gardenNo = gardenNo,
+                userNo = userNo,
+                bookTitle = "가든 삭제 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookInfo = "소개",
+                bookStatus = 0,
+                bookPage = 100,
+            ),
+        ).bookNo ?: error("bookNo was not generated")
+        gardenRepository.deleteById(gardenNo)
+
+        mockMvc.perform(
+            get("/api/v1/book/read")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("book_no", bookNo.toString()),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("일치하는 책 정보가 없습니다."))
+    }
+
+    @Test
+    fun `read detail should keep legacy internal error for zero page percent`() {
+        val accessToken = signupAndGetAccessToken("readzeropage@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("readzeropage@example.com")?.userNo)
+        val gardenNo = gardenRepository.save(
+            GardenEntity(
+                gardenTitle = "제로 페이지 가든",
+                gardenInfo = "소개",
+                gardenColor = "yellow",
+            ),
+        ).gardenNo ?: error("gardenNo was not generated")
+        val bookNo = bookRepository.save(
+            BookEntity(
+                gardenNo = gardenNo,
+                userNo = userNo,
+                bookTitle = "제로 페이지 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookInfo = "소개",
+                bookStatus = 0,
+                bookPage = 0,
+            ),
+        ).bookNo ?: error("bookNo was not generated")
+        bookReadRepository.save(
+            BookReadEntity(
+                bookNo = bookNo,
+                bookCurrentPage = 1,
+                userNo = userNo,
+            ),
+        )
+
+        mockMvc.perform(
+            get("/api/v1/book/read")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("book_no", bookNo.toString()),
+        )
+            .andExpect(status().isInternalServerError)
+            .andExpect(jsonPath("$.resp_code").value(500))
+            .andExpect(jsonPath("$.resp_msg").value("An unexpected error occurred."))
+    }
+
+    @Test
+    fun `create read should transition book status on first and final page`() {
+        val accessToken = signupAndGetAccessToken("readstatus@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("readstatus@example.com")?.userNo)
+        val bookNo = bookRepository.save(
+            BookEntity(
+                userNo = userNo,
+                bookTitle = "상태 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookInfo = "소개",
+                bookStatus = 2,
+                bookPage = 100,
+            ),
+        ).bookNo ?: error("bookNo was not generated")
+
+        mockMvc.perform(
+            post("/api/v1/book/read")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"book_no":$bookNo,"book_current_page":20}"""),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.resp_code").value(201))
+            .andExpect(jsonPath("$.resp_msg").value("책 기록 성공"))
+            .andExpect(jsonPath("$.data.book_current_page").value(20))
+            .andExpect(jsonPath("$.data.percent").value(20.0))
+            .andExpect(jsonPath("$.data.id").doesNotExist())
+            .andExpect(jsonPath("$.data.book_read_no").doesNotExist())
+
+        val firstRead = checkNotNull(bookReadRepository.findAllByBookNoOrderByCreatedAtDesc(bookNo).firstOrNull())
+        assertNotNull(firstRead.bookStartDate)
+        assertEquals(0, checkNotNull(bookRepository.findById(bookNo).orElse(null)).bookStatus)
+
+        mockMvc.perform(
+            post("/api/v1/book/read")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"book_no":$bookNo,"book_current_page":30}"""),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.resp_code").value(201))
+            .andExpect(jsonPath("$.resp_msg").value("책 기록 성공"))
+            .andExpect(jsonPath("$.data.book_current_page").value(30))
+            .andExpect(jsonPath("$.data.percent").value(30.0))
+            .andExpect(jsonPath("$.data.id").doesNotExist())
+            .andExpect(jsonPath("$.data.book_read_no").doesNotExist())
+
+        val secondRead = checkNotNull(bookReadRepository.findAllByBookNoOrderByCreatedAtDesc(bookNo).firstOrNull())
+        assertEquals(30, secondRead.bookCurrentPage)
+        assertEquals(null, secondRead.bookStartDate)
+        assertEquals(0, checkNotNull(bookRepository.findById(bookNo).orElse(null)).bookStatus)
+
+        mockMvc.perform(
+            post("/api/v1/book/read")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"book_no":$bookNo,"book_current_page":100}"""),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.resp_code").value(201))
+            .andExpect(jsonPath("$.resp_msg").value("책 기록 성공"))
+            .andExpect(jsonPath("$.data.book_current_page").value(100))
+            .andExpect(jsonPath("$.data.percent").value(100.0))
+            .andExpect(jsonPath("$.data.id").doesNotExist())
+            .andExpect(jsonPath("$.data.book_read_no").doesNotExist())
+
+        val reads = bookReadRepository.findAllByBookNoOrderByCreatedAtDesc(bookNo)
+        val latestRead = checkNotNull(reads.firstOrNull())
+        assertEquals(null, latestRead.bookStartDate)
+        assertNotNull(latestRead.bookEndDate)
+        assertEquals(1, checkNotNull(bookRepository.findById(bookNo).orElse(null)).bookStatus)
+
+        mockMvc.perform(
+            post("/api/v1/book/read")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"book_no":$bookNo,"book_current_page":40}"""),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.resp_code").value(201))
+            .andExpect(jsonPath("$.resp_msg").value("책 기록 성공"))
+            .andExpect(jsonPath("$.data.book_current_page").value(40))
+            .andExpect(jsonPath("$.data.percent").value(40.0))
+            .andExpect(jsonPath("$.data.id").doesNotExist())
+            .andExpect(jsonPath("$.data.book_read_no").doesNotExist())
+
+        val latestAfterRegression = checkNotNull(bookReadRepository.findAllByBookNoOrderByCreatedAtDesc(bookNo).firstOrNull())
+        assertEquals(40, latestAfterRegression.bookCurrentPage)
+        assertEquals(null, latestAfterRegression.bookStartDate)
+        assertEquals(1, checkNotNull(bookRepository.findById(bookNo).orElse(null)).bookStatus)
+    }
+
+    @Test
+    fun `update and delete read should use id without ownership guard`() {
+        val accessToken = signupAndGetAccessToken("readmutate@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("readmutate@example.com")?.userNo)
+        val bookNo = bookRepository.save(
+            BookEntity(
+                userNo = userNo,
+                bookTitle = "수정 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookInfo = "소개",
+                bookStatus = 0,
+                bookPage = 100,
+            ),
+        ).bookNo ?: error("bookNo was not generated")
+        val readId = bookReadRepository.save(
+            BookReadEntity(
+                bookNo = bookNo,
+                bookCurrentPage = 10,
+                userNo = userNo,
+            ),
+        ).id ?: error("read id was not generated")
+
+        mockMvc.perform(
+            put("/api/v1/book/read")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("id", readId.toString())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"book_start_date":"2026-04-06T11:00:00","book_end_date":"2026-04-06T12:00:00"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("독서 기록 수정 성공"))
+
+        val updatedRead = checkNotNull(bookReadRepository.findById(readId).orElse(null))
+        assertEquals(LocalDateTime.of(2026, 4, 6, 11, 0, 0), updatedRead.bookStartDate)
+        assertEquals(LocalDateTime.of(2026, 4, 6, 12, 0, 0), updatedRead.bookEndDate)
+
+        mockMvc.perform(
+            delete("/api/v1/book/read")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("id", readId.toString()),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("책 기록 삭제 성공"))
+
+        assertFalse(bookReadRepository.findById(readId).isPresent)
+    }
+
+    @Test
+    fun `update read should return legacy bad request when id is missing`() {
+        val accessToken = signupAndGetAccessToken("readupmissing@example.com")
+
+        mockMvc.perform(
+            put("/api/v1/book/read")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("id", "999999")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"book_start_date":"2026-04-06T11:00:00"}"""),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("일치하는 책 기록이 없습니다."))
+    }
+
+    @Test
+    fun `delete read should return legacy bad request when id is missing`() {
+        val accessToken = signupAndGetAccessToken("readdelmissing@example.com")
+
+        mockMvc.perform(
+            delete("/api/v1/book/read")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("id", "999999"),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("일치하는 책 기록이 없습니다."))
     }
 
     private fun signupAndGetAccessToken(email: String): String {

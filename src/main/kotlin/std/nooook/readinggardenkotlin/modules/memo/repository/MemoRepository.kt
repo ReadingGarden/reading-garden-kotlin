@@ -12,6 +12,8 @@ interface MemoRepository : JpaRepository<MemoEntity, Int> {
 
     fun findAllByBookNo(bookNo: Int): List<MemoEntity>
 
+    fun findAllByBookNoOrderByMemoLikeDescMemoCreatedAtDesc(bookNo: Int): List<MemoEntity>
+
     @Query(
         value = """
             select memo
