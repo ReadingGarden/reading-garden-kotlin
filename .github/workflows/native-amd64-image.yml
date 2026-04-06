@@ -81,6 +81,8 @@ jobs:
         run: |
           ssh -p "$EC2_PORT" "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" "mkdir -p '$REMOTE_APP_DIR'"
           scp -P "$EC2_PORT" deploy/docker-compose.ec2.yml "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:$REMOTE_APP_DIR/docker-compose.yml"
+          scp -P "$EC2_PORT" deploy/cutover-smoke-check.sh "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:$REMOTE_APP_DIR/cutover-smoke-check.sh"
+          ssh -p "$EC2_PORT" "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" "chmod +x '$REMOTE_APP_DIR/cutover-smoke-check.sh'"
 
       - name: Deploy container on EC2
         run: |
@@ -89,9 +91,20 @@ jobs:
           cd "$REMOTE_APP_DIR"
           test -f .env
           test -f secrets/firebase-service-account.json
+          PREVIOUS_IMAGE=""
+          if docker ps -a --format '{{.Names}}' | grep -qx 'reading-garden'; then
+            PREVIOUS_IMAGE="$(docker inspect --format='{{.Config.Image}}' reading-garden)"
+          fi
           export IMAGE_REF="$IMAGE_REF"
           export APP_PORT="$APP_PORT"
           docker compose -f docker-compose.yml pull
           docker compose -f docker-compose.yml up -d
+          if ! TIMEOUT_SECONDS=90 ./cutover-smoke-check.sh "http://127.0.0.1:${APP_PORT}"; then
+            if [ -n "$PREVIOUS_IMAGE" ]; then
+              export IMAGE_REF="$PREVIOUS_IMAGE"
+              docker compose -f docker-compose.yml up -d
+            fi
+            exit 1
+          fi
           docker image prune -f
           EOF
