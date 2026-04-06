@@ -197,6 +197,29 @@ class MemoControllerMvcTest(
     }
 
     @Test
+    fun `update memo should return bad request when id query parameter is missing`() {
+        mockMvc.perform(
+            put("/api/v1/memo/")
+                .with(
+                    authentication(
+                        UsernamePasswordAuthenticationToken(
+                            LegacyAuthenticationPrincipal(1, "테스터"),
+                            null,
+                            listOf(SimpleGrantedAuthority("ROLE_USER")),
+                        ),
+                    ),
+                )
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"book_no":17,"memo_content":"수정된 메모"}"""),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("Required parameter 'id' is not present."))
+            .andExpect(jsonPath("$.errors[0].parameter").value("id"))
+            .andExpect(jsonPath("$.errors[0].expectedType").value("int"))
+    }
+
+    @Test
     fun `delete memo should return legacy success envelope`() {
         given(memoCommandService.deleteMemo(userNo = 1, id = 9))
             .willReturn("메모 삭제 성공")
@@ -220,6 +243,27 @@ class MemoControllerMvcTest(
     }
 
     @Test
+    fun `delete memo should return bad request when id query parameter is missing`() {
+        mockMvc.perform(
+            delete("/api/v1/memo/")
+                .with(
+                    authentication(
+                        UsernamePasswordAuthenticationToken(
+                            LegacyAuthenticationPrincipal(1, "테스터"),
+                            null,
+                            listOf(SimpleGrantedAuthority("ROLE_USER")),
+                        ),
+                    ),
+                ),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("Required parameter 'id' is not present."))
+            .andExpect(jsonPath("$.errors[0].parameter").value("id"))
+            .andExpect(jsonPath("$.errors[0].expectedType").value("int"))
+    }
+
+    @Test
     fun `like memo should return legacy success envelope`() {
         given(memoCommandService.toggleMemoLike(userNo = 1, id = 9))
             .willReturn("메모 즐겨찾기 추가/해제")
@@ -240,5 +284,26 @@ class MemoControllerMvcTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.resp_code").value(200))
             .andExpect(jsonPath("$.resp_msg").value("메모 즐겨찾기 추가/해제"))
+    }
+
+    @Test
+    fun `like memo should return bad request when id query parameter is missing`() {
+        mockMvc.perform(
+            put("/api/v1/memo/like")
+                .with(
+                    authentication(
+                        UsernamePasswordAuthenticationToken(
+                            LegacyAuthenticationPrincipal(1, "테스터"),
+                            null,
+                            listOf(SimpleGrantedAuthority("ROLE_USER")),
+                        ),
+                    ),
+                ),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("Required parameter 'id' is not present."))
+            .andExpect(jsonPath("$.errors[0].parameter").value("id"))
+            .andExpect(jsonPath("$.errors[0].expectedType").value("int"))
     }
 }
