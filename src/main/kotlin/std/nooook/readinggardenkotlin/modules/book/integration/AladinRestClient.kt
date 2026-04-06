@@ -3,29 +3,43 @@ package std.nooook.readinggardenkotlin.modules.book.integration
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.json.JsonMapper
+import org.springframework.beans.factory.InitializingBean
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.MediaType
+import org.springframework.http.client.JdkClientHttpRequestFactory
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import org.springframework.web.util.UriComponentsBuilder
+import java.net.http.HttpClient
+import java.time.Duration
 
 @Component
 class AladinRestClient(
     @Value("\${app.integrations.aladin-ttbkey:}")
     private val aladinTtbKey: String,
-) : AladinClient {
-    private val restClient: RestClient = RestClient.builder().build()
+) : AladinClient, InitializingBean {
+    private val restClient: RestClient = RestClient.builder()
+        .requestFactory(
+            JdkClientHttpRequestFactory(
+                HttpClient.newBuilder()
+                    .connectTimeout(CONNECT_TIMEOUT)
+                    .build(),
+            ).apply {
+                setReadTimeout(READ_TIMEOUT)
+            },
+        )
+        .build()
     private val objectMapper: ObjectMapper = JsonMapper.builder().findAndAddModules().build()
+
+    override fun afterPropertiesSet() {
+        require(aladinTtbKey.isNotBlank()) { "app.integrations.aladin-ttbkey must not be blank" }
+    }
 
     override fun searchBooks(
         query: String,
         start: Int,
         maxResults: Int,
     ): Map<String, Any?> {
-        if (aladinTtbKey.isBlank()) {
-            return emptySearchResponse(query, start, maxResults)
-        }
-
         val uri = UriComponentsBuilder
             .fromUriString(ALADIN_ITEM_SEARCH_URL)
             .queryParam("ttbkey", aladinTtbKey)
@@ -45,24 +59,14 @@ class AladinRestClient(
             .accept(MediaType.APPLICATION_JSON)
             .retrieve()
             .body(String::class.java)
-            ?: return emptySearchResponse(query, start, maxResults)
+            ?: return emptyMap()
 
         return objectMapper.readValue(body, object : TypeReference<Map<String, Any?>>() {})
     }
 
-    private fun emptySearchResponse(
-        query: String,
-        start: Int,
-        maxResults: Int,
-    ): Map<String, Any?> =
-        mapOf(
-            "query" to query,
-            "startIndex" to start,
-            "itemsPerPage" to maxResults,
-            "item" to emptyList<Map<String, Any?>>(),
-        )
-
     companion object {
         private const val ALADIN_ITEM_SEARCH_URL = "http://www.aladin.co.kr/ttb/api/ItemSearch.aspx"
+        private val CONNECT_TIMEOUT: Duration = Duration.ofSeconds(3)
+        private val READ_TIMEOUT: Duration = Duration.ofSeconds(5)
     }
 }
