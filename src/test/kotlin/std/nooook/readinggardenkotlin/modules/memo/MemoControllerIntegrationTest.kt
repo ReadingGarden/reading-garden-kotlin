@@ -58,6 +58,17 @@ class MemoControllerIntegrationTest(
     }
 
     @Test
+    fun `get memo detail should require authentication`() {
+        mockMvc.perform(
+            get("/api/v1/memo/detail")
+                .queryParam("id", "1"),
+        )
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.resp_code").value(401))
+            .andExpect(jsonPath("$.resp_msg").value("Unauthorized"))
+    }
+
+    @Test
     fun `get memo should return current user's memos with legacy paging and ordering`() {
         val accessToken = signupAndGetAccessToken("memolist@example.com")
         val userNo = checkNotNull(userRepository.findByUserEmail("memolist@example.com")?.userNo)
@@ -245,6 +256,28 @@ class MemoControllerIntegrationTest(
             ),
         )
         val memoNo = checkNotNull(memo.id)
+
+        val otherBook = bookRepository.save(
+            BookEntity(
+                bookTitle = "다른 책",
+                bookAuthor = "다른 저자",
+                bookPublisher = "다른 출판사",
+                bookStatus = 1,
+                userNo = userNo,
+                bookPage = 456,
+                bookImageUrl = "https://example.com/book-other.jpg",
+                bookInfo = "다른 책 소개",
+            ),
+        )
+        memoRepository.save(
+            MemoEntity(
+                bookNo = checkNotNull(otherBook.bookNo),
+                memoContent = "다른 메모",
+                memoCreatedAt = now.minusDays(1),
+                userNo = userNo,
+                memoLike = false,
+            ),
+        )
 
         memoImageRepository.save(
             MemoImageEntity(
