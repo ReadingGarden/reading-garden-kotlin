@@ -303,6 +303,25 @@ class MemoControllerMvcTest(
     }
 
     @Test
+    fun `upload memo image should require authentication`() {
+        val file = MockMultipartFile(
+            "file",
+            "memo.png",
+            MediaType.IMAGE_PNG_VALUE,
+            "image-bytes".toByteArray(),
+        )
+
+        mockMvc.perform(
+            multipart("/api/v1/memo/image")
+                .file(file)
+                .param("id", "9"),
+        )
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.resp_code").value(401))
+            .andExpect(jsonPath("$.resp_msg").value("Unauthorized"))
+    }
+
+    @Test
     fun `upload memo image should return bad request when id query parameter is missing`() {
         val file = MockMultipartFile(
             "file",
@@ -353,6 +372,17 @@ class MemoControllerMvcTest(
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.resp_code").value(201))
             .andExpect(jsonPath("$.resp_msg").value("이미지 삭제 성공"))
+    }
+
+    @Test
+    fun `delete memo image should require authentication`() {
+        mockMvc.perform(
+            delete("/api/v1/memo/image")
+                .queryParam("id", "9"),
+        )
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.resp_code").value(401))
+            .andExpect(jsonPath("$.resp_msg").value("Unauthorized"))
     }
 
     @Test
