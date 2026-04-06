@@ -1,20 +1,31 @@
 package std.nooook.readinggardenkotlin.modules.book.service
 
 import jakarta.transaction.Transactional
+import java.nio.file.NoSuchFileException
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
+import std.nooook.readinggardenkotlin.common.storage.ImageStorage
 import std.nooook.readinggardenkotlin.modules.book.controller.CreateBookRequest
 import std.nooook.readinggardenkotlin.modules.book.controller.CreateBookResponse
 import std.nooook.readinggardenkotlin.modules.book.controller.UpdateBookRequest
 import std.nooook.readinggardenkotlin.modules.book.entity.BookEntity
+import std.nooook.readinggardenkotlin.modules.book.repository.BookImageRepository
+import std.nooook.readinggardenkotlin.modules.book.repository.BookReadRepository
 import std.nooook.readinggardenkotlin.modules.book.repository.BookRepository
 import std.nooook.readinggardenkotlin.modules.garden.repository.GardenRepository
+import std.nooook.readinggardenkotlin.modules.memo.repository.MemoImageRepository
+import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
 
 @Service
 class BookCommandService(
     private val bookRepository: BookRepository,
     private val gardenRepository: GardenRepository,
+    private val bookReadRepository: BookReadRepository,
+    private val bookImageRepository: BookImageRepository,
+    private val memoRepository: MemoRepository,
+    private val memoImageRepository: MemoImageRepository,
+    private val imageStorage: ImageStorage,
 ) {
     @Transactional
     fun createBook(
@@ -75,6 +86,43 @@ class BookCommandService(
         request.book_status?.let { book.bookStatus = it }
         bookRepository.save(book)
         return "책 수정 성공"
+    }
+
+    @Transactional
+    fun deleteBook(
+        userNo: Int,
+        bookNo: Int,
+    ): String {
+        val book = bookRepository.findByBookNoAndUserNo(bookNo, userNo)
+            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 책 정보가 없습니다.")
+
+        bookReadRepository.deleteAllByBookNo(bookNo)
+
+        bookImageRepository.findAllByBookNo(bookNo).forEach { image ->
+            deleteStoredImageIgnoringMissing(image.imageUrl)
+            bookImageRepository.delete(image)
+        }
+
+        val memos = memoRepository.findAllByBookNo(bookNo)
+        val memoIds = memos.mapNotNull { it.id }
+        if (memoIds.isNotEmpty()) {
+            memoImageRepository.findAllByMemoNoIn(memoIds).forEach { memoImage ->
+                deleteStoredImageIgnoringMissing(memoImage.imageUrl)
+                memoImageRepository.delete(memoImage)
+            }
+        }
+        memos.forEach { memoRepository.delete(it) }
+
+        bookRepository.delete(book)
+        return "책 삭제 성공"
+    }
+
+    private fun deleteStoredImageIgnoringMissing(relativePath: String) {
+        try {
+            imageStorage.delete(relativePath)
+        } catch (_: NoSuchFileException) {
+            // Legacy delete ignores missing files during cascade cleanup.
+        }
     }
 
     companion object {

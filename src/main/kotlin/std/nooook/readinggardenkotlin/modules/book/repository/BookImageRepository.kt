@@ -6,5 +6,7 @@ import std.nooook.readinggardenkotlin.modules.book.entity.BookImageEntity
 interface BookImageRepository : JpaRepository<BookImageEntity, Int> {
     fun deleteByBookNo(bookNo: Int)
 
+    fun findAllByBookNo(bookNo: Int): List<BookImageEntity>
+
     fun findByBookNo(bookNo: Int): BookImageEntity?
 }
