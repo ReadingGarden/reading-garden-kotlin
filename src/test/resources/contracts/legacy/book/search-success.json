@@ -1,0 +1,18 @@
+{
+  "resp_code": 200,
+  "resp_msg": "책 검색 성공",
+  "data": {
+    "query": "클린 코드",
+    "startIndex": 1,
+    "itemsPerPage": 100,
+    "item": [
+      {
+        "title": "클린 코드 결과",
+        "author": "로버트 C. 마틴",
+        "isbn13": "9780132350884",
+        "cover": "https://example.com/cover.jpg",
+        "publisher": "프래그마틱"
+      }
+    ]
+  }
+}
