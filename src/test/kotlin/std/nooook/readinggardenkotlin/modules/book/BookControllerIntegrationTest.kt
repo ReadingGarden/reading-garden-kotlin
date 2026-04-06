@@ -13,7 +13,9 @@ import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
+import org.springframework.mock.web.MockMultipartFile
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
@@ -35,10 +37,17 @@ import std.nooook.readinggardenkotlin.modules.memo.entity.MemoEntity
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoImageRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
 import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.Comparator
 import java.time.LocalDateTime
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+import org.springframework.test.context.DynamicPropertyRegistry
+import org.springframework.test.context.DynamicPropertySource
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -59,8 +68,19 @@ class BookControllerIntegrationTest(
 ) {
     private val objectMapper: ObjectMapper = JsonMapper.builder().findAndAddModules().build()
 
+    companion object {
+        private val imagesRoot: Path = Files.createTempDirectory("reading-garden-images")
+
+        @JvmStatic
+        @DynamicPropertySource
+        fun registerStorageProperties(registry: DynamicPropertyRegistry) {
+            registry.add("app.storage.images-root") { imagesRoot.toString() }
+        }
+    }
+
     @BeforeEach
     fun setUp() {
+        cleanImagesRoot()
         memoImageRepository.deleteAll()
         memoRepository.deleteAll()
         bookImageRepository.deleteAll()
@@ -92,6 +112,20 @@ class BookControllerIntegrationTest(
                 ),
             ),
         )
+    }
+
+    private fun cleanImagesRoot() {
+        if (!Files.exists(imagesRoot)) {
+            Files.createDirectories(imagesRoot)
+            return
+        }
+
+        Files.walk(imagesRoot).use { paths ->
+            paths
+                .sorted(Comparator.reverseOrder())
+                .filter { it != imagesRoot }
+                .forEach { Files.deleteIfExists(it) }
+        }
     }
 
     @Test
@@ -916,6 +950,221 @@ class BookControllerIntegrationTest(
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.resp_code").value(400))
             .andExpect(jsonPath("$.resp_msg").value("일치하는 책 기록이 없습니다."))
+    }
+
+    @Test
+    fun `upload image should persist file and serve it publicly`() {
+        val accessToken = signupAndGetAccessToken("bookimageupload@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("bookimageupload@example.com")?.userNo)
+        val bookNo = bookRepository.save(
+            BookEntity(
+                userNo = userNo,
+                bookTitle = "이미지 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookInfo = "소개",
+                bookStatus = 0,
+                bookPage = 100,
+            ),
+        ).bookNo ?: error("bookNo was not generated")
+        val file = MockMultipartFile(
+            "file",
+            "cover.png",
+            MediaType.IMAGE_PNG_VALUE,
+            "image-bytes".toByteArray(),
+        )
+
+        mockMvc.perform(
+            multipart("/api/v1/book/image")
+                .file(file)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .param("book_no", bookNo.toString()),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.resp_code").value(201))
+            .andExpect(jsonPath("$.resp_msg").value("이미지 업로드 성공"))
+
+        val image = checkNotNull(bookImageRepository.findByBookNo(bookNo))
+        val storedPath = imagesRoot.resolve(image.imageUrl)
+        assertTrue(Files.exists(storedPath))
+        assertTrue(image.imageUrl.startsWith("book/"))
+
+        val imageResponse = mockMvc.perform(
+            get("/images/${image.imageUrl}"),
+        )
+            .andExpect(status().isOk)
+            .andReturn()
+
+        assertContentEquals(
+            "image-bytes".toByteArray(),
+            imageResponse.response.contentAsByteArray,
+        )
+    }
+
+    @Test
+    fun `upload image should replace existing file and keep one row`() {
+        val accessToken = signupAndGetAccessToken("bookimagereplace@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("bookimagereplace@example.com")?.userNo)
+        val bookNo = bookRepository.save(
+            BookEntity(
+                userNo = userNo,
+                bookTitle = "교체 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookInfo = "소개",
+                bookStatus = 0,
+                bookPage = 100,
+            ),
+        ).bookNo ?: error("bookNo was not generated")
+        val firstFile = MockMultipartFile(
+            "file",
+            "first.png",
+            MediaType.IMAGE_PNG_VALUE,
+            "first-image".toByteArray(),
+        )
+        val secondFile = MockMultipartFile(
+            "file",
+            "second.png",
+            MediaType.IMAGE_PNG_VALUE,
+            "second-image".toByteArray(),
+        )
+
+        mockMvc.perform(
+            multipart("/api/v1/book/image")
+                .file(firstFile)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .param("book_no", bookNo.toString()),
+        )
+            .andExpect(status().isCreated)
+
+        val firstImage = checkNotNull(bookImageRepository.findByBookNo(bookNo))
+        val firstStoredPath = imagesRoot.resolve(firstImage.imageUrl)
+        assertTrue(Files.exists(firstStoredPath))
+
+        mockMvc.perform(
+            multipart("/api/v1/book/image")
+                .file(secondFile)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .param("book_no", bookNo.toString()),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.resp_msg").value("이미지 업로드 성공"))
+
+        val replacedImage = checkNotNull(bookImageRepository.findByBookNo(bookNo))
+        val replacedStoredPath = imagesRoot.resolve(replacedImage.imageUrl)
+        assertFalse(Files.exists(firstStoredPath))
+        assertTrue(Files.exists(replacedStoredPath))
+        assertEquals(1, bookImageRepository.count())
+        assertFalse(firstImage.imageUrl == replacedImage.imageUrl)
+    }
+
+    @Test
+    fun `upload image should reject files over five megabytes`() {
+        val accessToken = signupAndGetAccessToken("bookimageoversize@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("bookimageoversize@example.com")?.userNo)
+        val bookNo = bookRepository.save(
+            BookEntity(
+                userNo = userNo,
+                bookTitle = "큰 이미지 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookInfo = "소개",
+                bookStatus = 0,
+                bookPage = 100,
+            ),
+        ).bookNo ?: error("bookNo was not generated")
+        val oversizedBytes = ByteArray(5 * 1024 * 1024 + 1)
+        val file = MockMultipartFile(
+            "file",
+            "too-big.png",
+            MediaType.IMAGE_PNG_VALUE,
+            oversizedBytes,
+        )
+
+        mockMvc.perform(
+            multipart("/api/v1/book/image")
+                .file(file)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .param("book_no", bookNo.toString()),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("이미지 용량은 5MB를 초과할 수 없습니다."))
+
+        assertTrue(bookImageRepository.findByBookNo(bookNo) == null)
+    }
+
+    @Test
+    fun `delete image should remove file and record`() {
+        val accessToken = signupAndGetAccessToken("bookimagedelete@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("bookimagedelete@example.com")?.userNo)
+        val bookNo = bookRepository.save(
+            BookEntity(
+                userNo = userNo,
+                bookTitle = "삭제 이미지 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookInfo = "소개",
+                bookStatus = 0,
+                bookPage = 100,
+            ),
+        ).bookNo ?: error("bookNo was not generated")
+        val file = MockMultipartFile(
+            "file",
+            "delete.png",
+            MediaType.IMAGE_PNG_VALUE,
+            "delete-image".toByteArray(),
+        )
+
+        mockMvc.perform(
+            multipart("/api/v1/book/image")
+                .file(file)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .param("book_no", bookNo.toString()),
+        )
+            .andExpect(status().isCreated)
+
+        val storedImage = checkNotNull(bookImageRepository.findByBookNo(bookNo))
+        val storedPath = imagesRoot.resolve(storedImage.imageUrl)
+        assertTrue(Files.exists(storedPath))
+
+        mockMvc.perform(
+            delete("/api/v1/book/image")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("book_no", bookNo.toString()),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.resp_code").value(201))
+            .andExpect(jsonPath("$.resp_msg").value("이미지 삭제 성공"))
+
+        assertTrue(bookImageRepository.findByBookNo(bookNo) == null)
+        assertFalse(Files.exists(storedPath))
+    }
+
+    @Test
+    fun `delete image should return bad request when missing`() {
+        val accessToken = signupAndGetAccessToken("bookimagemissing@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("bookimagemissing@example.com")?.userNo)
+        val bookNo = bookRepository.save(
+            BookEntity(
+                userNo = userNo,
+                bookTitle = "이미지 없는 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookInfo = "소개",
+                bookStatus = 0,
+                bookPage = 100,
+            ),
+        ).bookNo ?: error("bookNo was not generated")
+
+        mockMvc.perform(
+            delete("/api/v1/book/image")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("book_no", bookNo.toString()),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(jsonPath("$.resp_msg").value("일치하는 이미지가 없습니다."))
     }
 
     private fun signupAndGetAccessToken(email: String): String {
