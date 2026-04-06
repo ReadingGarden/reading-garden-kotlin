@@ -5,17 +5,27 @@ import org.mockito.BDDMockito.given
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import std.nooook.readinggardenkotlin.common.security.LegacyAuthenticationPrincipal
 import std.nooook.readinggardenkotlin.modules.book.controller.BookDetailResponse
+import std.nooook.readinggardenkotlin.modules.book.controller.BookStatusItemResponse
+import std.nooook.readinggardenkotlin.modules.book.controller.BookStatusResponse
+import std.nooook.readinggardenkotlin.modules.book.controller.CreateBookRequest
+import std.nooook.readinggardenkotlin.modules.book.controller.CreateBookResponse
+import std.nooook.readinggardenkotlin.modules.book.service.BookCommandService
+import std.nooook.readinggardenkotlin.modules.book.service.BookQueryService
 import std.nooook.readinggardenkotlin.modules.book.service.BookService
+import org.springframework.web.server.ResponseStatusException
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -24,6 +34,12 @@ class BookControllerMvcTest(
 ) {
     @MockitoBean
     private lateinit var bookService: BookService
+
+    @MockitoBean
+    private lateinit var bookQueryService: BookQueryService
+
+    @MockitoBean
+    private lateinit var bookCommandService: BookCommandService
 
     @Test
     fun `search should return legacy success envelope`() {
@@ -39,15 +55,7 @@ class BookControllerMvcTest(
 
         mockMvc.perform(
             get("/api/v1/book/search")
-                .with(
-                    authentication(
-                        UsernamePasswordAuthenticationToken(
-                            LegacyAuthenticationPrincipal(1, "테스터"),
-                            null,
-                            listOf(SimpleGrantedAuthority("ROLE_USER")),
-                        ),
-                    ),
-                )
+                .with(bookAuth())
                 .queryParam("query", "해리포터")
                 .queryParam("start", "2")
                 .queryParam("maxResults", "10"),
@@ -70,15 +78,7 @@ class BookControllerMvcTest(
 
         mockMvc.perform(
             get("/api/v1/book/search-isbn")
-                .with(
-                    authentication(
-                        UsernamePasswordAuthenticationToken(
-                            LegacyAuthenticationPrincipal(1, "테스터"),
-                            null,
-                            listOf(SimpleGrantedAuthority("ROLE_USER")),
-                        ),
-                    ),
-                )
+                .with(bookAuth())
                 .queryParam("query", "9788937462788"),
         )
             .andExpect(status().isOk)
@@ -108,15 +108,7 @@ class BookControllerMvcTest(
 
         mockMvc.perform(
             get("/api/v1/book/detail-isbn")
-                .with(
-                    authentication(
-                        UsernamePasswordAuthenticationToken(
-                            LegacyAuthenticationPrincipal(1, "테스터"),
-                            null,
-                            listOf(SimpleGrantedAuthority("ROLE_USER")),
-                        ),
-                    ),
-                )
+                .with(bookAuth())
                 .queryParam("query", "9788937462788"),
         )
             .andExpect(status().isOk)
@@ -127,4 +119,117 @@ class BookControllerMvcTest(
             .andExpect(jsonPath("$.data.record").isMap)
             .andExpect(jsonPath("$.data.memo").isMap)
     }
+
+    @Test
+    fun `duplication should return 403 when isbn already exists`() {
+        given(bookQueryService.checkDuplication(1, "9788937462788"))
+            .willThrow(ResponseStatusException(HttpStatus.FORBIDDEN, "책 중복"))
+
+        mockMvc.perform(
+            get("/api/v1/book/")
+                .with(bookAuth())
+                .queryParam("isbn", "9788937462788"),
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.resp_code").value(403))
+            .andExpect(jsonPath("$.resp_msg").value("책 중복"))
+    }
+
+    @Test
+    fun `create should return legacy created envelope`() {
+        val request = CreateBookRequest(
+            book_isbn = null,
+            garden_no = 1,
+            book_title = "책",
+            book_info = "소개",
+            book_author = "저자",
+            book_publisher = "출판사",
+            book_tree = null,
+            book_image_url = null,
+            book_status = 2,
+            book_page = 300,
+        )
+
+        given(bookCommandService.createBook(1, request))
+            .willReturn(CreateBookResponse(book_no = 77))
+
+        mockMvc.perform(
+            post("/api/v1/book/")
+                .with(bookAuth())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"garden_no":1,"book_title":"책","book_info":"소개","book_author":"저자","book_publisher":"출판사","book_status":2,"book_page":300}"""),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.resp_code").value(201))
+            .andExpect(jsonPath("$.resp_msg").value("책 등록 성공"))
+            .andExpect(jsonPath("$.data.book_no").value(77))
+    }
+
+    @Test
+    fun `create should return 400 when book status is missing`() {
+        mockMvc.perform(
+            post("/api/v1/book/")
+                .with(bookAuth())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"garden_no":1,"book_title":"책","book_info":"소개","book_author":"저자","book_publisher":"출판사","book_page":300}"""),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.resp_code").value(400))
+    }
+
+    @Test
+    fun `status should keep legacy paging fields`() {
+        given(bookQueryService.getBookStatus(1, 2, null, 1, 10))
+            .willReturn(
+                BookStatusResponse(
+                    current_page = 1,
+                    max_page = 1,
+                    total_items = 1,
+                    page_size = 10,
+                    list = listOf(
+                        BookStatusItemResponse(
+                            book_no = 10,
+                            book_title = "책",
+                            book_author = "저자",
+                            book_publisher = "출판사",
+                            book_info = "소개",
+                            book_image_url = null,
+                            book_tree = null,
+                            book_status = 0,
+                            percent = 25.0,
+                            book_page = 300,
+                            garden_no = 2,
+                        ),
+                    ),
+                ),
+            )
+
+        mockMvc.perform(
+            get("/api/v1/book/status")
+                .with(bookAuth())
+                .queryParam("garden_no", "2")
+                .queryParam("page", "1")
+                .queryParam("page_size", "10"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("책 상태 조회 성공"))
+            .andExpect(jsonPath("$.data.current_page").value(1))
+            .andExpect(jsonPath("$.data.max_page").value(1))
+            .andExpect(jsonPath("$.data.total_items").value(1))
+            .andExpect(jsonPath("$.data.page_size").value(10))
+            .andExpect(jsonPath("$.data.list[0].book_no").value(10))
+            .andExpect(jsonPath("$.data.list[0].book_title").value("책"))
+            .andExpect(jsonPath("$.data.list[0].book_status").value(0))
+            .andExpect(jsonPath("$.data.list[0].percent").value(25.0))
+    }
+
+    private fun bookAuth() =
+        authentication(
+            UsernamePasswordAuthenticationToken(
+                LegacyAuthenticationPrincipal(1, "테스터"),
+                null,
+                listOf(SimpleGrantedAuthority("ROLE_USER")),
+            ),
+        )
 }

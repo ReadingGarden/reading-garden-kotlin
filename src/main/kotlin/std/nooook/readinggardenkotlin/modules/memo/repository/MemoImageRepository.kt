@@ -7,4 +7,6 @@ interface MemoImageRepository : JpaRepository<MemoImageEntity, Int> {
     fun deleteByMemoNo(memoNo: Int)
 
     fun findAllByMemoNoIn(memoNos: Collection<Int>): List<MemoImageEntity>
+
+    fun findByMemoNo(memoNo: Int): MemoImageEntity?
 }
