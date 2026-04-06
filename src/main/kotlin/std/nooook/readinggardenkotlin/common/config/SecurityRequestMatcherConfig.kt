@@ -19,6 +19,7 @@ class SecurityRequestMatcherConfig {
                 PathPatternRequestMatcher.pathPattern("/v3/api-docs.yaml"),
                 PathPatternRequestMatcher.pathPattern("/swagger-ui/**"),
                 PathPatternRequestMatcher.pathPattern("/swagger-ui.html"),
+                PathPatternRequestMatcher.pathPattern("/images/**"),
                 PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/auth"),
                 PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/auth/"),
                 PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/auth/login"),
