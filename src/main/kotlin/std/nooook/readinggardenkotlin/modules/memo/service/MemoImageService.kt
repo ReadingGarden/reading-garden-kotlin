@@ -31,12 +31,15 @@ class MemoImageService(
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지 용량은 5MB를 초과할 수 없습니다.")
         }
 
+        val existingImages = memoImageRepository.findAllByMemoNoIn(listOf(id))
         val stagedDeletes = mutableListOf<ImageStorage.StagedDelete>()
         var savedImageUrl: String? = null
         try {
-            memoImageRepository.findByMemoNo(id)?.let { existingImage ->
+            existingImages.forEach { existingImage ->
                 stagedDeletes += imageStorage.stageDelete(existingImage.imageUrl)
-                memoImageRepository.delete(existingImage)
+            }
+            if (existingImages.isNotEmpty()) {
+                memoImageRepository.deleteAll(existingImages)
             }
 
             val imageUrl = imageStorage.save("memo", file.originalFilename ?: file.name, file.bytes)
@@ -48,6 +51,7 @@ class MemoImageService(
                     imageUrl = imageUrl,
                 ),
             )
+            registerRollbackCleanup(imageUrl)
             finalizeStagedDeletes(stagedDeletes)
             return "이미지 업로드 성공"
         } catch (exception: Exception) {
@@ -65,13 +69,17 @@ class MemoImageService(
         memoRepository.findById(id)
             .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 메모가 없습니다.") }
 
-        val existingImage = memoImageRepository.findByMemoNo(id)
-            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 이미지가 없습니다.")
+        val existingImages = memoImageRepository.findAllByMemoNoIn(listOf(id))
+        if (existingImages.isEmpty()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 이미지가 없습니다.")
+        }
 
         val stagedDeletes = mutableListOf<ImageStorage.StagedDelete>()
         try {
-            stagedDeletes += imageStorage.stageDelete(existingImage.imageUrl)
-            memoImageRepository.delete(existingImage)
+            existingImages.forEach { existingImage ->
+                stagedDeletes += imageStorage.stageDelete(existingImage.imageUrl)
+            }
+            memoImageRepository.deleteAll(existingImages)
             finalizeStagedDeletes(stagedDeletes)
             return "이미지 삭제 성공"
         } catch (exception: Exception) {
@@ -100,6 +108,21 @@ class MemoImageService(
                 override fun afterCompletion(status: Int) {
                     if (status != TransactionSynchronization.STATUS_COMMITTED) {
                         rollbackStagedDeletes(stagedDeletes)
+                    }
+                }
+            },
+        )
+    }
+
+    private fun registerRollbackCleanup(relativePath: String) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return
+        }
+        TransactionSynchronizationManager.registerSynchronization(
+            object : TransactionSynchronization {
+                override fun afterCompletion(status: Int) {
+                    if (status != TransactionSynchronization.STATUS_COMMITTED) {
+                        runCatching { imageStorage.delete(relativePath) }
                     }
                 }
             },
