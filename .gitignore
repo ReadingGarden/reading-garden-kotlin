@@ -2,6 +2,7 @@
 AGENTS.md
 .git-backups/
 /env
+/docs
 
 .gradle
 build/
