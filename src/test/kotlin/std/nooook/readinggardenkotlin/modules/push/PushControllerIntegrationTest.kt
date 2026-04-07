@@ -12,6 +12,7 @@ import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import std.nooook.readinggardenkotlin.modules.auth.repository.RefreshTokenRepository
@@ -24,6 +25,7 @@ import std.nooook.readinggardenkotlin.modules.garden.repository.GardenUserReposi
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoImageRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
 import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
+import java.time.LocalDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
@@ -90,5 +92,74 @@ class PushControllerIntegrationTest(
             .andExpect(jsonPath("$.data.push_app_ok").value(true))
             .andExpect(jsonPath("$.data.push_book_ok").value(false))
             .andExpect(jsonPath("$.data.push_time").doesNotExist())
+    }
+
+    @Test
+    fun `update push book ok should preserve app ok and time`() {
+        val signupResponse = mockMvc.perform(
+            post("/api/v1/auth")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"user_email":"push_book@example.com","user_password":"pw1234","user_fcm":"first-fcm","user_social_id":"","user_social_type":""}"""),
+        )
+            .andExpect(status().isCreated)
+            .andReturn()
+
+        val accessToken = objectMapper.readTree(signupResponse.response.contentAsString)
+            .path("data")
+            .path("access_token")
+            .asText()
+
+        val user = assertNotNull(userRepository.findByUserEmail("push_book@example.com"))
+        val userNo = assertNotNull(user.userNo)
+
+        mockMvc.perform(
+            put("/api/v1/push/")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"push_book_ok":true}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("푸시 알림 수정 성공"))
+
+        val push = assertNotNull(pushRepository.findByUserNo(userNo))
+        assertEquals(true, push.pushAppOk)
+        assertEquals(true, push.pushBookOk)
+        assertEquals(null, push.pushTime)
+    }
+
+    @Test
+    fun `update push time should persist provided timestamp`() {
+        val signupResponse = mockMvc.perform(
+            post("/api/v1/auth")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"user_email":"push_time@example.com","user_password":"pw1234","user_fcm":"first-fcm","user_social_id":"","user_social_type":""}"""),
+        )
+            .andExpect(status().isCreated)
+            .andReturn()
+
+        val accessToken = objectMapper.readTree(signupResponse.response.contentAsString)
+            .path("data")
+            .path("access_token")
+            .asText()
+
+        val user = assertNotNull(userRepository.findByUserEmail("push_time@example.com"))
+        val userNo = assertNotNull(user.userNo)
+        val expectedPushTime = LocalDateTime.of(2026, 4, 6, 12, 30, 0)
+
+        mockMvc.perform(
+            put("/api/v1/push/")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"push_time":"2026-04-06T12:30:00"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("푸시 알림 수정 성공"))
+
+        val push = assertNotNull(pushRepository.findByUserNo(userNo))
+        assertEquals(true, push.pushAppOk)
+        assertEquals(false, push.pushBookOk)
+        assertEquals(expectedPushTime, push.pushTime)
     }
 }
