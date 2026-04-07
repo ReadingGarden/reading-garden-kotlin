@@ -7,8 +7,6 @@ import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
-import org.springframework.transaction.event.TransactionPhase
-import org.springframework.transaction.event.TransactionalEventListener
 import org.springframework.web.server.ResponseStatusException
 import std.nooook.readinggardenkotlin.common.storage.ImageStorage
 import std.nooook.readinggardenkotlin.modules.auth.repository.UserRepository
@@ -20,7 +18,7 @@ import std.nooook.readinggardenkotlin.modules.garden.repository.GardenRepository
 import std.nooook.readinggardenkotlin.modules.garden.repository.GardenUserRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoImageRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
-import std.nooook.readinggardenkotlin.modules.push.service.PushService
+import std.nooook.readinggardenkotlin.modules.push.service.GardenMemberJoinedPushEvent
 
 @Service
 class GardenMembershipService(
@@ -33,7 +31,6 @@ class GardenMembershipService(
     private val memoRepository: MemoRepository,
     private val memoImageRepository: MemoImageRepository,
     private val imageStorage: ImageStorage,
-    private val pushService: PushService,
     private val applicationEventPublisher: ApplicationEventPublisher,
 ) {
     @Transactional
@@ -141,20 +138,13 @@ class GardenMembershipService(
         )
 
         applicationEventPublisher.publishEvent(
-            GardenMemberJoinedEvent(
+            GardenMemberJoinedPushEvent(
                 gardenNo = gardenNo,
                 recipientUserNos = recipientUserNos,
             ),
         )
 
         return "가든 초대 완료"
-    }
-
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    fun handleGardenMemberJoined(event: GardenMemberJoinedEvent) {
-        event.recipientUserNos.forEach { userNo ->
-            pushService.sendNewMemberPush(userNo, event.gardenNo)
-        }
     }
 
     private fun deleteOwnedGardenResources(
@@ -233,9 +223,4 @@ class GardenMembershipService(
         private const val MAX_GARDEN_MEMBER_COUNT = 10L
         private val logger = LoggerFactory.getLogger(GardenMembershipService::class.java)
     }
-
-    data class GardenMemberJoinedEvent(
-        val gardenNo: Int,
-        val recipientUserNos: List<Int>,
-    )
 }

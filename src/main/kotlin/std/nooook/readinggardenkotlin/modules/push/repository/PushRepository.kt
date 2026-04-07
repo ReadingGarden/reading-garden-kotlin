@@ -5,4 +5,8 @@ import std.nooook.readinggardenkotlin.modules.push.entity.PushEntity
 
 interface PushRepository : JpaRepository<PushEntity, Int> {
     fun findByUserNo(userNo: Int): PushEntity?
+
+    fun findAllByPushBookOkTrueAndPushTimeIsNotNull(): List<PushEntity>
+
+    fun findAllByPushAppOkTrue(): List<PushEntity>
 }

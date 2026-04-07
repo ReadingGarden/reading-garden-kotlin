@@ -4,12 +4,14 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.json.JsonMapper
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.BDDMockito.given
+import org.mockito.Mockito.verify
+import org.mockito.Mockito.times
 import org.mockito.Mockito.clearInvocations
 import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.reset
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.verifyNoMoreInteractions
-import org.mockito.Mockito.verify
 import org.mockito.ArgumentMatchers.anyString
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -18,6 +20,7 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
@@ -46,6 +49,7 @@ import std.nooook.readinggardenkotlin.modules.memo.entity.MemoEntity
 import std.nooook.readinggardenkotlin.modules.memo.entity.MemoImageEntity
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoImageRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
+import std.nooook.readinggardenkotlin.modules.push.integration.FcmClient
 import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
 import std.nooook.readinggardenkotlin.modules.push.service.PushService
 import java.nio.file.Files
@@ -90,6 +94,9 @@ class GardenControllerIntegrationTest(
 
     @MockitoSpyBean
     private lateinit var pushService: PushService
+
+    @MockitoBean
+    private lateinit var fcmClient: FcmClient
 
     @MockitoSpyBean
     private lateinit var imageStorage: ImageStorage
@@ -1870,6 +1877,14 @@ class GardenControllerIntegrationTest(
                 gardenMain = false,
             ),
         )
+        given(
+            fcmClient.sendToMany(
+                listOf("fcm-token"),
+                "NEW 가드너 등장🧑‍🌾",
+                "초대 가든에 새로운 멤버가 들어왔어요. 함께 책을 읽어 가든을 채워주세요",
+                mapOf("garden_no" to gardenNo.toString()),
+            ),
+        ).willReturn(listOf(mapOf("result" to "sent")))
 
         mockMvc.perform(
             post("/api/v1/garden/invite")
@@ -1886,6 +1901,12 @@ class GardenControllerIntegrationTest(
         assertEquals(3L, gardenUserRepository.countByGardenNo(gardenNo))
         verify(pushService).sendNewMemberPush(leaderNo, gardenNo)
         verify(pushService).sendNewMemberPush(existingMemberNo, gardenNo)
+        verify(fcmClient, times(2)).sendToMany(
+            listOf("fcm-token"),
+            "NEW 가드너 등장🧑‍🌾",
+            "초대 가든에 새로운 멤버가 들어왔어요. 함께 책을 읽어 가든을 채워주세요",
+            mapOf("garden_no" to gardenNo.toString()),
+        )
         verifyNoMoreInteractions(pushService)
     }
 
@@ -1934,6 +1955,7 @@ class GardenControllerIntegrationTest(
 
         assertEquals(2L, gardenUserRepository.countByGardenNo(gardenNo))
         verifyNoInteractions(pushService)
+        verifyNoInteractions(fcmClient)
     }
 
     @Test
@@ -1988,6 +2010,7 @@ class GardenControllerIntegrationTest(
         assertEquals(10L, gardenUserRepository.countByGardenNo(gardenNo))
         assertEquals(null, gardenUserRepository.findByGardenNoAndUserNo(gardenNo, joinerNo))
         verifyNoInteractions(pushService)
+        verifyNoInteractions(fcmClient)
     }
 
     private fun signupAndGetAccessToken(email: String): String {
