@@ -3,6 +3,7 @@ package std.nooook.readinggardenkotlin.modules.push.service
 import org.springframework.stereotype.Service
 import std.nooook.readinggardenkotlin.modules.push.controller.PushResponse
 import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
+import java.time.LocalDateTime
 
 @Service
 class PushService(
@@ -20,8 +21,21 @@ class PushService(
         )
     }
 
-    fun sendBookPush() {
-        // Minimum implementation for the first migration slice.
+    fun sendBookPush(): List<Map<String, Any>> {
+        return emptyList()
+    }
+
+    fun updatePush(
+        userNo: Int,
+        push_app_ok: Boolean?,
+        push_book_ok: Boolean?,
+        push_time: LocalDateTime?,
+    ) {
+        // Controller contract is wired first; persistence work happens in later slices.
+    }
+
+    fun sendNoticePush(content: String): List<Map<String, Any>> {
+        return emptyList()
     }
 
     fun sendNewMemberPush(
