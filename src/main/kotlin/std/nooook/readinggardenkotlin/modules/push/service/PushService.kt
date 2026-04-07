@@ -7,12 +7,11 @@ import java.time.LocalDateTime
 @Service
 class PushService(
     private val pushPreferenceService: PushPreferenceService,
+    private val pushDeliveryService: PushDeliveryService,
 ) {
     fun getPush(userNo: Int): PushResponse = pushPreferenceService.getPush(userNo)
 
-    fun sendBookPush(): List<Map<String, Any>> {
-        return emptyList()
-    }
+    fun sendBookPush(): List<Map<String, Any>> = pushDeliveryService.sendBookPush()
 
     fun updatePush(
         userNo: Int,
@@ -26,9 +25,7 @@ class PushService(
         push_time = push_time,
     )
 
-    fun sendNoticePush(content: String): List<Map<String, Any>> {
-        return emptyList()
-    }
+    fun sendNoticePush(content: String): List<Map<String, Any>> = pushDeliveryService.sendNoticePush(content)
 
     fun sendNewMemberPush(
         userNo: Int,
