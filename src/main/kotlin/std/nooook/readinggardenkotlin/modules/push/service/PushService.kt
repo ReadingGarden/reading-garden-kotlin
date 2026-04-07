@@ -30,7 +30,5 @@ class PushService(
     fun sendNewMemberPush(
         userNo: Int,
         gardenNo: Int,
-    ) {
-        // Garden membership flow only needs a stable integration point for now.
-    }
+    ): List<Map<String, Any>> = pushDeliveryService.sendNewMemberPush(userNo, gardenNo)
 }
