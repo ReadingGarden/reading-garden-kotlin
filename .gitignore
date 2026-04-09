@@ -3,6 +3,7 @@ AGENTS.md
 .git-backups/
 /env
 /docs
+external/ReadingGarden-App/
 
 .gradle
 build/
