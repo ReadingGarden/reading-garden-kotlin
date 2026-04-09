@@ -575,6 +575,54 @@ class AuthControllerIntegrationTest(
     }
 
     @Test
+    fun `update profile should change nickname for app client request`() {
+        val signupBody = signup("profilenick@example.com", "pw1234", "fcm-profile")
+        val accessToken = signupBody.path("data").path("access_token").asText()
+
+        mockMvc.perform(
+            put("/api/v1/auth/")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"user_nick":"변경닉네임"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("프로필 변경 성공"))
+            .andExpect(jsonPath("$.data.user_email").value("profilenick@example.com"))
+            .andExpect(jsonPath("$.data.user_nick").value("변경닉네임"))
+            .andExpect(jsonPath("$.data.user_image").value("데이지"))
+
+        val savedUser = checkNotNull(userRepository.findByUserEmail("profilenick@example.com"))
+        kotlin.test.assertEquals("변경닉네임", savedUser.userNick)
+        kotlin.test.assertEquals("데이지", savedUser.userImage)
+    }
+
+    @Test
+    fun `update profile should change image for app client request`() {
+        val signupBody = signup("profileimage@example.com", "pw1234", "fcm-profile-image")
+        val accessToken = signupBody.path("data").path("access_token").asText()
+        val beforeUser = checkNotNull(userRepository.findByUserEmail("profileimage@example.com"))
+        val beforeNick = beforeUser.userNick
+
+        mockMvc.perform(
+            put("/api/v1/auth/")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"user_image":"튤립"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("프로필 변경 성공"))
+            .andExpect(jsonPath("$.data.user_email").value("profileimage@example.com"))
+            .andExpect(jsonPath("$.data.user_nick").value(beforeNick))
+            .andExpect(jsonPath("$.data.user_image").value("튤립"))
+
+        val savedUser = checkNotNull(userRepository.findByUserEmail("profileimage@example.com"))
+        kotlin.test.assertEquals(beforeNick, savedUser.userNick)
+        kotlin.test.assertEquals("튤립", savedUser.userImage)
+    }
+
+    @Test
     fun `delete user should remove auth garden book and memo data`() {
         val signupBody = signup("delete@example.com", "pw1234", "fcm-delete")
         val accessToken = signupBody.path("data").path("access_token").asText()
