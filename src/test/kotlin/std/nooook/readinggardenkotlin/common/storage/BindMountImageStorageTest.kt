@@ -72,9 +72,9 @@ class BindMountImageStorageTest {
     }
 
     private fun storage(): BindMountImageStorage {
-        val properties = StorageProperties(
-            imagesRoot = tempDir.resolve("images").toString(),
-        )
+        val properties = StorageProperties().apply {
+            imagesRoot = tempDir.resolve("images").toString()
+        }
         return BindMountImageStorage(properties)
     }
 
