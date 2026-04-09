@@ -51,9 +51,18 @@ class HibernateNativeHints : RuntimeHintsRegistrar {
         val loader = classLoader ?: return
         val resolver = PathMatchingResourcePatternResolver(loader)
 
+        registerKotlinReflectionParameterHints(hints)
         registerHibernateLoggerImplementations(hints, resolver)
         registerHibernateEventListenerArrays(hints)
         registerHibernateI18nResources(hints)
+    }
+
+    private fun registerKotlinReflectionParameterHints(hints: RuntimeHints) {
+        // kotlin-reflect resolves java.lang.reflect.Parameter#getName reflectively in native mode.
+        hints.reflection().registerType(
+            java.lang.reflect.Parameter::class.java,
+            MemberCategory.INVOKE_PUBLIC_METHODS,
+        )
     }
 
     private fun registerHibernateLoggerImplementations(
