@@ -10,11 +10,11 @@ import org.springframework.http.CacheControl
 import org.springframework.util.unit.DataSize
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
-import std.nooook.readinggardenkotlin.common.storage.StorageProperties
 
 @Configuration
 class WebMvcConfig(
-    private val storageProperties: StorageProperties,
+    @Value("\${app.storage.images-root:/opt/reading-garden/data/images}")
+    private val imagesRoot: String,
     @Value("\${spring.servlet.multipart.max-file-size:10MB}")
     private val maxFileSize: DataSize,
     @Value("\${spring.servlet.multipart.max-request-size:10MB}")
@@ -23,7 +23,7 @@ class WebMvcConfig(
     @Bean
     fun multipartConfigElement(): MultipartConfigElement {
         val factory = MultipartConfigFactory()
-        factory.setLocation(Path.of(storageProperties.imagesRoot, "multipart-temp").toString())
+        factory.setLocation(Path.of(imagesRoot, "multipart-temp").toString())
         factory.setFileSizeThreshold(DataSize.ofBytes(0))
         factory.setMaxFileSize(maxFileSize)
         factory.setMaxRequestSize(maxRequestSize)
@@ -31,7 +31,7 @@ class WebMvcConfig(
     }
 
     override fun addResourceHandlers(registry: ResourceHandlerRegistry) {
-        val imagesRoot = Path.of(storageProperties.imagesRoot).toAbsolutePath().normalize().toString()
+        val imagesRoot = Path.of(imagesRoot).toAbsolutePath().normalize().toString()
         registry
             .addResourceHandler("/images/**")
             .addResourceLocations("file:$imagesRoot/")
