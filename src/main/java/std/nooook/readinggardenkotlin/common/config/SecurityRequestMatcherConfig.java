@@ -1,18 +1,19 @@
-package std.nooook.readinggardenkotlin.common.config
+package std.nooook.readinggardenkotlin.common.config;
 
-import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Configuration
-import org.springframework.http.HttpMethod
-import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher
-import org.springframework.security.web.util.matcher.OrRequestMatcher
-import org.springframework.security.web.util.matcher.RequestMatcher
+import java.util.List;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.OrRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 
-@Configuration
-class SecurityRequestMatcherConfig {
+@Configuration(proxyBeanMethods = false)
+public class SecurityRequestMatcherConfig {
+
     @Bean
-    fun publicEndpointRequestMatcher(): RequestMatcher =
-        OrRequestMatcher(
-            listOf(
+    public RequestMatcher publicEndpointRequestMatcher() {
+        return new OrRequestMatcher(List.of(
                 PathPatternRequestMatcher.pathPattern("/api/health"),
                 PathPatternRequestMatcher.pathPattern("/v3/api-docs"),
                 PathPatternRequestMatcher.pathPattern("/v3/api-docs/**"),
@@ -26,7 +27,7 @@ class SecurityRequestMatcherConfig {
                 PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/auth/refresh"),
                 PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/auth/find-password"),
                 PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/auth/find-password/check"),
-                PathPatternRequestMatcher.pathPattern(HttpMethod.PUT, "/api/v1/auth/find-password/update-password"),
-            ),
-        )
+                PathPatternRequestMatcher.pathPattern(HttpMethod.PUT, "/api/v1/auth/find-password/update-password")
+        ));
+    }
 }
