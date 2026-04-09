@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.json.JsonMapper
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.DisposableBean
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -13,6 +14,9 @@ import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
+import org.springframework.scheduling.TaskScheduler
+import org.springframework.scheduling.Trigger
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
@@ -24,6 +28,7 @@ import std.nooook.readinggardenkotlin.modules.auth.entity.RefreshTokenEntity
 import std.nooook.readinggardenkotlin.modules.auth.integration.MailSender
 import std.nooook.readinggardenkotlin.modules.auth.repository.RefreshTokenRepository
 import std.nooook.readinggardenkotlin.modules.auth.repository.UserRepository
+import std.nooook.readinggardenkotlin.modules.auth.service.AuthService
 import std.nooook.readinggardenkotlin.modules.book.entity.BookEntity
 import std.nooook.readinggardenkotlin.modules.book.entity.BookImageEntity
 import std.nooook.readinggardenkotlin.modules.book.entity.BookReadEntity
@@ -39,14 +44,24 @@ import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
 import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
 import std.nooook.readinggardenkotlin.modules.scheduler.repository.ApschedulerJobRepository
 import std.nooook.readinggardenkotlin.modules.scheduler.service.AuthPasswordResetExpiryJobService
+import std.nooook.readinggardenkotlin.modules.scheduler.service.SchedulerJobExecutionPhase
+import std.nooook.readinggardenkotlin.modules.scheduler.service.SchedulerJobExecutionRecord
+import std.nooook.readinggardenkotlin.modules.scheduler.service.SchedulerJobExecutionRecorder
+import std.nooook.readinggardenkotlin.modules.scheduler.service.SchedulerJobTriggerSource
+import java.time.Duration
+import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.ScheduledFuture
 import java.util.TimeZone
 import kotlin.test.assertEquals
+import org.springframework.transaction.support.TransactionTemplate
 
 @SpringBootTest(
     properties = [
         "app.auth.password-reset-auth-ttl=PT2S",
+        "spring.main.allow-bean-definition-overriding=true",
     ],
 )
 @AutoConfigureMockMvc
@@ -65,7 +80,11 @@ class AuthControllerIntegrationTest(
     @Autowired private val pushRepository: PushRepository,
     @Autowired private val apschedulerJobRepository: ApschedulerJobRepository,
     @Autowired private val passwordResetExpiryJobService: AuthPasswordResetExpiryJobService,
+    @Autowired private val authService: AuthService,
+    @Autowired private val transactionTemplate: TransactionTemplate,
     @Autowired private val recordingMailSender: RecordingMailSender,
+    @Autowired private val recordingTaskScheduler: RecordingTaskScheduler,
+    @Autowired private val recordingSchedulerJobExecutionRecorder: RecordingSchedulerJobExecutionRecorder,
 ) {
     private val objectMapper: ObjectMapper = JsonMapper.builder().findAndAddModules().build()
 
@@ -83,6 +102,8 @@ class AuthControllerIntegrationTest(
         apschedulerJobRepository.deleteAll()
         userRepository.deleteAll()
         recordingMailSender.sentMessages.clear()
+        recordingTaskScheduler.clear()
+        recordingSchedulerJobExecutionRecorder.records.clear()
     }
 
     @Test
@@ -362,6 +383,34 @@ class AuthControllerIntegrationTest(
     }
 
     @Test
+    fun `schedule password reset expiry should register task only after outer transaction commits`() {
+        signup("resetaftercommit@example.com", "before-password", "fcm-reset-after-commit")
+
+        transactionTemplate.executeWithoutResult {
+            authService.sendPasswordResetMail("resetaftercommit@example.com")
+
+            val userNo = checkNotNull(userRepository.findByUserEmail("resetaftercommit@example.com")?.userNo)
+            kotlin.test.assertTrue(
+                apschedulerJobRepository.findById(AuthPasswordResetExpiryJobService.jobId(userNo)).isPresent,
+            )
+            kotlin.test.assertTrue(recordingTaskScheduler.scheduledTasks.isEmpty())
+        }
+
+        kotlin.test.assertEquals(1, recordingTaskScheduler.scheduledTasks.size)
+        val scheduledTask = recordingTaskScheduler.scheduledTasks.single()
+        val userNo = checkNotNull(userRepository.findByUserEmail("resetaftercommit@example.com")?.userNo)
+        val persistedJob = checkNotNull(
+            apschedulerJobRepository.findById(AuthPasswordResetExpiryJobService.jobId(userNo)).orElse(null),
+        )
+
+        kotlin.test.assertEquals(
+            (persistedJob.nextRunTime!! * 1000).toLong(),
+            scheduledTask.runAt.toEpochMilli(),
+        )
+        kotlin.test.assertTrue(recordingSchedulerJobExecutionRecorder.records.isEmpty())
+    }
+
+    @Test
     fun `expired persisted auth expiry job should fail check and clear auth number`() {
         signup("resetexpire@example.com", "before-password", "fcm-reset-expire")
 
@@ -418,11 +467,42 @@ class AuthControllerIntegrationTest(
         overdueJob.nextRunTime = (System.currentTimeMillis() - 1_000).toDouble() / 1000.0
         apschedulerJobRepository.save(overdueJob)
 
+        recordingTaskScheduler.clear()
         passwordResetExpiryJobService.rehydratePasswordResetExpiryJobs()
 
         kotlin.test.assertNull(userRepository.findByUserEmail("rehydrateoverdue@example.com")?.userAuthNumber)
         kotlin.test.assertFalse(apschedulerJobRepository.findById(overdueJobId).isPresent)
         kotlin.test.assertTrue(apschedulerJobRepository.findById(futureJobId).isPresent)
+        kotlin.test.assertEquals(1, recordingTaskScheduler.scheduledTasks.size)
+        kotlin.test.assertEquals(
+            listOf(
+                SchedulerJobExecutionPhase.STARTED,
+                SchedulerJobExecutionPhase.SUCCEEDED,
+            ),
+            recordingSchedulerJobExecutionRecorder.records.map { it.phase },
+        )
+        kotlin.test.assertEquals(
+            listOf(
+                SchedulerJobTriggerSource.REHYDRATED,
+                SchedulerJobTriggerSource.REHYDRATED,
+            ),
+            recordingSchedulerJobExecutionRecorder.records.map { it.triggerSource },
+        )
+        kotlin.test.assertEquals(
+            listOf(overdueJobId, overdueJobId),
+            recordingSchedulerJobExecutionRecorder.records.map { it.jobId },
+        )
+        kotlin.test.assertEquals(
+            "expire_overdue",
+            recordingSchedulerJobExecutionRecorder.records.first().context["rehydrate_action"],
+        )
+        kotlin.test.assertTrue(
+            recordingTaskScheduler.scheduledTasks.any { scheduledTask ->
+                scheduledTask.runAt.toEpochMilli() == (
+                    checkNotNull(apschedulerJobRepository.findById(futureJobId).orElse(null)).nextRunTime!! * 1000
+                    ).toLong()
+            },
+        )
 
         Thread.sleep(2_500)
 
@@ -476,6 +556,22 @@ class AuthControllerIntegrationTest(
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.resp_code").value(400))
             .andExpect(jsonPath("$.resp_msg").value("인증번호 불일치"))
+    }
+
+    @Test
+    fun `startup rehydration should delete malformed persisted jobs safely`() {
+        apschedulerJobRepository.save(
+            std.nooook.readinggardenkotlin.modules.scheduler.entity.ApschedulerJobEntity(
+                id = "auth:password-reset-expiry:999",
+                nextRunTime = Instant.now().plusSeconds(120).toEpochMilli() / 1000.0,
+                jobState = "malformed".toByteArray(),
+            ),
+        )
+
+        passwordResetExpiryJobService.rehydratePasswordResetExpiryJobs()
+
+        kotlin.test.assertFalse(apschedulerJobRepository.findById("auth:password-reset-expiry:999").isPresent)
+        kotlin.test.assertTrue(recordingSchedulerJobExecutionRecorder.records.isEmpty())
     }
 
     @Test
@@ -565,10 +661,92 @@ class AuthControllerIntegrationTest(
         val content: String,
     )
 
+    class RecordingTaskScheduler : TaskScheduler, DisposableBean {
+        private val delegate = ThreadPoolTaskScheduler().apply {
+            poolSize = 1
+            setThreadNamePrefix("test-auth-scheduler-")
+            initialize()
+        }
+
+        val scheduledTasks = CopyOnWriteArrayList<ScheduledTask>()
+        private val scheduledFutures = CopyOnWriteArrayList<ScheduledFuture<*>>()
+
+        override fun getClock() = delegate.clock
+
+        override fun schedule(
+            task: Runnable,
+            startTime: Instant,
+        ): ScheduledFuture<*> {
+            scheduledTasks += ScheduledTask(startTime)
+            val future = requireNotNull(delegate.schedule(task, startTime))
+            scheduledFutures += future
+            return future
+        }
+
+        override fun schedule(
+            task: Runnable,
+            trigger: Trigger,
+        ): ScheduledFuture<*> = requireNotNull(delegate.schedule(task, trigger))
+
+        override fun scheduleAtFixedRate(
+            task: Runnable,
+            startTime: Instant,
+            period: Duration,
+        ): ScheduledFuture<*> = requireNotNull(delegate.scheduleAtFixedRate(task, startTime, period))
+
+        override fun scheduleAtFixedRate(
+            task: Runnable,
+            period: Duration,
+        ): ScheduledFuture<*> = requireNotNull(delegate.scheduleAtFixedRate(task, period))
+
+        override fun scheduleWithFixedDelay(
+            task: Runnable,
+            startTime: Instant,
+            delay: Duration,
+        ): ScheduledFuture<*> = requireNotNull(delegate.scheduleWithFixedDelay(task, startTime, delay))
+
+        override fun scheduleWithFixedDelay(
+            task: Runnable,
+            delay: Duration,
+        ): ScheduledFuture<*> = requireNotNull(delegate.scheduleWithFixedDelay(task, delay))
+
+        fun clear() {
+            scheduledFutures.forEach { it.cancel(false) }
+            scheduledFutures.clear()
+            scheduledTasks.clear()
+        }
+
+        override fun destroy() {
+            clear()
+            delegate.shutdown()
+        }
+    }
+
+    data class ScheduledTask(
+        val runAt: Instant,
+    )
+
+    class RecordingSchedulerJobExecutionRecorder : SchedulerJobExecutionRecorder {
+        val records = mutableListOf<SchedulerJobExecutionRecord>()
+
+        override fun record(record: SchedulerJobExecutionRecord) {
+            records += record
+        }
+    }
+
     @TestConfiguration(proxyBeanMethods = false)
     class TestConfig {
         @Bean
         @Primary
         fun mailSender(): RecordingMailSender = RecordingMailSender()
+
+        @Bean
+        @Primary
+        fun taskScheduler(): RecordingTaskScheduler = RecordingTaskScheduler()
+
+        @Bean
+        @Primary
+        fun schedulerJobExecutionRecorder(): RecordingSchedulerJobExecutionRecorder =
+            RecordingSchedulerJobExecutionRecorder()
     }
 }
