@@ -28,4 +28,11 @@ class ConfigurationPropertiesRegistrationTest {
             Class.forName("std.nooook.readinggardenkotlin.modules.push.integration.FirebaseProperties")
         }
     }
+
+    @Test
+    fun `web mvc config should not declare multipart config bean for native compatibility`() {
+        assertFalse(
+            WebMvcConfig::class.java.declaredMethods.any { it.name == "multipartConfigElement" },
+        )
+    }
 }
