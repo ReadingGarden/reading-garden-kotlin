@@ -1,6 +1,7 @@
 package std.nooook.readinggardenkotlin.common.config
 
 import org.springframework.aot.hint.MemberCategory
+import org.springframework.aot.hint.ExecutableMode
 import org.springframework.aot.hint.RuntimeHints
 import org.springframework.aot.hint.RuntimeHintsRegistrar
 import org.springframework.aot.hint.TypeReference
@@ -58,6 +59,10 @@ class HibernateNativeHints : RuntimeHintsRegistrar {
     }
 
     private fun registerKotlinReflectionParameterHints(hints: RuntimeHints) {
+        hints.reflection().registerType(java.lang.reflect.Executable::class.java) { typeHint ->
+            typeHint.withMethod("getParameters", emptyList(), ExecutableMode.INVOKE)
+        }
+
         // kotlin-reflect resolves java.lang.reflect.Parameter#getName reflectively in native mode.
         hints.reflection().registerType(
             java.lang.reflect.Parameter::class.java,

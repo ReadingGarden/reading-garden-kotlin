@@ -19,4 +19,18 @@ class HibernateNativeHintsTest {
 
         assertTrue(predicate.test(hints))
     }
+
+    @Test
+    fun `registers java reflect Executable getParameters for kotlin reflection`() {
+        val hints = RuntimeHints()
+
+        HibernateNativeHints().registerHints(hints, javaClass.classLoader)
+
+        val predicate = RuntimeHintsPredicates.reflection().onMethodInvocation(
+            java.lang.reflect.Executable::class.java,
+            "getParameters",
+        )
+
+        assertTrue(predicate.test(hints))
+    }
 }
