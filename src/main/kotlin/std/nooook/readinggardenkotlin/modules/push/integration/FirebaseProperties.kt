@@ -1,15 +1,13 @@
 package std.nooook.readinggardenkotlin.modules.push.integration
 
-import org.springframework.boot.context.properties.ConfigurationProperties
-import org.springframework.stereotype.Component
 import java.nio.file.Path
+import org.springframework.boot.context.properties.ConfigurationProperties
 
-@Component
 @ConfigurationProperties(prefix = "app.firebase")
-class FirebaseProperties {
-    var projectId: String = ""
-    var serviceAccountFile: String = ""
-
+data class FirebaseProperties(
+    val projectId: String = "",
+    val serviceAccountFile: String = "",
+) {
     fun serviceAccountPath(): Path? = serviceAccountFile
         .trim()
         .takeIf { it.isNotBlank() }
