@@ -86,7 +86,9 @@ jobs:
 
       - name: Deploy container on EC2
         run: |
-          ssh -p "$EC2_PORT" "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" <<EOF
+          ssh -T -p "$EC2_PORT" \
+            "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" \
+            IMAGE_REF="$IMAGE_REF" APP_PORT="$APP_PORT" REMOTE_APP_DIR="$REMOTE_APP_DIR" /bin/bash -seu <<'EOF'
           set -euo pipefail
           cd "$REMOTE_APP_DIR"
           test -f .env
