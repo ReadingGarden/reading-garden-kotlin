@@ -4,6 +4,7 @@ import com.google.auth.oauth2.GoogleCredentials
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.messaging.FirebaseMessaging
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -19,12 +20,15 @@ import java.util.UUID
 class FcmClientConfig {
     @Bean
     @ConditionalOnMissingBean(FcmClient::class)
-    fun fcmClient(firebaseProperties: FirebaseProperties): FcmClient {
-        if (!hasUsableFirebaseConfig(firebaseProperties)) {
+    fun fcmClient(
+        @Value("\${app.firebase.project-id:}") projectId: String,
+        @Value("\${app.firebase.service-account-file:}") serviceAccountFile: String,
+    ): FcmClient {
+        if (!hasUsableFirebaseConfig(projectId, serviceAccountFile)) {
             logger.info(
                 "Firebase FCM client is disabled. Falling back to no-op client. projectIdPresent={}, serviceAccountUsable={}",
-                firebaseProperties.projectId.isNotBlank(),
-                hasUsableServiceAccountPath(firebaseProperties),
+                projectId.isNotBlank(),
+                hasUsableServiceAccountPath(serviceAccountFile),
             )
             return NoopFcmClient()
         }
@@ -32,7 +36,7 @@ class FcmClientConfig {
         val firebaseAppName = "reading-garden-${UUID.randomUUID()}"
 
         return try {
-            val firebaseApp = createFirebaseApp(firebaseAppName, firebaseProperties)
+            val firebaseApp = createFirebaseApp(firebaseAppName, projectId, serviceAccountFile)
             FirebaseAdminFcmClient(
                 firebaseApp = firebaseApp,
                 firebaseMessagingSender = FirebaseAdminMessagingSender(FirebaseMessaging.getInstance(firebaseApp)),
@@ -40,8 +44,8 @@ class FcmClientConfig {
         } catch (exception: Exception) {
             logger.error(
                 "Firebase FCM client initialization failed. Falling back to no-op client. projectId={}, serviceAccountFile={}",
-                firebaseProperties.projectId.trim(),
-                firebaseProperties.serviceAccountFile.trim(),
+                projectId.trim(),
+                serviceAccountFile.trim(),
                 exception,
             )
             NoopFcmClient()
@@ -53,28 +57,36 @@ class FcmClientConfig {
 
     private fun createFirebaseApp(
         appName: String,
-        firebaseProperties: FirebaseProperties,
+        projectId: String,
+        serviceAccountFile: String,
     ): FirebaseApp {
-        val serviceAccountPath = requireNotNull(firebaseProperties.serviceAccountPath())
+        val serviceAccountPath = requireNotNull(serviceAccountPath(serviceAccountFile))
         Files.newInputStream(serviceAccountPath).use { inputStream ->
             val options = FirebaseOptions.builder()
                 .setCredentials(GoogleCredentials.fromStream(inputStream))
-                .setProjectId(firebaseProperties.projectId.trim())
+                .setProjectId(projectId.trim())
                 .build()
             return FirebaseApp.initializeApp(options, appName)
         }
     }
 
-    private fun hasUsableFirebaseConfig(firebaseProperties: FirebaseProperties): Boolean =
-        firebaseProperties.projectId.isNotBlank() && hasUsableServiceAccountPath(firebaseProperties)
+    private fun hasUsableFirebaseConfig(
+        projectId: String,
+        serviceAccountFile: String,
+    ): Boolean = projectId.isNotBlank() && hasUsableServiceAccountPath(serviceAccountFile)
 
     private fun isReadableFile(path: Path): Boolean = Files.isRegularFile(path) && Files.isReadable(path)
 
-    private fun hasUsableServiceAccountPath(firebaseProperties: FirebaseProperties): Boolean = try {
-        firebaseProperties.serviceAccountPath()?.let(::isReadableFile) == true
+    private fun hasUsableServiceAccountPath(serviceAccountFile: String): Boolean = try {
+        serviceAccountPath(serviceAccountFile)?.let(::isReadableFile) == true
     } catch (_: InvalidPathException) {
         false
     }
+
+    private fun serviceAccountPath(serviceAccountFile: String): Path? = serviceAccountFile
+        .trim()
+        .takeIf { it.isNotBlank() }
+        ?.let(Path::of)
 
     companion object {
         private val logger = LoggerFactory.getLogger(FcmClientConfig::class.java)
