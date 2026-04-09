@@ -9,7 +9,7 @@ class FcmClientConfigTest {
 
     @Test
     fun `fcmClient should fall back to noop when firebase properties are missing`() {
-        val client = config.fcmClient(projectId = "", serviceAccountFile = "")
+        val client = config.fcmClient("", "")
 
         assertIs<NoopFcmClient>(client)
     }
@@ -20,10 +20,7 @@ class FcmClientConfigTest {
         Files.writeString(invalidServiceAccount, """{"invalid":true}""")
 
         try {
-            val client = config.fcmClient(
-                projectId = "reading-garden",
-                serviceAccountFile = invalidServiceAccount.toString(),
-            )
+            val client = config.fcmClient("reading-garden", invalidServiceAccount.toString())
             assertIs<NoopFcmClient>(client)
         } finally {
             Files.deleteIfExists(invalidServiceAccount)
