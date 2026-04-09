@@ -21,10 +21,10 @@ class FcmClientConfigTest {
         val invalidServiceAccount = Files.createTempFile("firebase-invalid", ".json")
         Files.writeString(invalidServiceAccount, """{"invalid":true}""")
 
-        val firebaseProperties = FirebaseProperties(
-            projectId = "reading-garden",
-            serviceAccountFile = invalidServiceAccount.toString(),
-        )
+        val firebaseProperties = FirebaseProperties().apply {
+            projectId = "reading-garden"
+            serviceAccountFile = invalidServiceAccount.toString()
+        }
 
         try {
             val client = config.fcmClient(firebaseProperties)

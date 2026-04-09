@@ -26,4 +26,27 @@ class ConfigurationPropertiesRegistrationTest {
     fun `firebase properties should not be registered as component bean`() {
         assertFalse(FirebaseProperties::class.java.isAnnotationPresent(Component::class.java))
     }
+
+    @Test
+    fun `storage properties should expose java bean setter for native binding`() {
+        assertTrue(
+            StorageProperties::class.java.methods.any { method ->
+                method.name == "setImagesRoot" && method.parameterCount == 1
+            },
+        )
+    }
+
+    @Test
+    fun `firebase properties should expose java bean setters for native binding`() {
+        assertTrue(
+            FirebaseProperties::class.java.methods.any { method ->
+                method.name == "setProjectId" && method.parameterCount == 1
+            },
+        )
+        assertTrue(
+            FirebaseProperties::class.java.methods.any { method ->
+                method.name == "setServiceAccountFile" && method.parameterCount == 1
+            },
+        )
+    }
 }
