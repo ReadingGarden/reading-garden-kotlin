@@ -7,6 +7,7 @@ import org.springframework.scheduling.TaskScheduler
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
+import org.slf4j.LoggerFactory
 import std.nooook.readinggardenkotlin.modules.auth.repository.UserRepository
 import std.nooook.readinggardenkotlin.modules.scheduler.entity.ApschedulerJobEntity
 import std.nooook.readinggardenkotlin.modules.scheduler.repository.ApschedulerJobRepository
@@ -23,6 +24,7 @@ class AuthPasswordResetExpiryJobService(
     private val apschedulerJobRepository: ApschedulerJobRepository,
     private val userRepository: UserRepository,
     private val taskScheduler: TaskScheduler,
+    private val schedulerJobExecutionRunner: SchedulerJobExecutionRunner,
     private val utcClock: Clock,
     @Value("\${app.auth.password-reset-auth-ttl:PT5M}")
     private val passwordResetAuthTtl: Duration,
@@ -67,8 +69,7 @@ class AuthPasswordResetExpiryJobService(
         val persistedJobs = apschedulerJobRepository.findAllByIdStartingWith(JOB_ID_PREFIX)
             .mapNotNull { entity ->
                 entity.toPasswordResetJobOrNull() ?: run {
-                    cancelScheduledJob(entity.id)
-                    apschedulerJobRepository.delete(entity)
+                    deleteMalformedJob(entity)
                     null
                 }
             }
@@ -81,9 +82,13 @@ class AuthPasswordResetExpiryJobService(
         val now = Instant.now(utcClock)
         persistedJobs.forEach { job ->
             if (job.isExpired(now)) {
-                expire(job)
+                executeExpiry(
+                    job = job,
+                    triggerSource = SchedulerJobTriggerSource.REHYDRATED,
+                    context = jobContext(job) + ("rehydrate_action" to "expire_overdue"),
+                )
             } else {
-                schedule(job)
+                schedule(job, SchedulerJobTriggerSource.REHYDRATED)
             }
         }
     }
@@ -93,15 +98,34 @@ class AuthPasswordResetExpiryJobService(
         scheduleAfterCommit(job)
     }
 
-    private fun schedule(job: PasswordResetExpiryJob) {
+    private fun schedule(
+        job: PasswordResetExpiryJob,
+        triggerSource: SchedulerJobTriggerSource,
+    ) {
         cancelScheduledJob(job.id)
         scheduledJobs[job.id] = ScheduledJobHandle(
             job = job,
             future = taskScheduler.schedule(
-                { expire(job) },
+                { executeExpiry(job, triggerSource, jobContext(job)) },
                 job.runAt,
             ),
         )
+    }
+
+    private fun executeExpiry(
+        job: PasswordResetExpiryJob,
+        triggerSource: SchedulerJobTriggerSource,
+        context: Map<String, String>,
+    ) {
+        schedulerJobExecutionRunner.run(
+            jobName = JOB_NAME,
+            jobId = job.id,
+            overlapKey = job.id,
+            triggerSource = triggerSource,
+            context = context,
+        ) {
+            expire(job)
+        }
     }
 
     private fun expire(job: PasswordResetExpiryJob) {
@@ -122,18 +146,31 @@ class AuthPasswordResetExpiryJobService(
 
     private fun scheduleAfterCommit(job: PasswordResetExpiryJob) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            schedule(job)
+            schedule(job, SchedulerJobTriggerSource.AFTER_COMMIT)
             return
         }
 
         TransactionSynchronizationManager.registerSynchronization(
             object : TransactionSynchronization {
                 override fun afterCommit() {
-                    schedule(job)
+                    schedule(job, SchedulerJobTriggerSource.AFTER_COMMIT)
                 }
             },
         )
     }
+
+    private fun deleteMalformedJob(entity: ApschedulerJobEntity) {
+        cancelScheduledJob(entity.id)
+        apschedulerJobRepository.delete(entity)
+        logger.warn("Deleted malformed password reset expiry job during rehydrate: {}", entity.id)
+    }
+
+    private fun jobContext(job: PasswordResetExpiryJob): Map<String, String> =
+        mapOf(
+            "job_type" to "auth_password_reset_expiry",
+            "user_no" to job.userNo.toString(),
+            "run_at_epoch_millis" to job.runAt.toEpochMilli().toString(),
+        )
 
     private fun clearScheduledJobHandle(job: PasswordResetExpiryJob) {
         val handle = scheduledJobs[job.id] ?: return
@@ -222,6 +259,8 @@ class AuthPasswordResetExpiryJobService(
     }
 
     companion object {
+        private val logger = LoggerFactory.getLogger(AuthPasswordResetExpiryJobService::class.java)
+        private const val JOB_NAME = "auth-password-reset-expiry"
         private const val JOB_TYPE = "AUTH_PASSWORD_RESET_EXPIRY"
         private const val JOB_VERSION = 1
         private const val JOB_ID_PREFIX = "auth:password-reset-expiry:"
