@@ -6,6 +6,8 @@ import org.springframework.aot.hint.MemberCategory
 import org.springframework.aot.hint.RuntimeHints
 import org.springframework.aot.hint.predicate.RuntimeHintsPredicates
 import std.nooook.readinggardenkotlin.common.api.LegacyErrorDetail
+import std.nooook.readinggardenkotlin.modules.book.controller.UploadBookImageRequest
+import std.nooook.readinggardenkotlin.modules.memo.controller.UploadMemoImageRequest
 
 class HibernateNativeHintsTest {
     @Test
@@ -36,15 +38,21 @@ class HibernateNativeHintsTest {
     }
 
     @Test
-    fun `registers legacy error detail members for springdoc schema generation in native mode`() {
+    fun `registers springdoc schema dto members for native mode`() {
         val hints = RuntimeHints()
 
         HibernateNativeHints().registerHints(hints, javaClass.classLoader)
 
-        val predicate = RuntimeHintsPredicates.reflection()
-            .onType(LegacyErrorDetail::class.java)
-            .withMemberCategory(MemberCategory.INTROSPECT_DECLARED_METHODS)
+        listOf(
+            LegacyErrorDetail::class.java,
+            UploadMemoImageRequest::class.java,
+            UploadBookImageRequest::class.java,
+        ).forEach { type ->
+            val predicate = RuntimeHintsPredicates.reflection()
+                .onType(type)
+                .withMemberCategory(MemberCategory.INTROSPECT_DECLARED_METHODS)
 
-        assertTrue(predicate.test(hints))
+            assertTrue(predicate.test(hints), "${type.name} should be registered for springdoc")
+        }
     }
 }
