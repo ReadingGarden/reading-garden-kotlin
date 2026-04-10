@@ -97,6 +97,14 @@ jobs:
           if docker ps -a --format '{{.Names}}' | grep -qx 'reading-garden'; then
             PREVIOUS_IMAGE="$(docker inspect --format='{{.Config.Image}}' reading-garden)"
           fi
+          echo "=== Disk usage before cleanup ==="
+          df -h .
+          docker system df || true
+          docker rm -f reading-garden-debug >/dev/null 2>&1 || true
+          docker system prune -af || true
+          echo "=== Disk usage after cleanup ==="
+          df -h .
+          docker system df || true
           export IMAGE_REF="$IMAGE_REF"
           export APP_PORT="$APP_PORT"
           docker compose -f docker-compose.yml pull
@@ -106,7 +114,8 @@ jobs:
               export IMAGE_REF="$PREVIOUS_IMAGE"
               docker compose -f docker-compose.yml up -d
             fi
+            docker system prune -af || true
             exit 1
           fi
-          docker image prune -f
+          docker system prune -af || true
           EOF
