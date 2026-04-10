@@ -8,14 +8,16 @@ import java.nio.file.NoSuchFileException
 import java.nio.file.StandardOpenOption
 import java.nio.file.StandardCopyOption
 import java.util.UUID
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 
 @Service
 class BindMountImageStorage(
-    private val storageProperties: StorageProperties,
+    @Value("\${app.storage.images-root:/opt/reading-garden/data/images}")
+    private val imagesRoot: String,
 ) : ImageStorage {
     private val rootPath: Path by lazy {
-        Path.of(storageProperties.imagesRoot).toAbsolutePath().normalize()
+        Path.of(imagesRoot).toAbsolutePath().normalize()
     }
 
     private val trashRootPath: Path by lazy {

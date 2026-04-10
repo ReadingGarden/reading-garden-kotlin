@@ -2,10 +2,10 @@ package std.nooook.readinggardenkotlin.modules.book
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.json.JsonMapper
-import jakarta.servlet.MultipartConfigElement
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.servlet.autoconfigure.MultipartProperties
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -57,7 +57,7 @@ import org.springframework.test.context.DynamicPropertySource
 @Import(BookControllerIntegrationTest.TestConfig::class)
 class BookControllerIntegrationTest(
     @Autowired private val mockMvc: MockMvc,
-    @Autowired private val multipartConfigElement: MultipartConfigElement,
+    @Autowired private val multipartProperties: MultipartProperties,
     @Autowired private val userRepository: UserRepository,
     @Autowired private val refreshTokenRepository: RefreshTokenRepository,
     @Autowired private val pushRepository: PushRepository,
@@ -79,6 +79,7 @@ class BookControllerIntegrationTest(
         @DynamicPropertySource
         fun registerStorageProperties(registry: DynamicPropertyRegistry) {
             registry.add("app.storage.images-root") { imagesRoot.toString() }
+            registry.add("spring.servlet.multipart.location") { imagesRoot.resolve("multipart-temp").toString() }
         }
     }
 
@@ -144,9 +145,9 @@ class BookControllerIntegrationTest(
 
     @Test
     fun `multipart temp location should use external images root`() {
-        assertEquals(imagesRoot.resolve("multipart-temp").toString(), multipartConfigElement.location)
-        assertEquals(10L * 1024L * 1024L, multipartConfigElement.maxFileSize)
-        assertEquals(10L * 1024L * 1024L, multipartConfigElement.maxRequestSize)
+        assertEquals(imagesRoot.resolve("multipart-temp").toString(), multipartProperties.location)
+        assertEquals(10L * 1024L * 1024L, multipartProperties.maxFileSize.toBytes())
+        assertEquals(10L * 1024L * 1024L, multipartProperties.maxRequestSize.toBytes())
     }
 
     @Test
