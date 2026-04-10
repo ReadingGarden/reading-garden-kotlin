@@ -47,6 +47,6 @@ app:
     account: ${APP_EMAIL_ACCOUNT:${EMAIL_ACCOUNT:}}
     password: ${APP_EMAIL_PASSWORD:${EMAIL_PASSWORD:}}
   storage:
-    images-root: ${APP_STORAGE_IMAGES_ROOT:/opt/reading-garden/data/images}
+    images-root: ${APP_STORAGE_IMAGES_ROOT:/srv/Back/images}
   integrations:
     aladin-ttbkey: ${APP_ALADIN_TTBKEY:${ALADIN_TTBKEY:}}

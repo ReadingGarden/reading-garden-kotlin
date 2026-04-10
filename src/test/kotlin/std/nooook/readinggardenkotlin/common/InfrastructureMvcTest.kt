@@ -40,7 +40,7 @@ class InfrastructureMvcTest(
         mockMvc.perform(get("/v3/api-docs"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.openapi").exists())
-            .andExpect(jsonPath("$.info.title").value("Reading Garden API"))
+            .andExpect(jsonPath("$.info.title").value("Reading Garden Legacy API"))
     }
 
     @Test

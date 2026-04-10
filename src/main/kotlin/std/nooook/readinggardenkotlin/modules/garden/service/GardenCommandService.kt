@@ -32,10 +32,42 @@ class GardenCommandService(
     private val memoImageRepository: MemoImageRepository,
     private val imageStorage: ImageStorage,
 ) {
+    @Transactional
     fun createGarden(
         userNo: Int,
         request: CreateGardenRequest,
-    ): CreateGardenResponse = throw UnsupportedOperationException("Not implemented yet")
+    ): CreateGardenResponse {
+        userRepository.findByUserNoForUpdate(userNo)
+            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 사용자 정보가 없습니다.")
+
+        if (gardenUserRepository.countByUserNo(userNo) >= MAX_GARDEN_COUNT) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "가든 생성 개수 초과")
+        }
+
+        val garden = gardenRepository.save(
+            std.nooook.readinggardenkotlin.modules.garden.entity.GardenEntity(
+                gardenTitle = request.garden_title,
+                gardenInfo = request.garden_info,
+                gardenColor = request.garden_color,
+            ),
+        )
+
+        gardenUserRepository.save(
+            std.nooook.readinggardenkotlin.modules.garden.entity.GardenUserEntity(
+                gardenNo = garden.gardenNo ?: throw IllegalStateException("Garden id was not generated"),
+                userNo = userNo,
+                gardenLeader = true,
+                gardenMain = true,
+            ),
+        )
+
+        return CreateGardenResponse(
+            garden_no = garden.gardenNo ?: throw IllegalStateException("Garden id was not generated"),
+            garden_title = request.garden_title,
+            garden_info = request.garden_info,
+            garden_color = request.garden_color,
+        )
+    }
 
     @Transactional
     fun updateGarden(
@@ -250,6 +282,7 @@ class GardenCommandService(
     }
 
     companion object {
+        private const val MAX_GARDEN_COUNT = 5L
         private const val MAX_GARDEN_BOOK_COUNT = 30L
         private val logger = LoggerFactory.getLogger(GardenCommandService::class.java)
     }

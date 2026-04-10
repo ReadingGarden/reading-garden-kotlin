@@ -1,0 +1,15 @@
+{
+  "resp_code": 200,
+  "resp_msg": "메모 상세 조회 성공",
+  "data": {
+    "id": 1,
+    "book_no": 1,
+    "book_title": "상세 메모 책",
+    "book_author": "저자",
+    "book_publisher": "출판사",
+    "book_info": "메모 상세용 책 소개",
+    "memo_content": "상세 메모 내용",
+    "image_url": null,
+    "memo_created_at": "2026-04-09T16:30:00"
+  }
+}
