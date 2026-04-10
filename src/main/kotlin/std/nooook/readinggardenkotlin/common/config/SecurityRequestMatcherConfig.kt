@@ -1,19 +1,18 @@
-package std.nooook.readinggardenkotlin.common.config;
+package std.nooook.readinggardenkotlin.common.config
 
-import java.util.List;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
-import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
-import org.springframework.security.web.util.matcher.OrRequestMatcher;
-import org.springframework.security.web.util.matcher.RequestMatcher;
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
+import org.springframework.http.HttpMethod
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher
+import org.springframework.security.web.util.matcher.OrRequestMatcher
+import org.springframework.security.web.util.matcher.RequestMatcher
 
-@Configuration(proxyBeanMethods = false)
-public class SecurityRequestMatcherConfig {
-
+@Configuration
+class SecurityRequestMatcherConfig {
     @Bean
-    public RequestMatcher publicEndpointRequestMatcher() {
-        return new OrRequestMatcher(List.of(
+    fun publicEndpointRequestMatcher(): RequestMatcher =
+        OrRequestMatcher(
+            listOf(
                 PathPatternRequestMatcher.pathPattern("/api/health"),
                 PathPatternRequestMatcher.pathPattern("/v3/api-docs"),
                 PathPatternRequestMatcher.pathPattern("/v3/api-docs/**"),
@@ -21,13 +20,14 @@ public class SecurityRequestMatcherConfig {
                 PathPatternRequestMatcher.pathPattern("/swagger-ui/**"),
                 PathPatternRequestMatcher.pathPattern("/swagger-ui.html"),
                 PathPatternRequestMatcher.pathPattern("/images/**"),
+                PathPatternRequestMatcher.pathPattern("/api/images/**"),
                 PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/auth"),
                 PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/auth/"),
                 PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/auth/login"),
                 PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/auth/refresh"),
                 PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/auth/find-password"),
                 PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/auth/find-password/check"),
-                PathPatternRequestMatcher.pathPattern(HttpMethod.PUT, "/api/v1/auth/find-password/update-password")
-        ));
-    }
+                PathPatternRequestMatcher.pathPattern(HttpMethod.PUT, "/api/v1/auth/find-password/update-password"),
+            ),
+        )
 }
