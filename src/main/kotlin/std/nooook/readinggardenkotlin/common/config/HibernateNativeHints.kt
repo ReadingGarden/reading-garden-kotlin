@@ -7,6 +7,7 @@ import org.springframework.aot.hint.RuntimeHintsRegistrar
 import org.springframework.aot.hint.TypeReference
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver
 import org.springframework.core.io.support.ResourcePatternResolver
+import std.nooook.readinggardenkotlin.common.api.LegacyErrorDetail
 
 class HibernateNativeHints : RuntimeHintsRegistrar {
 
@@ -53,6 +54,7 @@ class HibernateNativeHints : RuntimeHintsRegistrar {
         val resolver = PathMatchingResourcePatternResolver(loader)
 
         registerKotlinReflectionParameterHints(hints)
+        registerSpringDocSchemaHints(hints)
         registerHibernateLoggerImplementations(hints, resolver)
         registerHibernateEventListenerArrays(hints)
         registerHibernateI18nResources(hints)
@@ -67,6 +69,18 @@ class HibernateNativeHints : RuntimeHintsRegistrar {
         hints.reflection().registerType(
             java.lang.reflect.Parameter::class.java,
             MemberCategory.INVOKE_PUBLIC_METHODS,
+        )
+    }
+
+    private fun registerSpringDocSchemaHints(hints: RuntimeHints) {
+        // springdoc inspects this schema model through kotlin-reflect when generating /v3/api-docs in native mode.
+        hints.reflection().registerType(
+            LegacyErrorDetail::class.java,
+            MemberCategory.INTROSPECT_DECLARED_CONSTRUCTORS,
+            MemberCategory.INVOKE_DECLARED_CONSTRUCTORS,
+            MemberCategory.INTROSPECT_DECLARED_METHODS,
+            MemberCategory.INVOKE_PUBLIC_METHODS,
+            MemberCategory.ACCESS_DECLARED_FIELDS,
         )
     }
 
