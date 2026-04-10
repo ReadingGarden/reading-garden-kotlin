@@ -33,7 +33,7 @@ class WebMvcConfig(
     override fun addResourceHandlers(registry: ResourceHandlerRegistry) {
         val imagesRoot = Path.of(storageProperties.imagesRoot).toAbsolutePath().normalize().toString()
         registry
-            .addResourceHandler("/images/**")
+            .addResourceHandler("/images/**", "/api/images/**")
             .addResourceLocations("file:$imagesRoot/")
             .setCacheControl(CacheControl.noCache())
     }
