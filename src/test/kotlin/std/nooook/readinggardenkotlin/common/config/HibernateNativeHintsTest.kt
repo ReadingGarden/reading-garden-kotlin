@@ -5,6 +5,7 @@ import kotlin.test.assertTrue
 import org.springframework.aot.hint.MemberCategory
 import org.springframework.aot.hint.RuntimeHints
 import org.springframework.aot.hint.predicate.RuntimeHintsPredicates
+import std.nooook.readinggardenkotlin.common.api.LegacyErrorDetail
 
 class HibernateNativeHintsTest {
     @Test
@@ -30,6 +31,19 @@ class HibernateNativeHintsTest {
             java.lang.reflect.Executable::class.java,
             "getParameters",
         )
+
+        assertTrue(predicate.test(hints))
+    }
+
+    @Test
+    fun `registers legacy error detail members for springdoc schema generation in native mode`() {
+        val hints = RuntimeHints()
+
+        HibernateNativeHints().registerHints(hints, javaClass.classLoader)
+
+        val predicate = RuntimeHintsPredicates.reflection()
+            .onType(LegacyErrorDetail::class.java)
+            .withMemberCategory(MemberCategory.INTROSPECT_DECLARED_METHODS)
 
         assertTrue(predicate.test(hints))
     }
