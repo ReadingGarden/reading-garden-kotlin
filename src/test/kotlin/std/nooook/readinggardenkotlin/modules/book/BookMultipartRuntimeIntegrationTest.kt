@@ -53,6 +53,7 @@ class BookMultipartRuntimeIntegrationTest(
         @DynamicPropertySource
         fun registerStorageProperties(registry: DynamicPropertyRegistry) {
             registry.add("app.storage.images-root") { imagesRoot.toString() }
+            registry.add("spring.servlet.multipart.location") { imagesRoot.resolve("multipart-temp").toString() }
         }
     }
 
