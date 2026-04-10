@@ -1011,6 +1011,17 @@ class BookControllerIntegrationTest(
             "image-bytes".toByteArray(),
             imageResponse.response.contentAsByteArray,
         )
+
+        val legacyImageResponse = mockMvc.perform(
+            get("/api/images/${image.imageUrl}"),
+        )
+            .andExpect(status().isOk)
+            .andReturn()
+
+        assertContentEquals(
+            "image-bytes".toByteArray(),
+            legacyImageResponse.response.contentAsByteArray,
+        )
     }
 
     @Test

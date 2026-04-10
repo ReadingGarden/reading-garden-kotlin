@@ -1,0 +1,17 @@
+{
+  "resp_code": 200,
+  "resp_msg": "책 상세 조회 성공",
+  "data": {
+    "searchCategoryId": 1,
+    "searchCategoryName": "소설",
+    "title": "상세 책",
+    "author": "저자",
+    "description": "소개",
+    "isbn13": "9788937462788",
+    "cover": "https://example.com/book.jpg",
+    "publisher": "출판사",
+    "itemPage": 321,
+    "record": {},
+    "memo": {}
+  }
+}

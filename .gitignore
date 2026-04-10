@@ -2,6 +2,10 @@
 AGENTS.md
 .git-backups/
 /env
+.env
+.env.*
+external/ReadingGarden-App/
+scripts/bootrun-local.sh
 /docs
 external/ReadingGarden-App/
 

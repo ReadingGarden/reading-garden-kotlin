@@ -83,6 +83,21 @@ class LegacyApiCompatibilityTest(
                 ),
             ),
         )
+        fixedAladinClient.detailResponse = mapOf(
+            "searchCategoryId" to 1,
+            "searchCategoryName" to "소설",
+            "item" to listOf(
+                mapOf(
+                    "title" to "상세 책",
+                    "author" to "저자",
+                    "description" to "소개",
+                    "isbn13" to "9788937462788",
+                    "cover" to "https://example.com/book.jpg",
+                    "publisher" to "출판사",
+                    "subInfo" to mapOf("itemPage" to 321),
+                ),
+            ),
+        )
     }
 
     @Test
@@ -118,6 +133,41 @@ class LegacyApiCompatibilityTest(
 
         assertSameShape(
             fixture = readFixture("contracts/legacy/book/search-success.json"),
+            actual = objectMapper.readTree(response.response.contentAsString),
+        )
+    }
+
+    @Test
+    fun `get auth profile should match legacy contract shape`() {
+        val accessToken = signupAndGetAccessToken("authprofile@example.com")
+
+        val response = mockMvc.perform(
+            get("/api/v1/auth")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken"),
+        )
+            .andExpect(status().isOk)
+            .andReturn()
+
+        assertSameShape(
+            fixture = readFixture("contracts/legacy/auth/profile-success.json"),
+            actual = objectMapper.readTree(response.response.contentAsString),
+        )
+    }
+
+    @Test
+    fun `get book detail should match legacy contract shape`() {
+        val accessToken = signupAndGetAccessToken("bookdetailcontract@example.com")
+
+        val response = mockMvc.perform(
+            get("/api/v1/book/detail-isbn")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("query", "9788937462788"),
+        )
+            .andExpect(status().isOk)
+            .andReturn()
+
+        assertSameShape(
+            fixture = readFixture("contracts/legacy/book/detail-success.json"),
             actual = objectMapper.readTree(response.response.contentAsString),
         )
     }
@@ -339,6 +389,48 @@ class LegacyApiCompatibilityTest(
 
         assertSameShape(
             fixture = readFixture("contracts/legacy/memo/list-success.json"),
+            actual = objectMapper.readTree(response.response.contentAsString),
+        )
+    }
+
+    @Test
+    fun `get memo detail should match legacy contract shape`() {
+        val accessToken = signupAndGetAccessToken("memodetailcontract@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("memodetailcontract@example.com")?.userNo)
+        val bookNo = bookRepository.save(
+            BookEntity(
+                gardenNo = null,
+                bookTitle = "상세 메모 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookStatus = 1,
+                userNo = userNo,
+                bookPage = 300,
+                bookImageUrl = "https://example.com/memo-book.jpg",
+                bookInfo = "메모 상세용 책 소개",
+            ),
+        ).bookNo ?: error("bookNo was not generated")
+
+        val memoId = memoRepository.save(
+            MemoEntity(
+                bookNo = bookNo,
+                memoContent = "상세 메모 내용",
+                userNo = userNo,
+                memoLike = true,
+                memoCreatedAt = LocalDateTime.of(2026, 4, 9, 16, 30, 0),
+            ),
+        ).id ?: error("memoId was not generated")
+
+        val response = mockMvc.perform(
+            get("/api/v1/memo/detail")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .queryParam("id", memoId.toString()),
+        )
+            .andExpect(status().isOk)
+            .andReturn()
+
+        assertSameShape(
+            fixture = readFixture("contracts/legacy/memo/detail-success.json"),
             actual = objectMapper.readTree(response.response.contentAsString),
         )
     }
@@ -822,6 +914,7 @@ class LegacyApiCompatibilityTest(
 
     class FixedAladinClient : AladinClient {
         var searchBooksResponse: Map<String, Any?> = emptyMap()
+        var detailResponse: Map<String, Any?> = emptyMap()
 
         override fun searchBooks(
             query: String,
@@ -831,7 +924,7 @@ class LegacyApiCompatibilityTest(
 
         override fun searchBookByIsbn(query: String): Map<String, Any?> = emptyMap()
 
-        override fun getBookDetailByIsbn(query: String): Map<String, Any?> = emptyMap()
+        override fun getBookDetailByIsbn(query: String): Map<String, Any?> = detailResponse
     }
 
     @TestConfiguration(proxyBeanMethods = false)
