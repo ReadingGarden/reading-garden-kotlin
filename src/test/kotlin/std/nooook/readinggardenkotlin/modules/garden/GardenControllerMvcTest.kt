@@ -31,16 +31,12 @@ import std.nooook.readinggardenkotlin.modules.garden.controller.GardenListMember
 import std.nooook.readinggardenkotlin.modules.garden.service.GardenCommandService
 import std.nooook.readinggardenkotlin.modules.garden.service.GardenMembershipService
 import std.nooook.readinggardenkotlin.modules.garden.service.GardenQueryService
-import std.nooook.readinggardenkotlin.modules.garden.service.GardenService
 
 @SpringBootTest
 @AutoConfigureMockMvc
 class GardenControllerMvcTest(
     @Autowired private val mockMvc: MockMvc,
 ) {
-    @MockitoBean
-    private lateinit var gardenService: GardenService
-
     @MockitoBean
     private lateinit var gardenCommandService: GardenCommandService
 
@@ -53,7 +49,7 @@ class GardenControllerMvcTest(
     @Test
     fun `create garden should return legacy success envelope`() {
         given(
-            gardenService.createGarden(
+            gardenCommandService.createGarden(
                 userNo = 1,
                 request = CreateGardenRequest(
                     garden_title = "새 가든",
@@ -89,7 +85,7 @@ class GardenControllerMvcTest(
             .andExpect(jsonPath("$.resp_msg").value("가든 추가 성공"))
             .andExpect(jsonPath("$.data.garden_no").value(10))
             .andExpect(jsonPath("$.data.garden_title").value("새 가든"))
-        verify(gardenService).createGarden(
+        verify(gardenCommandService).createGarden(
             1,
             CreateGardenRequest(
                 garden_title = "새 가든",
