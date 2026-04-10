@@ -1,15 +1,19 @@
 package std.nooook.readinggardenkotlin.common.config
 
-import org.springframework.aot.hint.MemberCategory
 import org.springframework.aot.hint.ExecutableMode
+import org.springframework.aot.hint.MemberCategory
 import org.springframework.aot.hint.RuntimeHints
 import org.springframework.aot.hint.RuntimeHintsRegistrar
 import org.springframework.aot.hint.TypeReference
+import org.springframework.core.io.Resource
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver
 import org.springframework.core.io.support.ResourcePatternResolver
-import std.nooook.readinggardenkotlin.common.api.LegacyErrorDetail
 
 class HibernateNativeHints : RuntimeHintsRegistrar {
+    private val springDocSchemaResourcePatterns = listOf(
+        "classpath*:std/nooook/readinggardenkotlin/common/api/*.class",
+        "classpath*:std/nooook/readinggardenkotlin/modules/*/controller/*.class",
+    )
 
     private val hibernateEventListenerTypes = listOf(
         "org.hibernate.event.spi.AutoFlushEventListener",
@@ -54,7 +58,7 @@ class HibernateNativeHints : RuntimeHintsRegistrar {
         val resolver = PathMatchingResourcePatternResolver(loader)
 
         registerKotlinReflectionParameterHints(hints)
-        registerSpringDocSchemaHints(hints)
+        registerSpringDocSchemaHints(hints, resolver)
         registerHibernateLoggerImplementations(hints, resolver)
         registerHibernateEventListenerArrays(hints)
         registerHibernateI18nResources(hints)
@@ -72,16 +76,26 @@ class HibernateNativeHints : RuntimeHintsRegistrar {
         )
     }
 
-    private fun registerSpringDocSchemaHints(hints: RuntimeHints) {
-        // springdoc inspects this schema model through kotlin-reflect when generating /v3/api-docs in native mode.
-        hints.reflection().registerType(
-            LegacyErrorDetail::class.java,
-            MemberCategory.INTROSPECT_DECLARED_CONSTRUCTORS,
-            MemberCategory.INVOKE_DECLARED_CONSTRUCTORS,
-            MemberCategory.INTROSPECT_DECLARED_METHODS,
-            MemberCategory.INVOKE_PUBLIC_METHODS,
-            MemberCategory.ACCESS_DECLARED_FIELDS,
-        )
+    private fun registerSpringDocSchemaHints(
+        hints: RuntimeHints,
+        resolver: ResourcePatternResolver,
+    ) {
+        // springdoc inspects controller/common DTOs through kotlin-reflect when generating /v3/api-docs in native mode.
+        springDocSchemaResourcePatterns
+            .asSequence()
+            .flatMap { resolver.getResources(it).asSequence() }
+            .mapNotNull(::toApplicationClassName)
+            .distinct()
+            .forEach { className ->
+                hints.reflection().registerType(
+                    TypeReference.of(className),
+                    MemberCategory.INTROSPECT_DECLARED_CONSTRUCTORS,
+                    MemberCategory.INVOKE_DECLARED_CONSTRUCTORS,
+                    MemberCategory.INTROSPECT_DECLARED_METHODS,
+                    MemberCategory.INVOKE_PUBLIC_METHODS,
+                    MemberCategory.ACCESS_DECLARED_FIELDS,
+                )
+            }
     }
 
     private fun registerHibernateLoggerImplementations(
@@ -123,5 +137,32 @@ class HibernateNativeHints : RuntimeHintsRegistrar {
 
     private fun registerHibernateI18nResources(hints: RuntimeHints) {
         hints.resources().registerPattern("org/hibernate/**/*.i18n.properties")
+    }
+
+    private fun toApplicationClassName(resource: Resource): String? {
+        val location = resource.url.toString()
+        val path = when {
+            location.contains("!/") -> location.substringAfter("!/")
+            location.contains("/std/nooook/readinggardenkotlin/") ->
+                "std/nooook/readinggardenkotlin/${location.substringAfter("/std/nooook/readinggardenkotlin/")}"
+            else -> null
+        }?.removePrefix("/")
+
+        if (path == null || !path.endsWith(".class")) {
+            return null
+        }
+
+        val className = path.removeSuffix(".class").replace('/', '.')
+        if (
+            className.endsWith("Controller") ||
+            className.endsWith("Kt") ||
+            className.endsWith("package-info") ||
+            className.endsWith("module-info") ||
+            '$' in className
+        ) {
+            return null
+        }
+
+        return className
     }
 }
