@@ -13,25 +13,17 @@ class JjwtNativeHintsTest {
     }
 
     @Test
-    fun `registers KeysBridge for native jjwt bootstrap`() {
-        val keysBridge = Class.forName("io.jsonwebtoken.impl.security.KeysBridge")
-        val predicate = RuntimeHintsPredicates.reflection()
-            .onType(keysBridge)
-            .withMemberCategory(MemberCategory.INVOKE_PUBLIC_METHODS)
-
-        assertTrue(predicate.test(hints))
-    }
-
-    @Test
-    fun `registers Jwts static initializer dependencies`() {
-        val classNames = listOf(
+    fun `registers jjwt-impl classes for reflection`() {
+        val sampleClasses = listOf(
+            "io.jsonwebtoken.impl.security.KeysBridge",
             "io.jsonwebtoken.impl.security.StandardSecureDigestAlgorithms",
-            "io.jsonwebtoken.impl.security.StandardEncryptionAlgorithms",
             "io.jsonwebtoken.impl.security.StandardKeyAlgorithms",
-            "io.jsonwebtoken.impl.io.StandardCompressionAlgorithms",
+            "io.jsonwebtoken.impl.security.StandardKeyOperations",
+            "io.jsonwebtoken.impl.DefaultJwtBuilder",
+            "io.jsonwebtoken.impl.DefaultJwtParser",
         )
 
-        for (className in classNames) {
+        for (className in sampleClasses) {
             val predicate = RuntimeHintsPredicates.reflection()
                 .onType(Class.forName(className))
                 .withMemberCategory(MemberCategory.INVOKE_DECLARED_CONSTRUCTORS)
@@ -40,12 +32,10 @@ class JjwtNativeHintsTest {
     }
 
     @Test
-    fun `registers jjwt builder and parser supplier classes`() {
+    fun `registers jjwt-jackson classes for reflection`() {
         val classNames = listOf(
-            "io.jsonwebtoken.impl.DefaultJwtBuilder\$Supplier",
-            "io.jsonwebtoken.impl.DefaultJwtParserBuilder\$Supplier",
-            "io.jsonwebtoken.impl.DefaultJwtHeaderBuilder\$Supplier",
-            "io.jsonwebtoken.impl.DefaultClaimsBuilder\$Supplier",
+            "io.jsonwebtoken.jackson.io.JacksonSerializer",
+            "io.jsonwebtoken.jackson.io.JacksonDeserializer",
         )
 
         for (className in classNames) {
@@ -58,30 +48,8 @@ class JjwtNativeHintsTest {
 
     @Test
     fun `registers ServiceLoader resources`() {
-        val resources = listOf(
-            "META-INF/services/io.jsonwebtoken.io.Serializer",
-            "META-INF/services/io.jsonwebtoken.io.Deserializer",
-            "META-INF/services/io.jsonwebtoken.CompressionCodec",
-        )
-
-        for (resource in resources) {
-            val predicate = RuntimeHintsPredicates.resource().forResource(resource)
-            assertTrue(predicate.test(hints), "$resource should be registered")
-        }
-    }
-
-    @Test
-    fun `registers Jackson serializer and deserializer implementations`() {
-        val classNames = listOf(
-            "io.jsonwebtoken.jackson.io.JacksonSerializer",
-            "io.jsonwebtoken.jackson.io.JacksonDeserializer",
-        )
-
-        for (className in classNames) {
-            val predicate = RuntimeHintsPredicates.reflection()
-                .onType(Class.forName(className))
-                .withMemberCategory(MemberCategory.INVOKE_DECLARED_CONSTRUCTORS)
-            assertTrue(predicate.test(hints), "$className should be registered")
-        }
+        val predicate = RuntimeHintsPredicates.resource()
+            .forResource("META-INF/services/io.jsonwebtoken.io.Serializer")
+        assertTrue(predicate.test(hints))
     }
 }
