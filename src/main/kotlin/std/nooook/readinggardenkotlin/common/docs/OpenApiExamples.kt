@@ -146,6 +146,7 @@ object OpenApiExamples {
           "resp_code": 200,
           "resp_msg": "푸시 알림 조회 성공",
           "data": {
+            "user_no": 1,
             "push_app_ok": true,
             "push_book_ok": false,
             "push_time": null

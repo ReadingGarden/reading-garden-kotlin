@@ -217,7 +217,7 @@ class BookControllerIntegrationTest(
     }
 
     @Test
-    fun `detail isbn should fail loudly when required fields are missing`() {
+    fun `detail isbn should return empty fields when required fields are missing`() {
         val accessToken = signupAndGetAccessToken("bookdetailfail@example.com")
         recordingAladinClient.detailResponse = mapOf(
             "searchCategoryId" to 1,
@@ -230,8 +230,10 @@ class BookControllerIntegrationTest(
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .queryParam("query", "9788937462788"),
         )
-            .andExpect(status().isInternalServerError)
-            .andExpect(jsonPath("$.resp_code").value(500))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.data.title").value(""))
+            .andExpect(jsonPath("$.data.itemPage").value(0))
     }
 
     @Test
