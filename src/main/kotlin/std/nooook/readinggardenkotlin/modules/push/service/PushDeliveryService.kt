@@ -35,7 +35,7 @@ class PushDeliveryService(
             tokens = tokens,
             title = "💧물 주는 시간이에요!",
             body = "책 어디까지 읽으셨나요? 독서가든에서 기록해보세요!",
-            data = emptyMap(),
+            data = HashMap(),
         )
     }
 
@@ -50,7 +50,7 @@ class PushDeliveryService(
             tokens = tokens,
             title = "독서가든",
             body = content,
-            data = emptyMap(),
+            data = HashMap(),
         )
     }
 

@@ -28,7 +28,7 @@ class BookService(
             )
         } catch (e: Exception) {
             logger.error("Book search failed for query={}", query, e)
-            emptyMap()
+            HashMap()
         }
 
     fun searchBookByIsbn(query: String): BookLookupResponse =
@@ -38,7 +38,7 @@ class BookService(
             )
         } catch (e: Exception) {
             logger.error("Book ISBN search failed for query={}", query, e)
-            emptyMap()
+            HashMap()
         }
 
     fun getBookDetailByIsbn(query: String): BookDetailResponse {
@@ -48,7 +48,7 @@ class BookService(
             )
         } catch (e: Exception) {
             logger.error("Book detail lookup failed for query={}", query, e)
-            emptyMap()
+            HashMap()
         }
 
         val item = (response["item"] as? List<*>)?.firstOrNull() as? Map<*, *>
@@ -65,8 +65,8 @@ class BookService(
             cover = (item["cover"] as? String).orEmpty(),
             publisher = (item["publisher"] as? String).orEmpty(),
             itemPage = (subInfo?.get("itemPage") as? Number)?.toInt() ?: 0,
-            record = emptyMap(),
-            memo = emptyMap(),
+            record = HashMap(),
+            memo = HashMap(),
         )
     }
 
