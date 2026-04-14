@@ -33,7 +33,7 @@ import io.swagger.v3.oas.annotations.parameters.RequestBody as SwaggerRequestBod
 class AuthController(
     private val authService: AuthService,
 ) {
-    @PostMapping("", "/")
+    @PostMapping("")
     @Operation(
         summary = "회원가입",
         description = "레거시 앱이 사용하는 회원가입 API입니다. `user_email`, `user_password`, `user_fcm`를 JSON body로 전달합니다.",
@@ -169,7 +169,7 @@ class AuthController(
             data = authService.refresh(request.refresh_token),
         )
 
-    @DeleteMapping("", "/")
+    @DeleteMapping("")
     @Operation(summary = "회원 탈퇴", description = "현재 인증된 사용자를 삭제합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses(
@@ -273,7 +273,7 @@ class AuthController(
         )
     }
 
-    @GetMapping("", "/")
+    @GetMapping("")
     @Operation(summary = "내 프로필 조회", description = "현재 인증된 사용자의 프로필과 집계 정보를 조회합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses(
@@ -299,7 +299,7 @@ class AuthController(
             data = authService.getProfile(principal.userNo.toInt()),
         )
 
-    @PutMapping("", "/")
+    @PutMapping("")
     @Operation(
         summary = "프로필 수정",
         description = "닉네임과 프로필 이미지를 수정합니다. 변경하지 않을 필드는 null로 보낼 수 있습니다.",

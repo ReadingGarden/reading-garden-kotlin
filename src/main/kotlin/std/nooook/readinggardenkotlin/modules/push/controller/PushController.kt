@@ -32,7 +32,7 @@ import io.swagger.v3.oas.annotations.parameters.RequestBody as SwaggerRequestBod
 class PushController(
     private val pushService: PushService,
 ) {
-    @GetMapping("", "/")
+    @GetMapping("")
     @Operation(summary = "푸시 설정 조회", description = "현재 사용자의 푸시 허용 여부와 예약 시각을 조회합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses(
@@ -53,7 +53,7 @@ class PushController(
             data = pushService.getPush(principal.userNo.toInt()),
         )
 
-    @PutMapping("", "/")
+    @PutMapping("")
     @Operation(
         summary = "푸시 설정 수정",
         description = "앱 푸시 허용 여부, 독서 푸시 허용 여부, 푸시 시각을 수정합니다.",
