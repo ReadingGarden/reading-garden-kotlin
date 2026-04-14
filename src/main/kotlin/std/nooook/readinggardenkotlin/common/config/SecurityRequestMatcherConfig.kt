@@ -22,7 +22,6 @@ class SecurityRequestMatcherConfig {
                 PathPatternRequestMatcher.pathPattern("/images/**"),
                 PathPatternRequestMatcher.pathPattern("/api/images/**"),
                 PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/auth"),
-                PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/auth/"),
                 PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/auth/login"),
                 PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/auth/refresh"),
                 PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/auth/find-password"),

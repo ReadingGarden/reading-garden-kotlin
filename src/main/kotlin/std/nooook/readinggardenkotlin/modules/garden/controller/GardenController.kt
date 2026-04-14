@@ -73,7 +73,7 @@ class GardenController(
             data = gardenQueryService.getGardenDetail(principal.userNo.toInt(), gardenNo),
         )
 
-    @PostMapping("", "/")
+    @PostMapping("")
     @Operation(
         summary = "가든 생성",
         description = "새 가든을 생성합니다.",
@@ -95,7 +95,7 @@ class GardenController(
             ),
         )
 
-    @PutMapping("", "/")
+    @PutMapping("")
     @Operation(
         summary = "가든 수정",
         description = "`garden_no`에 해당하는 가든 제목, 소개, 색상을 수정합니다.",
@@ -117,7 +117,7 @@ class GardenController(
             data = emptyMap<String, Any?>(),
         )
 
-    @DeleteMapping("", "/")
+    @DeleteMapping("")
     @Operation(summary = "가든 삭제", description = "`garden_no`에 해당하는 가든을 삭제합니다.")
     @SecurityRequirement(name = "bearerAuth")
     fun deleteGarden(
