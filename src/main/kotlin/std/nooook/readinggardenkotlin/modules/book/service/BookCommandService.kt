@@ -86,6 +86,9 @@ class BookCommandService(
         }
         request.book_tree?.let { book.bookTree = it }
         request.book_status?.let { book.bookStatus = it }
+        request.book_title?.let { book.bookTitle = it }
+        request.book_author?.let { book.bookAuthor = it }
+        request.book_image_url?.let { book.bookImageUrl = it }
         bookRepository.save(book)
         return "책 수정 성공"
     }
