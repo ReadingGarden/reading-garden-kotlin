@@ -12,16 +12,18 @@ class FirebaseAdminMessagingSender(
     private val firebaseMessaging: FirebaseMessaging,
 ) : FirebaseMessagingSender {
     override fun sendEachForMulticast(request: FcmMulticastRequest): List<FcmSendResult> {
-        val message = MulticastMessage.builder()
+        val builder = MulticastMessage.builder()
             .setNotification(
                 Notification.builder()
                     .setTitle(request.title)
                     .setBody(request.body)
                     .build(),
             )
-            .putAllData(request.data)
             .addAllTokens(request.tokens)
-            .build()
+        if (request.data.isNotEmpty()) {
+            builder.putAllData(request.data)
+        }
+        val message = builder.build()
 
         return firebaseMessaging
             .sendEachForMulticast(message)
