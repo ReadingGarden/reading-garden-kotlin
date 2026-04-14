@@ -15,7 +15,7 @@
         "book_image_url": "https://example.com/book.jpg",
         "memo_content": "메모 내용",
         "memo_like": true,
-        "image_url": "",
+        "image_url": null,
         "memo_created_at": "2026-04-06T12:00:00"
       }
     ]
