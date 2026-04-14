@@ -3,6 +3,7 @@ package std.nooook.readinggardenkotlin.modules.book.integration
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.json.JsonMapper
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.InitializingBean
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.MediaType
@@ -87,18 +88,23 @@ class AladinRestClient(
         return fetch(uri)
     }
 
-    private fun fetch(uri: java.net.URI): Map<String, Any?> {
-        val body = restClient.get()
-            .uri(uri)
-            .accept(MediaType.APPLICATION_JSON)
-            .retrieve()
-            .body(String::class.java)
-            ?: return emptyMap()
+    private fun fetch(uri: java.net.URI): Map<String, Any?> =
+        try {
+            val body = restClient.get()
+                .uri(uri)
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .body(String::class.java)
+                ?: return emptyMap()
 
-        return objectMapper.readValue(body, object : TypeReference<Map<String, Any?>>() {})
-    }
+            objectMapper.readValue(body, object : TypeReference<Map<String, Any?>>() {})
+        } catch (e: Exception) {
+            logger.error("Aladin API call failed for URI: {}", uri, e)
+            emptyMap()
+        }
 
     companion object {
+        private val logger = LoggerFactory.getLogger(AladinRestClient::class.java)
         private const val ALADIN_ITEM_SEARCH_URL = "http://www.aladin.co.kr/ttb/api/ItemSearch.aspx"
         private const val ALADIN_ITEM_LOOKUP_URL = "http://www.aladin.co.kr/ttb/api/ItemLookUp.aspx"
         private val CONNECT_TIMEOUT: Duration = Duration.ofSeconds(3)
