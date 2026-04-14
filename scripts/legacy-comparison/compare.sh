@@ -151,10 +151,10 @@ compare_endpoint() {
         "${kotlin_extra_args[@]+"${kotlin_extra_args[@]}"}")
 
     local legacy_status kotlin_status legacy_body kotlin_body
-    legacy_status=$(echo "${legacy_raw}" | head -1)
-    legacy_body=$(echo "${legacy_raw}" | tail -n +2)
-    kotlin_status=$(echo "${kotlin_raw}" | head -1)
-    kotlin_body=$(echo "${kotlin_raw}" | tail -n +2)
+    legacy_status=$(head -1 <<< "${legacy_raw}")
+    legacy_body=$(tail -n +2 <<< "${legacy_raw}")
+    kotlin_status=$(head -1 <<< "${kotlin_raw}")
+    kotlin_body=$(tail -n +2 <<< "${kotlin_raw}")
 
     # Save for callers that need IDs from responses
     LAST_LEGACY_STATUS="${legacy_status}"
@@ -302,7 +302,7 @@ DIFFEOF
 log_step "Health Checks"
 
 log_info "Checking legacy server health..."
-LEGACY_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" "${LEGACY_BASE}/api/health" || echo "000")
+LEGACY_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" "${LEGACY_BASE}/api/v1/docs" || echo "000")
 if [[ "${LEGACY_HEALTH}" == "200" ]]; then
     log_ok "Legacy server is healthy (HTTP ${LEGACY_HEALTH})"
 else
@@ -341,14 +341,14 @@ EOF
 # Try logging in to legacy first
 log_info "Attempting login on legacy server..."
 LEGACY_LOGIN_RAW=$(api_call POST "${LEGACY_API}/auth/login" -d "${LOGIN_BODY}")
-LEGACY_LOGIN_STATUS=$(echo "${LEGACY_LOGIN_RAW}" | head -1)
-LEGACY_LOGIN_BODY=$(echo "${LEGACY_LOGIN_RAW}" | tail -n +2)
+LEGACY_LOGIN_STATUS=$(head -1 <<< "${LEGACY_LOGIN_RAW}")
+LEGACY_LOGIN_BODY=$(tail -n +2 <<< "${LEGACY_LOGIN_RAW}")
 
 if [[ "${LEGACY_LOGIN_STATUS}" != "200" ]]; then
     log_info "Login failed (HTTP ${LEGACY_LOGIN_STATUS}). Creating account via legacy signup..."
     SIGNUP_RAW=$(api_call POST "${LEGACY_API}/auth/" -d "${LOGIN_BODY}")
-    SIGNUP_STATUS=$(echo "${SIGNUP_RAW}" | head -1)
-    SIGNUP_BODY=$(echo "${SIGNUP_RAW}" | tail -n +2)
+    SIGNUP_STATUS=$(head -1 <<< "${SIGNUP_RAW}")
+    SIGNUP_BODY=$(tail -n +2 <<< "${SIGNUP_RAW}")
 
     if [[ "${SIGNUP_STATUS}" == "201" ]] || [[ "${SIGNUP_STATUS}" == "200" ]]; then
         log_ok "Account created successfully"
@@ -362,8 +362,8 @@ if [[ "${LEGACY_LOGIN_STATUS}" != "200" ]]; then
     # Login again after signup
     log_info "Logging in to legacy after signup..."
     LEGACY_LOGIN_RAW=$(api_call POST "${LEGACY_API}/auth/login" -d "${LOGIN_BODY}")
-    LEGACY_LOGIN_STATUS=$(echo "${LEGACY_LOGIN_RAW}" | head -1)
-    LEGACY_LOGIN_BODY=$(echo "${LEGACY_LOGIN_RAW}" | tail -n +2)
+    LEGACY_LOGIN_STATUS=$(head -1 <<< "${LEGACY_LOGIN_RAW}")
+    LEGACY_LOGIN_BODY=$(tail -n +2 <<< "${LEGACY_LOGIN_RAW}")
 fi
 
 LEGACY_TOKEN=$(echo "${LEGACY_LOGIN_BODY}" | jq -r '.data.access_token // .data.token // empty' 2>/dev/null)
@@ -377,8 +377,8 @@ log_ok "Legacy login successful (token: ${LEGACY_TOKEN:0:20}...)"
 # Login to Kotlin
 log_info "Logging in to Kotlin server..."
 KOTLIN_LOGIN_RAW=$(api_call POST "${KOTLIN_API}/auth/login" -d "${LOGIN_BODY}")
-KOTLIN_LOGIN_STATUS=$(echo "${KOTLIN_LOGIN_RAW}" | head -1)
-KOTLIN_LOGIN_BODY=$(echo "${KOTLIN_LOGIN_RAW}" | tail -n +2)
+KOTLIN_LOGIN_STATUS=$(head -1 <<< "${KOTLIN_LOGIN_RAW}")
+KOTLIN_LOGIN_BODY=$(tail -n +2 <<< "${KOTLIN_LOGIN_RAW}")
 
 KOTLIN_TOKEN=$(echo "${KOTLIN_LOGIN_BODY}" | jq -r '.data.access_token // .data.token // empty' 2>/dev/null)
 if [[ -z "${KOTLIN_TOKEN}" ]]; then
@@ -465,8 +465,8 @@ GARDEN_CREATE_BODY_K='{"garden_title":"Compare Test Garden K","garden_info":"aut
 KOTLIN_GARDEN_RAW=$(api_call POST "${KOTLIN_API}/garden/" \
     -H "Authorization: Bearer ${KOTLIN_TOKEN}" \
     -d "${GARDEN_CREATE_BODY_K}")
-KOTLIN_GARDEN_STATUS=$(echo "${KOTLIN_GARDEN_RAW}" | head -1)
-KOTLIN_GARDEN_BODY=$(echo "${KOTLIN_GARDEN_RAW}" | tail -n +2)
+KOTLIN_GARDEN_STATUS=$(head -1 <<< "${KOTLIN_GARDEN_RAW}")
+KOTLIN_GARDEN_BODY=$(tail -n +2 <<< "${KOTLIN_GARDEN_RAW}")
 KOTLIN_GARDEN_NO=$(echo "${KOTLIN_GARDEN_BODY}" | jq -r '.data.garden_no // empty' 2>/dev/null)
 
 # Update garden — compare via both servers using legacy-created garden
@@ -491,7 +491,7 @@ log_step "Write Endpoints — Book CRUD"
 
 # We need a garden_no. Re-fetch garden list to get the default garden.
 GARDEN_LIST_RAW=$(api_call GET "${LEGACY_API}/garden/list" -H "Authorization: Bearer ${LEGACY_TOKEN}")
-GARDEN_LIST_BODY=$(echo "${GARDEN_LIST_RAW}" | tail -n +2)
+GARDEN_LIST_BODY=$(tail -n +2 <<< "${GARDEN_LIST_RAW}")
 DEFAULT_GARDEN_NO=$(echo "${GARDEN_LIST_BODY}" | jq -r '.data[0].garden_no // empty' 2>/dev/null)
 
 if [[ -z "${DEFAULT_GARDEN_NO}" ]]; then
@@ -538,8 +538,8 @@ BOOKEOF2
     KOTLIN_BOOK_RAW=$(api_call POST "${KOTLIN_API}/book/" \
         -H "Authorization: Bearer ${KOTLIN_TOKEN}" \
         -d "${BOOK_CREATE_BODY_K}")
-    KOTLIN_BOOK_STATUS=$(echo "${KOTLIN_BOOK_RAW}" | head -1)
-    KOTLIN_BOOK_BODY=$(echo "${KOTLIN_BOOK_RAW}" | tail -n +2)
+    KOTLIN_BOOK_STATUS=$(head -1 <<< "${KOTLIN_BOOK_RAW}")
+    KOTLIN_BOOK_BODY=$(tail -n +2 <<< "${KOTLIN_BOOK_RAW}")
     KOTLIN_BOOK_NO=$(echo "${KOTLIN_BOOK_BODY}" | jq -r '.data.book_no // empty' 2>/dev/null)
 
     # Update book (using legacy-created book)
@@ -607,7 +607,7 @@ MEMOBOOKEOF
     MEMO_BOOK_RAW=$(api_call POST "${LEGACY_API}/book/" \
         -H "Authorization: Bearer ${LEGACY_TOKEN}" \
         -d "${MEMO_BOOK_BODY}")
-    MEMO_BOOK_BODY_RESP=$(echo "${MEMO_BOOK_RAW}" | tail -n +2)
+    MEMO_BOOK_BODY_RESP=$(tail -n +2 <<< "${MEMO_BOOK_RAW}")
     MEMO_BOOK_NO=$(echo "${MEMO_BOOK_BODY_RESP}" | jq -r '.data.book_no // empty' 2>/dev/null)
 
     if [[ -n "${MEMO_BOOK_NO}" ]]; then
@@ -633,7 +633,7 @@ MEMOEOF2
         KOTLIN_MEMO_RAW=$(api_call POST "${KOTLIN_API}/memo/" \
             -H "Authorization: Bearer ${KOTLIN_TOKEN}" \
             -d "${MEMO_CREATE_BODY_K}")
-        KOTLIN_MEMO_BODY_RESP=$(echo "${KOTLIN_MEMO_RAW}" | tail -n +2)
+        KOTLIN_MEMO_BODY_RESP=$(tail -n +2 <<< "${KOTLIN_MEMO_RAW}")
         KOTLIN_MEMO_ID=$(echo "${KOTLIN_MEMO_BODY_RESP}" | jq -r '.data.memo_no // .data.id // empty' 2>/dev/null)
 
         # Memo detail
@@ -693,24 +693,25 @@ compare_endpoint "Push" "PUT /push (update settings)" PUT "/push/" --body "${PUS
 
 log_step "Generating Report"
 
-# Build module summary table
-declare -A MODULE_COUNTS
+# Build module summary using temp file (bash 3.x compatible — no associative arrays)
+MODULE_COUNTS_FILE="${TMPDIR_COMP}/module_counts.txt"
+: > "${MODULE_COUNTS_FILE}"
 for result in "${MODULE_RESULTS[@]}"; do
     mod=$(echo "${result}" | cut -d'|' -f1)
     sev=$(echo "${result}" | cut -d'|' -f3)
-    key="${mod}_${sev}"
-    MODULE_COUNTS["${key}"]=$(( ${MODULE_COUNTS["${key}"]:-0} + 1 ))
-    MODULE_COUNTS["${mod}_TOTAL"]=$(( ${MODULE_COUNTS["${mod}_TOTAL"]:-0} + 1 ))
+    echo "${mod}|${sev}" >> "${MODULE_COUNTS_FILE}"
 done
 
 # Unique modules in order
-declare -a MODULES_ORDERED=()
-declare -A MODULES_SEEN=()
+MODULES_ORDERED=()
 for result in "${MODULE_RESULTS[@]}"; do
     mod=$(echo "${result}" | cut -d'|' -f1)
-    if [[ -z "${MODULES_SEEN[${mod}]:-}" ]]; then
+    local_found=0
+    for existing in "${MODULES_ORDERED[@]+"${MODULES_ORDERED[@]}"}"; do
+        if [[ "${existing}" == "${mod}" ]]; then local_found=1; break; fi
+    done
+    if [[ ${local_found} -eq 0 ]]; then
         MODULES_ORDERED+=("${mod}")
-        MODULES_SEEN["${mod}"]=1
     fi
 done
 
@@ -747,11 +748,11 @@ cat > "${REPORT_FILE}" <<REPORTEOF
 REPORTEOF
 
 for mod in "${MODULES_ORDERED[@]}"; do
-    t=${MODULE_COUNTS["${mod}_TOTAL"]:-0}
-    m=${MODULE_COUNTS["${mod}_MATCH"]:-0}
-    b=${MODULE_COUNTS["${mod}_BREAKING"]:-0}
-    bh=${MODULE_COUNTS["${mod}_BEHAVIORAL"]:-0}
-    c=${MODULE_COUNTS["${mod}_COSMETIC"]:-0}
+    t=$(grep -c "^${mod}|" "${MODULE_COUNTS_FILE}" || echo 0)
+    m=$(grep -c "^${mod}|MATCH" "${MODULE_COUNTS_FILE}" || echo 0)
+    b=$(grep -c "^${mod}|BREAKING" "${MODULE_COUNTS_FILE}" || echo 0)
+    bh=$(grep -c "^${mod}|BEHAVIORAL" "${MODULE_COUNTS_FILE}" || echo 0)
+    c=$(grep -c "^${mod}|COSMETIC" "${MODULE_COUNTS_FILE}" || echo 0)
     echo "| ${mod} | ${t} | ${m} | ${b} | ${bh} | ${c} |" >> "${REPORT_FILE}"
 done
 
