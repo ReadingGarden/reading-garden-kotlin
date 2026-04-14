@@ -306,7 +306,7 @@ class BookControllerIntegrationTest(
     }
 
     @Test
-    fun `create should reject when null garden books already reached legacy limit`() {
+    fun `create should allow unlimited books when garden_no is null like legacy`() {
         val accessToken = signupAndGetAccessToken("createlimit@example.com")
         val userNo = checkNotNull(userRepository.findByUserEmail("createlimit@example.com")?.userNo)
         repeat(30) { index ->
@@ -332,9 +332,9 @@ class BookControllerIntegrationTest(
                     """{"book_isbn":"9788937462789","book_title":"새 책","book_info":"소개","book_author":"저자","book_publisher":"출판사","book_tree":"seed","book_image_url":"https://example.com/book.jpg","book_status":2,"book_page":300}""",
                 ),
         )
-            .andExpect(status().isForbidden)
-            .andExpect(jsonPath("$.resp_code").value(403))
-            .andExpect(jsonPath("$.resp_msg").value("책 생성 개수 초과"))
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.resp_code").value(201))
+            .andExpect(jsonPath("$.resp_msg").value("책 등록 성공"))
     }
 
     @Test
