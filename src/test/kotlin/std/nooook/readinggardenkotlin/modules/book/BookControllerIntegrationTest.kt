@@ -892,6 +892,36 @@ class BookControllerIntegrationTest(
     }
 
     @Test
+    fun `create read should accept Dart DateTime format with space separator`() {
+        val accessToken = signupAndGetAccessToken("dartdate@example.com")
+        val userNo = checkNotNull(userRepository.findByUserEmail("dartdate@example.com")?.userNo)
+        val bookNo = bookRepository.save(
+            BookEntity(
+                userNo = userNo,
+                bookTitle = "Dart 날짜 책",
+                bookAuthor = "저자",
+                bookPublisher = "출판사",
+                bookInfo = "소개",
+                bookStatus = 2,
+                bookPage = 200,
+            ),
+        ).bookNo ?: error("bookNo was not generated")
+
+        mockMvc.perform(
+            post("/api/v1/book/read")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"book_no":$bookNo,"book_start_date":"2026-04-14 15:30:45.123456","book_current_page":0}"""),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.resp_code").value(201))
+            .andExpect(jsonPath("$.resp_msg").value("책 기록 성공"))
+
+        val read = checkNotNull(bookReadRepository.findAllByBookNoOrderByCreatedAtDesc(bookNo).firstOrNull())
+        assertNotNull(read.bookStartDate)
+    }
+
+    @Test
     fun `update and delete read should use id without ownership guard`() {
         val accessToken = signupAndGetAccessToken("readmutate@example.com")
         val userNo = checkNotNull(userRepository.findByUserEmail("readmutate@example.com")?.userNo)
