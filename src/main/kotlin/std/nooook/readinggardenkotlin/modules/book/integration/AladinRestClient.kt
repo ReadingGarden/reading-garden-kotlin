@@ -105,8 +105,8 @@ class AladinRestClient(
 
     companion object {
         private val logger = LoggerFactory.getLogger(AladinRestClient::class.java)
-        private const val ALADIN_ITEM_SEARCH_URL = "http://www.aladin.co.kr/ttb/api/ItemSearch.aspx"
-        private const val ALADIN_ITEM_LOOKUP_URL = "http://www.aladin.co.kr/ttb/api/ItemLookUp.aspx"
+        private const val ALADIN_ITEM_SEARCH_URL = "https://www.aladin.co.kr/ttb/api/ItemSearch.aspx"
+        private const val ALADIN_ITEM_LOOKUP_URL = "https://www.aladin.co.kr/ttb/api/ItemLookUp.aspx"
         private val CONNECT_TIMEOUT: Duration = Duration.ofSeconds(3)
         private val READ_TIMEOUT: Duration = Duration.ofSeconds(5)
     }
