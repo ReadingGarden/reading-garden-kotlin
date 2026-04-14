@@ -42,7 +42,7 @@ class MemoController(
     private val memoCommandService: MemoCommandService,
     private val memoImageService: MemoImageService,
 ) {
-    @GetMapping("", "/")
+    @GetMapping("")
     @Operation(summary = "메모 목록 조회", description = "현재 사용자의 메모 목록을 페이지 단위로 조회합니다.")
     @SecurityRequirement(name = "bearerAuth")
     fun getMemoList(
@@ -88,7 +88,7 @@ class MemoController(
             ),
         )
 
-    @PostMapping("", "/")
+    @PostMapping("")
     @Operation(
         summary = "메모 생성",
         description = "책에 연결된 메모를 생성합니다.",
@@ -113,7 +113,7 @@ class MemoController(
             ),
         )
 
-    @PutMapping("", "/")
+    @PutMapping("")
     @Operation(
         summary = "메모 수정",
         description = "`id`에 해당하는 메모 내용을 수정합니다.",
@@ -137,7 +137,7 @@ class MemoController(
             ),
         )
 
-    @DeleteMapping("", "/")
+    @DeleteMapping("")
     @Operation(summary = "메모 삭제", description = "`id`에 해당하는 메모를 삭제합니다.")
     @SecurityRequirement(name = "bearerAuth")
     fun deleteMemo(
