@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.context.request.WebRequest
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 import org.springframework.web.method.annotation.HandlerMethodValidationException
+import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler
 import org.springframework.web.ErrorResponse
 import std.nooook.readinggardenkotlin.common.api.LegacyHttpResponse
@@ -58,6 +59,14 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
                     },
                 ),
             )
+
+    @ExceptionHandler(ResponseStatusException::class)
+    fun handleResponseStatusException(
+        ex: ResponseStatusException,
+    ): ResponseEntity<LegacyHttpResponse> =
+        ResponseEntity
+            .status(ex.statusCode)
+            .body(LegacyResponses.error(ex.statusCode.value(), ex.reason ?: ex.message))
 
     @ExceptionHandler(Exception::class)
     fun handleUnhandledException(

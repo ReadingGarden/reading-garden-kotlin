@@ -16,6 +16,7 @@ class PushPreferenceService(
         }
 
         return PushResponse(
+            user_no = push.userNo,
             push_app_ok = push.pushAppOk,
             push_book_ok = push.pushBookOk,
             push_time = push.pushTime,
