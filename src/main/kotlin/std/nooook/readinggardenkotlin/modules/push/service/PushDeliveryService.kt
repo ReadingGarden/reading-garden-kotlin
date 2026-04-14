@@ -6,6 +6,7 @@ import std.nooook.readinggardenkotlin.modules.auth.repository.UserRepository
 import std.nooook.readinggardenkotlin.modules.garden.repository.GardenRepository
 import std.nooook.readinggardenkotlin.modules.push.integration.FcmClient
 import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
+import org.slf4j.LoggerFactory
 import java.time.Clock
 import java.time.LocalDateTime
 
@@ -20,23 +21,35 @@ class PushDeliveryService(
 ) {
     fun sendBookPush(): List<Map<String, Any>> {
         val now = LocalDateTime.now(pushClock)
-        val targets = pushRepository.findAllByPushBookOkTrueAndPushTimeIsNotNull()
+        val allPushTargets = pushRepository.findAllByPushBookOkTrueAndPushTimeIsNotNull()
+        val targets = allPushTargets
             .filter { push ->
                 val pushTime = push.pushTime ?: return@filter false
                 pushTime.hour == now.hour && pushTime.minute == now.minute
             }
 
+        logger.info(
+            "Book push check: now={}:{}, totalPushEnabled={}, matchingTargets={}, targetUserNos={}",
+            now.hour, now.minute, allPushTargets.size, targets.size, targets.map { it.userNo },
+        )
+
         val tokens = selectTokens(targets.map { it.userNo })
         if (tokens.isEmpty()) {
+            if (targets.isNotEmpty()) {
+                logger.warn("Book push targets found but no FCM tokens available: userNos={}", targets.map { it.userNo })
+            }
             return emptyList()
         }
 
-        return fcmClient.sendToMany(
+        logger.info("Sending book push to {} tokens", tokens.size)
+        val results = fcmClient.sendToMany(
             tokens = tokens,
             title = "💧물 주는 시간이에요!",
             body = "책 어디까지 읽으셨나요? 독서가든에서 기록해보세요!",
             data = HashMap(),
         )
+        logger.info("Book push results: {}", results)
+        return results
     }
 
     fun sendNoticePush(content: String): List<Map<String, Any>> {
@@ -93,5 +106,9 @@ class PushDeliveryService(
                 ?.trim()
                 ?.takeIf { it.isNotBlank() }
         }
+    }
+
+    companion object {
+        private val logger = LoggerFactory.getLogger(PushDeliveryService::class.java)
     }
 }
