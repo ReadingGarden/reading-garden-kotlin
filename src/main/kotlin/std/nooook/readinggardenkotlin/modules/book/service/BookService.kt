@@ -1,6 +1,8 @@
 package std.nooook.readinggardenkotlin.modules.book.service
 
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import org.springframework.web.server.ResponseStatusException
 import std.nooook.readinggardenkotlin.modules.book.controller.BookDetailResponse
 import std.nooook.readinggardenkotlin.modules.book.controller.BookLookupResponse
 import std.nooook.readinggardenkotlin.modules.book.controller.BookSearchResponse
@@ -33,43 +35,22 @@ class BookService(
             query = IsbnQueryRequest(query = query).query,
         )
 
-        val item = response.requireList("item")
-            .firstOrNull() as? Map<*, *>
-            ?: throw IllegalStateException("Aladin detail response item is missing")
+        val item = (response["item"] as? List<*>)?.firstOrNull() as? Map<*, *>
+            ?: throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "알라딘 API 응답에 도서 정보가 없습니다.")
         val subInfo = item["subInfo"] as? Map<*, *>
-            ?: throw IllegalStateException("Aladin detail response subInfo is missing")
 
         return BookDetailResponse(
-            searchCategoryId = response.requireValue("searchCategoryId"),
-            searchCategoryName = response.requireString("searchCategoryName"),
-            title = item.requireFieldString("title"),
-            author = item.requireFieldString("author"),
-            description = item.requireFieldString("description"),
-            isbn13 = item.requireFieldString("isbn13"),
-            cover = item.requireFieldString("cover"),
-            publisher = item.requireFieldString("publisher"),
-            itemPage = subInfo.requireInt("itemPage"),
+            searchCategoryId = response["searchCategoryId"] ?: 0,
+            searchCategoryName = (response["searchCategoryName"] as? String).orEmpty(),
+            title = (item["title"] as? String).orEmpty(),
+            author = (item["author"] as? String).orEmpty(),
+            description = (item["description"] as? String).orEmpty(),
+            isbn13 = (item["isbn13"] as? String).orEmpty(),
+            cover = (item["cover"] as? String).orEmpty(),
+            publisher = (item["publisher"] as? String).orEmpty(),
+            itemPage = (subInfo?.get("itemPage") as? Number)?.toInt() ?: 0,
             record = emptyMap(),
             memo = emptyMap(),
         )
     }
-
-    private fun Map<String, Any?>.requireValue(key: String): Any =
-        this[key] ?: throw IllegalStateException("Aladin response missing $key")
-
-    private fun Map<String, Any?>.requireString(key: String): String =
-        this[key] as? String ?: throw IllegalStateException("Aladin response missing $key")
-
-    private fun Map<String, Any?>.requireList(key: String): List<*> =
-        this[key] as? List<*> ?: throw IllegalStateException("Aladin response missing $key")
-
-    private fun Map<*, *>.requireFieldString(key: String): String =
-        this[key] as? String ?: throw IllegalStateException("Aladin response missing $key")
-
-    private fun Map<*, *>.requireInt(key: String): Int =
-        when (val value = this[key]) {
-            is Int -> value
-            is Number -> value.toInt()
-            else -> throw IllegalStateException("Aladin response missing $key")
-        }
 }
