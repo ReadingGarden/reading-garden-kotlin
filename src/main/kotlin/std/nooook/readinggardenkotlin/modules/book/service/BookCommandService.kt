@@ -34,11 +34,7 @@ class BookCommandService(
         userNo: Int,
         request: CreateBookRequest,
     ): CreateBookResponse {
-        if (request.garden_no == null) {
-            if (bookRepository.findAll().count { it.gardenNo == null } >= MAX_GARDEN_BOOK_COUNT) {
-                throw ResponseStatusException(HttpStatus.FORBIDDEN, "책 생성 개수 초과")
-            }
-        } else {
+        if (request.garden_no != null) {
             val gardenNo = request.garden_no
             if (!gardenRepository.existsById(gardenNo)) {
                 throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 가든이 없습니다.")
