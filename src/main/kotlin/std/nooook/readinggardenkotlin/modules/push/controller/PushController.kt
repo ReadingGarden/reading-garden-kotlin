@@ -115,6 +115,8 @@ class PushController(
 
 @Schema(description = "푸시 설정 조회 응답 데이터")
 data class PushResponse(
+    @field:Schema(description = "사용자 번호", example = "1")
+    val user_no: Int,
     @field:Schema(description = "앱 푸시 전체 허용 여부", example = "true")
     val push_app_ok: Boolean,
     @field:Schema(description = "독서 푸시 허용 여부", example = "false")

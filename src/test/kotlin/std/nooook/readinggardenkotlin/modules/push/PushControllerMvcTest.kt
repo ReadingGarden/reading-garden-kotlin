@@ -36,6 +36,7 @@ class PushControllerMvcTest(
         given(pushService.getPush(1))
             .willReturn(
                 PushResponse(
+                    user_no = 1,
                     push_app_ok = true,
                     push_book_ok = false,
                     push_time = pushTime,
