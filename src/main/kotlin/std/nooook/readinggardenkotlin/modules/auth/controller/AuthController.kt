@@ -141,7 +141,7 @@ class AuthController(
         return LegacyDataResponse(
             resp_code = 200,
             resp_msg = "로그아웃 성공",
-            data = emptyMap(),
+            data = HashMap(),
         )
     }
 
@@ -189,7 +189,7 @@ class AuthController(
         return LegacyDataResponse(
             resp_code = 200,
             resp_msg = "회원 탈퇴 성공",
-            data = emptyMap(),
+            data = HashMap(),
         )
     }
 
@@ -209,7 +209,7 @@ class AuthController(
         return LegacyDataResponse(
             resp_code = 200,
             resp_msg = "메일이 발송되었습니다. 확인해주세요.",
-            data = emptyMap(),
+            data = HashMap(),
         )
     }
 
@@ -229,7 +229,7 @@ class AuthController(
         return LegacyDataResponse(
             resp_code = 200,
             resp_msg = "인증 성공",
-            data = emptyMap(),
+            data = HashMap(),
         )
     }
 
