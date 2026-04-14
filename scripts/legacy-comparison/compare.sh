@@ -46,6 +46,10 @@ MATCH=0
 BREAKING=0
 BEHAVIORAL=0
 COSMETIC=0
+LAST_LEGACY_STATUS=""
+LAST_LEGACY_BODY=""
+LAST_KOTLIN_STATUS=""
+LAST_KOTLIN_BODY=""
 
 # ── Report accumulators ──────────────────────────────────────────────────────
 declare -a MODULE_RESULTS=()   # "module|endpoint|result|details"
@@ -70,6 +74,7 @@ api_call() {
     local http_code body
 
     http_code=$(curl -s -o "${TMPDIR_COMP}/body" -w "%{http_code}" \
+        --connect-timeout 10 --max-time 30 \
         -X "${method}" \
         -H "Content-Type: application/json" \
         "$@" \
@@ -710,6 +715,7 @@ for result in "${MODULE_RESULTS[@]}"; do
 done
 
 # Write report
+mkdir -p "$(dirname "${REPORT_FILE}")"
 cat > "${REPORT_FILE}" <<REPORTEOF
 # Legacy vs Kotlin API Comparison Report
 
