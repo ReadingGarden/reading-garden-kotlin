@@ -51,6 +51,12 @@ data class UpdateBookRequest(
     val book_tree: String? = null,
     @field:Schema(description = "수정할 독서 상태 코드", example = "2", nullable = true)
     val book_status: Int? = null,
+    @field:Schema(description = "수정할 책 제목", example = "새 제목", nullable = true)
+    val book_title: String? = null,
+    @field:Schema(description = "수정할 저자", example = "새 저자", nullable = true)
+    val book_author: String? = null,
+    @field:Schema(description = "수정할 표지 이미지 URL", example = "https://example.com/new.jpg", nullable = true)
+    val book_image_url: String? = null,
 )
 
 @Schema(description = "독서 기록 생성 요청")
