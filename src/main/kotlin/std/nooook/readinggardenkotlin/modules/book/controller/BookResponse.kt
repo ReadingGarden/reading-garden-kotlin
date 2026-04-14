@@ -31,7 +31,7 @@ data class BookReadHistoryItemResponse(
     @field:Schema(description = "종료 시각", example = "2026-04-10T11:00:00", nullable = true)
     val book_end_date: String?,
     @field:Schema(description = "기록 생성 시각", example = "2026-04-10T11:00:00")
-    val created_ad: String,
+    val book_created_at: String,
 )
 
 @Schema(description = "독서 기록에 연결된 메모 항목")
@@ -44,6 +44,8 @@ data class BookReadMemoItemResponse(
     val memo_like: Boolean,
     @field:Schema(description = "메모 작성 시각", example = "2026-04-10T11:30:00")
     val memo_created_at: String,
+    @field:Schema(description = "메모 이미지 URL", example = "https://example.com/memo.jpg", nullable = true)
+    val image_url: String? = null,
 )
 
 @Schema(description = "책 상태 목록 항목")
@@ -114,6 +116,8 @@ data class BookDetailResponse(
 
 @Schema(description = "독서 기록 상세 응답")
 data class BookReadDetailResponse(
+    @field:Schema(description = "책 번호", example = "1")
+    val book_no: Int,
     @field:Schema(description = "사용자 번호", example = "1")
     val user_no: Int,
     @field:Schema(description = "책 제목", example = "클린 코드")
@@ -134,6 +138,10 @@ data class BookReadDetailResponse(
     val book_page: Int,
     @field:Schema(description = "가든 번호", example = "10", nullable = true)
     val garden_no: Int?,
+    @field:Schema(description = "가든 제목", example = "나의 가든")
+    val garden_title: String = "",
+    @field:Schema(description = "가든 색상", example = "blue")
+    val garden_color: String = "",
     @field:Schema(description = "현재 읽은 페이지", example = "150")
     val book_current_page: Int,
     @field:Schema(description = "현재 진행률", example = "46.7")

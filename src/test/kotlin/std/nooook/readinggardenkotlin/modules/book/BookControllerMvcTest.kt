@@ -330,10 +330,11 @@ class BookControllerMvcTest(
     }
 
     @Test
-    fun `read should keep legacy typo and zero defaults`() {
+    fun `read should return flutter-compatible fields`() {
         given(bookQueryService.getBookRead(10))
             .willReturn(
                 BookReadDetailResponse(
+                    book_no = 10,
                     user_no = 1,
                     book_title = "책",
                     book_author = "저자",
@@ -343,7 +344,9 @@ class BookControllerMvcTest(
                     book_tree = null,
                     book_status = 0,
                     book_page = 300,
-                    garden_no = null,
+                    garden_no = 5,
+                    garden_title = "나의 가든",
+                    garden_color = "blue",
                     book_current_page = 0,
                     percent = 0.0,
                     book_read_list = listOf(
@@ -352,7 +355,7 @@ class BookControllerMvcTest(
                             book_current_page = 20,
                             book_start_date = "2026-04-06T11:00:00",
                             book_end_date = null,
-                            created_ad = "2026-04-06T11:00:00",
+                            book_created_at = "2026-04-06T11:00:00",
                         ),
                     ),
                     memo_list = listOf(
@@ -361,6 +364,7 @@ class BookControllerMvcTest(
                             memo_content = "메모",
                             memo_like = true,
                             memo_created_at = "2026-04-06T10:30:00",
+                            image_url = "https://example.com/memo.jpg",
                         ),
                     ),
                 ),
@@ -374,19 +378,22 @@ class BookControllerMvcTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.resp_code").value(200))
             .andExpect(jsonPath("$.resp_msg").value("독서 기록 조회 성공"))
+            .andExpect(jsonPath("$.data.book_no").value(10))
             .andExpect(jsonPath("$.data.user_no").value(1))
-            .andExpect(jsonPath("$.data.book_no").doesNotExist())
+            .andExpect(jsonPath("$.data.garden_title").value("나의 가든"))
+            .andExpect(jsonPath("$.data.garden_color").value("blue"))
             .andExpect(jsonPath("$.data.book_current_page").value(0))
             .andExpect(jsonPath("$.data.percent").value(0.0))
-            .andExpect(jsonPath("$.data.book_read_list[0].created_ad").value("2026-04-06T11:00:00"))
+            .andExpect(jsonPath("$.data.book_read_list[0].book_created_at").value("2026-04-06T11:00:00"))
             .andExpect(jsonPath("$.data.book_read_list[0].book_start_date").value("2026-04-06T11:00:00"))
+            .andExpect(jsonPath("$.data.book_read_list[0].created_ad").doesNotExist())
             .andExpect(jsonPath("$.data.book_read_list[0].created_at").doesNotExist())
             .andExpect(jsonPath("$.data.book_read_list[0].book_read_no").doesNotExist())
             .andExpect(jsonPath("$.data.memo_list[0].memo_content").value("메모"))
             .andExpect(jsonPath("$.data.memo_list[0].memo_created_at").value("2026-04-06T10:30:00"))
+            .andExpect(jsonPath("$.data.memo_list[0].image_url").value("https://example.com/memo.jpg"))
             .andExpect(jsonPath("$.data.memo_list[0].book_no").doesNotExist())
             .andExpect(jsonPath("$.data.memo_list[0].book_title").doesNotExist())
-            .andExpect(jsonPath("$.data.memo_list[0].image_url").doesNotExist())
     }
 
     private fun bookAuth() =

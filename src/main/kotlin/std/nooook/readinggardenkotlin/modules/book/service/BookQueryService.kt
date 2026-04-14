@@ -14,6 +14,7 @@ import std.nooook.readinggardenkotlin.modules.book.controller.BookReadHistoryIte
 import std.nooook.readinggardenkotlin.modules.book.repository.BookReadRepository
 import std.nooook.readinggardenkotlin.modules.book.repository.BookRepository
 import std.nooook.readinggardenkotlin.modules.garden.repository.GardenRepository
+import std.nooook.readinggardenkotlin.modules.memo.repository.MemoImageRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
 
 @Service
@@ -22,6 +23,7 @@ class BookQueryService(
     private val bookReadRepository: BookReadRepository,
     private val gardenRepository: GardenRepository,
     private val memoRepository: MemoRepository,
+    private val memoImageRepository: MemoImageRepository,
 ) {
     companion object {
         private val LEGACY_DATE_TIME_FORMATTER: DateTimeFormatter =
@@ -100,7 +102,7 @@ class BookQueryService(
             .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 책 정보가 없습니다.") }
         val gardenNo = book.gardenNo
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 책 정보가 없습니다.")
-        gardenRepository.findById(gardenNo)
+        val garden = gardenRepository.findById(gardenNo)
             .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 책 정보가 없습니다.") }
         val latestRead = bookReadRepository.findTopByBookNoOrderByCreatedAtDesc(bookNo)
         val reads = bookReadRepository.findAllByBookNoOrderByCreatedAtDesc(bookNo)
@@ -109,15 +111,18 @@ class BookQueryService(
         val memoList = memoRepository.findAllByBookNoOrderByMemoLikeDescMemoCreatedAtDesc(bookNo)
             .map { memo ->
                 val memoId = checkNotNull(memo.id) { "Memo id is required" }
+                val memoImage = memoImageRepository.findFirstByMemoNoOrderByImageCreatedAtDesc(memoId)
                 BookReadMemoItemResponse(
                     id = memoId,
                     memo_content = memo.memoContent,
                     memo_like = memo.memoLike,
                     memo_created_at = formatDateTime(memo.memoCreatedAt),
+                    image_url = memoImage?.imageUrl,
                 )
             }
 
         return BookReadDetailResponse(
+            book_no = bookNo,
             user_no = book.userNo,
             book_title = book.bookTitle,
             book_author = book.bookAuthor,
@@ -128,6 +133,8 @@ class BookQueryService(
             book_status = book.bookStatus,
             book_page = book.bookPage,
             garden_no = book.gardenNo,
+            garden_title = garden.gardenTitle,
+            garden_color = garden.gardenColor,
             book_current_page = currentPage,
             percent = percent,
             book_read_list = reads.map { read ->
@@ -137,7 +144,7 @@ class BookQueryService(
                     book_current_page = read.bookCurrentPage,
                     book_start_date = read.bookStartDate?.let(::formatDateTime),
                     book_end_date = read.bookEndDate?.let(::formatDateTime),
-                    created_ad = formatDateTime(read.createdAt),
+                    book_created_at = formatDateTime(read.createdAt),
                 )
             },
             memo_list = memoList,
