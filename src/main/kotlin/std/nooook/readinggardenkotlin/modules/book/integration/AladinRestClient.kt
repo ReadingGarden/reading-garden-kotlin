@@ -52,7 +52,7 @@ class AladinRestClient(
             .queryParam("SearchTarget", "BOOK")
             .queryParam("output", "js")
             .queryParam("Version", "20131101")
-            .build(true)
+            .build()
             .toUri()
 
         return fetch(uri)
@@ -82,7 +82,7 @@ class AladinRestClient(
             .queryParam("Cover", "Big")
             .queryParam("output", "js")
             .queryParam("Version", "20131101")
-            .build(true)
+            .build()
             .toUri()
 
         return fetch(uri)
