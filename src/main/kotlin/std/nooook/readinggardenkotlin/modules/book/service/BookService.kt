@@ -1,5 +1,6 @@
 package std.nooook.readinggardenkotlin.modules.book.service
 
+import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
@@ -19,21 +20,36 @@ class BookService(
         start: Int,
         maxResults: Int,
     ): BookSearchResponse =
-        aladinClient.searchBooks(
-            query = SearchBooksRequest(query = query, start = start, maxResults = maxResults).query,
-            start = start,
-            maxResults = maxResults,
-        )
+        try {
+            aladinClient.searchBooks(
+                query = SearchBooksRequest(query = query, start = start, maxResults = maxResults).query,
+                start = start,
+                maxResults = maxResults,
+            )
+        } catch (e: Exception) {
+            logger.error("Book search failed for query={}", query, e)
+            emptyMap()
+        }
 
     fun searchBookByIsbn(query: String): BookLookupResponse =
-        aladinClient.searchBookByIsbn(
-            query = IsbnQueryRequest(query = query).query,
-        )
+        try {
+            aladinClient.searchBookByIsbn(
+                query = IsbnQueryRequest(query = query).query,
+            )
+        } catch (e: Exception) {
+            logger.error("Book ISBN search failed for query={}", query, e)
+            emptyMap()
+        }
 
     fun getBookDetailByIsbn(query: String): BookDetailResponse {
-        val response = aladinClient.getBookDetailByIsbn(
-            query = IsbnQueryRequest(query = query).query,
-        )
+        val response = try {
+            aladinClient.getBookDetailByIsbn(
+                query = IsbnQueryRequest(query = query).query,
+            )
+        } catch (e: Exception) {
+            logger.error("Book detail lookup failed for query={}", query, e)
+            emptyMap()
+        }
 
         val item = (response["item"] as? List<*>)?.firstOrNull() as? Map<*, *>
             ?: throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "알라딘 API 응답에 도서 정보가 없습니다.")
@@ -52,5 +68,9 @@ class BookService(
             record = emptyMap(),
             memo = emptyMap(),
         )
+    }
+
+    companion object {
+        private val logger = LoggerFactory.getLogger(BookService::class.java)
     }
 }
