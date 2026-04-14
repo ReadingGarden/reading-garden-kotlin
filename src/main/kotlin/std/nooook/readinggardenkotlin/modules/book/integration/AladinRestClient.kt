@@ -95,12 +95,12 @@ class AladinRestClient(
                 .accept(MediaType.APPLICATION_JSON)
                 .retrieve()
                 .body(String::class.java)
-                ?: return emptyMap()
+                ?: return HashMap()
 
             objectMapper.readValue(body, object : TypeReference<Map<String, Any?>>() {})
         } catch (e: Exception) {
             logger.error("Aladin API call failed for URI: {}", uri, e)
-            emptyMap()
+            HashMap()
         }
 
     companion object {

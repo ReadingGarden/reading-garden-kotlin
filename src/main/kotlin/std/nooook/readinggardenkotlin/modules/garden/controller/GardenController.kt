@@ -114,7 +114,7 @@ class GardenController(
         LegacyDataResponse(
             resp_code = 200,
             resp_msg = gardenCommandService.updateGarden(principal.userNo.toInt(), gardenNo, request),
-            data = emptyMap<String, Any?>(),
+            data = HashMap<String, Any?>(),
         )
 
     @DeleteMapping("", "/")
