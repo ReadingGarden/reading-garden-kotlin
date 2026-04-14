@@ -37,7 +37,7 @@ class MemoService(
             list = memoPage.content.map { memo ->
                 val memoId = checkNotNull(memo.id) { "Memo id is required" }
                 val book = checkNotNull(booksByNo[memo.bookNo]) { "Book ${memo.bookNo} is missing for memo $memoId" }
-                val imageUrl = imagesByMemoNo[memoId]?.imageUrl.orEmpty()
+                val imageUrl = imagesByMemoNo[memoId]?.imageUrl
 
                 MemoListItemResponse(
                     id = memoId,

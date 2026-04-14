@@ -24,8 +24,8 @@ data class MemoListItemResponse(
     val memo_content: String,
     @field:Schema(description = "좋아요 여부", example = "true")
     val memo_like: Boolean,
-    @field:Schema(description = "메모 이미지 URL", example = "https://example.com/memo.jpg")
-    val image_url: String,
+    @field:Schema(description = "메모 이미지 URL", example = "https://example.com/memo.jpg", nullable = true)
+    val image_url: String?,
     @field:Schema(description = "메모 작성 시각", example = "2026-04-09T16:30:00")
     val memo_created_at: String,
 )
