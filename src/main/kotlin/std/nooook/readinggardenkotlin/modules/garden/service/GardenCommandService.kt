@@ -75,6 +75,7 @@ class GardenCommandService(
         gardenNo: Int,
         request: UpdateGardenRequest,
     ): String {
+        logger.debug("updateGarden: userNo={}, gardenNo={}, request={}", userNo, gardenNo, request)
         val garden = gardenRepository.findById(gardenNo)
             .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 가든이 없습니다.") }
         val membership = gardenUserRepository.findByGardenNoAndUserNo(gardenNo, userNo)
