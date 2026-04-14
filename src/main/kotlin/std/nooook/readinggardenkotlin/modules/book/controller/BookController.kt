@@ -44,7 +44,7 @@ class BookController(
     private val bookReadService: BookReadService,
     private val bookImageService: BookImageService,
 ) {
-    @GetMapping("", "/")
+    @GetMapping("")
     @Operation(summary = "책 중복 확인", description = "현재 사용자 기준으로 같은 ISBN의 책이 이미 등록되었는지 확인합니다.")
     @SecurityRequirement(name = "bearerAuth")
     fun checkBookDuplication(
@@ -124,7 +124,7 @@ class BookController(
             data = bookService.getBookDetailByIsbn(query),
         )
 
-    @PostMapping("", "/")
+    @PostMapping("")
     @Operation(
         summary = "책 등록",
         description = "현재 사용자 계정에 책을 등록합니다.",
@@ -146,7 +146,7 @@ class BookController(
             ),
         )
 
-    @DeleteMapping("", "/")
+    @DeleteMapping("")
     @Operation(summary = "책 삭제", description = "`book_no`에 해당하는 책을 삭제합니다.")
     @SecurityRequirement(name = "bearerAuth")
     fun deleteBook(
@@ -310,7 +310,7 @@ class BookController(
             ),
         )
 
-    @PutMapping("", "/")
+    @PutMapping("")
     @Operation(
         summary = "책 수정",
         description = "가든 이동, 분류 변경, 상태 변경 등 책 정보를 수정합니다.",
