@@ -199,7 +199,7 @@ class MemoControllerIntegrationTest(
             .andExpect(jsonPath("$.data.list.length()").value(3))
             .andExpect(jsonPath("$.data.list[0].memo_content").value("메모 B"))
             .andExpect(jsonPath("$.data.list[0].memo_like").value(true))
-            .andExpect(jsonPath("$.data.list[0].image_url").value(""))
+            .andExpect(jsonPath("$.data.list[0].image_url").doesNotExist())
             .andExpect(jsonPath("$.data.list[0].book_title").value("두 번째 책"))
             .andExpect(jsonPath("$.data.list[1].memo_content").value("메모 A"))
             .andExpect(jsonPath("$.data.list[1].memo_like").value(true))
