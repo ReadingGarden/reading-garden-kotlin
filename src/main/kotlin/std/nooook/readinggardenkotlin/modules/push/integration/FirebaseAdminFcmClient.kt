@@ -32,11 +32,14 @@ class FirebaseAdminFcmClient(
                     when {
                         response == null -> failedResult(token, "UNKNOWN", "FCM response is missing")
                         response.successful -> successResult(token, response.messageId)
-                        else -> failedResult(
-                            token = token,
-                            errorCode = response.errorCode ?: "UNKNOWN",
-                            errorMessage = response.errorMessage ?: "FCM send failed",
-                        )
+                        else -> {
+                            logger.warn("FCM send failed for token {}: errorCode={}, message={}", token, response.errorCode, response.errorMessage)
+                            failedResult(
+                                token = token,
+                                errorCode = response.errorCode ?: "UNKNOWN",
+                                errorMessage = response.errorMessage ?: "FCM send failed",
+                            )
+                        }
                     }
                 }
             } catch (exception: Exception) {
