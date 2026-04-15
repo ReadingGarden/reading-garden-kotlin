@@ -16,7 +16,6 @@ jobs:
   build-jvm:
     runs-on: ubuntu-latest
     env:
-      JVM_IMAGE_NAME: ghcr.io/readinggarden/reading-garden-kotlin:jvm-${{ github.sha }}
       REGISTRY_IMAGE: ghcr.io/readinggarden/reading-garden-kotlin
     steps:
       - name: Checkout
@@ -29,6 +28,15 @@ jobs:
           java-version: '25'
           cache: gradle
 
+      - name: Run tests
+        run: ./gradlew test
+
+      - name: Build JAR
+        run: ./gradlew bootJar
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
@@ -39,24 +47,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run tests
-        run: ./gradlew test
-
-      - name: Build JVM image
-        run: ./gradlew bootBuildImage
-        env:
-          JVM_IMAGE_NAME: ${{ env.JVM_IMAGE_NAME }}
-
-      - name: Push sha tag
-        run: docker push "$JVM_IMAGE_NAME"
-
-      - name: Tag latest
-        if: github.ref == 'refs/heads/main'
-        run: docker tag "$JVM_IMAGE_NAME" "$REGISTRY_IMAGE:jvm-latest"
-
-      - name: Push latest tag
-        if: github.ref == 'refs/heads/main'
-        run: docker push "$REGISTRY_IMAGE:jvm-latest"
+      - name: Build and push multi-platform image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.REGISTRY_IMAGE }}:jvm-${{ github.sha }}
+            ${{ env.REGISTRY_IMAGE }}:jvm-latest
 
   deploy-oci:
     needs: build-jvm
@@ -99,10 +98,8 @@ jobs:
           test -f .env
           test -f secrets/firebase-service-account.json
 
-          # Log in to GHCR
           echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 
-          # Run blue-green deployment
           export IMAGE_REF="$IMAGE_REF"
           ./blue-green-deploy.sh
           EOF
