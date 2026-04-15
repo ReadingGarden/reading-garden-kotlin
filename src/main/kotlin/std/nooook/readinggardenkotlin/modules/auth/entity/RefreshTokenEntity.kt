@@ -1,24 +1,26 @@
 package std.nooook.readinggardenkotlin.modules.auth.entity
 
-import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.FetchType
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
+import jakarta.persistence.JoinColumn
+import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 import java.time.LocalDateTime
 
 @Entity
-@Table(name = "REFRESH_TOKEN")
+@Table(name = "refresh_tokens")
 class RefreshTokenEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id")
-    var id: Int? = null,
-    @Column(name = "user_no", nullable = false)
-    var userNo: Int = 0,
-    @Column(name = "token", columnDefinition = "text")
+    val id: Long = 0,
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    val user: UserEntity,
     var token: String? = null,
-    @Column(name = "exp")
     var exp: LocalDateTime? = null,
-)
+) {
+    protected constructor() : this(user = UserEntity())
+}

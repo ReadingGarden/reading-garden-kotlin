@@ -5,6 +5,8 @@ import org.mockito.BDDMockito.given
 import org.mockito.Mockito.verify
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.context.annotation.Import
+import std.nooook.readinggardenkotlin.TestcontainersConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
@@ -22,6 +24,7 @@ import std.nooook.readinggardenkotlin.modules.push.controller.PushResponse
 import std.nooook.readinggardenkotlin.modules.push.service.PushService
 import java.time.LocalDateTime
 
+@Import(TestcontainersConfiguration::class)
 @SpringBootTest
 @AutoConfigureMockMvc
 class PushControllerMvcTest(
@@ -48,7 +51,7 @@ class PushControllerMvcTest(
                 .with(
                     authentication(
                         UsernamePasswordAuthenticationToken(
-                            LegacyAuthenticationPrincipal(1, "테스터"),
+                            LegacyAuthenticationPrincipal(1L, "테스터"),
                             null,
                             listOf(SimpleGrantedAuthority("ROLE_USER")),
                         ),
@@ -71,7 +74,7 @@ class PushControllerMvcTest(
                 .with(
                     authentication(
                         UsernamePasswordAuthenticationToken(
-                            LegacyAuthenticationPrincipal(1, "테스터"),
+                            LegacyAuthenticationPrincipal(1L, "테스터"),
                             null,
                             listOf(SimpleGrantedAuthority("ROLE_USER")),
                         ),
@@ -104,7 +107,7 @@ class PushControllerMvcTest(
                 .with(
                     authentication(
                         UsernamePasswordAuthenticationToken(
-                            LegacyAuthenticationPrincipal(1, "테스터"),
+                            LegacyAuthenticationPrincipal(1L, "테스터"),
                             null,
                             listOf(SimpleGrantedAuthority("ROLE_USER")),
                         ),
@@ -138,7 +141,7 @@ class PushControllerMvcTest(
                 .with(
                     authentication(
                         UsernamePasswordAuthenticationToken(
-                            LegacyAuthenticationPrincipal(1, "테스터"),
+                            LegacyAuthenticationPrincipal(1L, "테스터"),
                             null,
                             listOf(SimpleGrantedAuthority("ROLE_USER")),
                         ),

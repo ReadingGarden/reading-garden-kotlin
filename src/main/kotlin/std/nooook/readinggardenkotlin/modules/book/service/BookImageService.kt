@@ -16,15 +16,15 @@ class BookImageService(
     private val imageStorage: ImageStorage,
 ) {
     fun uploadBookImage(
-        bookNo: Int,
+        bookNo: Long,
         file: MultipartFile,
     ): String {
-        bookRepository.findById(bookNo)
+        val book = bookRepository.findById(bookNo)
             .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 책이 없습니다.") }
 
-        val existingImage = bookImageRepository.findByBookNo(bookNo)
+        val existingImage = bookImageRepository.findByBookId(bookNo)
         if (existingImage != null) {
-            imageStorage.delete(existingImage.imageUrl)
+            imageStorage.delete(existingImage.url)
             bookImageRepository.delete(existingImage)
         }
 
@@ -35,23 +35,23 @@ class BookImageService(
         val imageUrl = imageStorage.save("book", file.originalFilename ?: file.name, file.bytes)
         bookImageRepository.save(
             BookImageEntity(
-                bookNo = bookNo,
-                imageName = file.originalFilename ?: file.name,
-                imageUrl = imageUrl,
+                book = book,
+                name = file.originalFilename ?: file.name,
+                url = imageUrl,
             ),
         )
 
         return "이미지 업로드 성공"
     }
 
-    fun deleteBookImage(bookNo: Int): String {
+    fun deleteBookImage(bookNo: Long): String {
         bookRepository.findById(bookNo)
             .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 책이 없습니다.") }
 
-        val existingImage = bookImageRepository.findByBookNo(bookNo)
+        val existingImage = bookImageRepository.findByBookId(bookNo)
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 이미지가 없습니다.")
 
-        imageStorage.delete(existingImage.imageUrl)
+        imageStorage.delete(existingImage.url)
         bookImageRepository.delete(existingImage)
         return "이미지 삭제 성공"
     }

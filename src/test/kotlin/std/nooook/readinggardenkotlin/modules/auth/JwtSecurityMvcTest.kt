@@ -3,8 +3,9 @@ package std.nooook.readinggardenkotlin.modules.auth
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
+import std.nooook.readinggardenkotlin.TestcontainersConfiguration
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.HttpHeaders
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
@@ -16,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(JwtSecurityMvcTest.ProtectedAuthTestController::class)
+@Import(TestcontainersConfiguration::class, JwtSecurityMvcTest.ProtectedAuthTestController::class)
 class JwtSecurityMvcTest(
     @Autowired private val mockMvc: MockMvc,
 ) {

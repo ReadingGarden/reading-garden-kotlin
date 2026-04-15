@@ -19,16 +19,15 @@ class BookReadService(
 ) {
     @Transactional
     fun createRead(
-        userNo: Int,
+        userId: Long,
         request: CreateReadRequest,
     ): CreateReadResponse {
-        val book = bookRepository.findByBookNoAndUserNo(request.book_no, userNo)
+        val book = bookRepository.findByIdAndUserId(request.book_no, userId)
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 책 정보가 없습니다.")
-        val isFirstRead = bookReadRepository.findAllByBookNoOrderByCreatedAtDesc(request.book_no)
-            .none { it.userNo == userNo }
+        val isFirstRead = bookReadRepository.findAllByBookIdOrderByCreatedAtDesc(request.book_no).isEmpty()
         val now = LocalDateTime.now()
         val currentPage = request.book_current_page
-        val isFinalPage = currentPage == book.bookPage
+        val isFinalPage = currentPage == book.page
         val resolvedStartDate = when {
             isFirstRead && request.book_start_date == null -> now
             else -> request.book_start_date
@@ -36,46 +35,45 @@ class BookReadService(
         val resolvedEndDate = if (isFinalPage) now else request.book_end_date
         bookReadRepository.save(
             BookReadEntity(
-                bookNo = request.book_no,
-                bookCurrentPage = currentPage,
-                bookStartDate = resolvedStartDate,
-                bookEndDate = resolvedEndDate,
+                book = book,
+                currentPage = currentPage,
+                startDate = resolvedStartDate,
+                endDate = resolvedEndDate,
                 createdAt = now,
-                userNo = userNo,
             ),
         )
         when {
             isFinalPage -> {
-                book.bookStatus = 1
+                book.status = 1
                 bookRepository.save(book)
             }
             isFirstRead && request.book_start_date == null -> {
-                book.bookStatus = 0
+                book.status = 0
                 bookRepository.save(book)
             }
         }
 
         return CreateReadResponse(
             book_current_page = currentPage,
-            percent = calculatePercent(currentPage, book.bookPage),
+            percent = calculatePercent(currentPage, book.page),
         )
     }
 
     @Transactional
     fun updateRead(
-        id: Int,
+        id: Long,
         request: UpdateReadRequest,
     ): String {
         val read = bookReadRepository.findById(id)
             .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 책 기록이 없습니다.") }
-        request.book_start_date?.let { read.bookStartDate = it }
-        request.book_end_date?.let { read.bookEndDate = it }
+        request.book_start_date?.let { read.startDate = it }
+        request.book_end_date?.let { read.endDate = it }
         bookReadRepository.save(read)
         return "독서 기록 수정 성공"
     }
 
     @Transactional
-    fun deleteRead(id: Int): String {
+    fun deleteRead(id: Long): String {
         if (!bookReadRepository.existsById(id)) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 책 기록이 없습니다.")
         }

@@ -16,7 +16,7 @@ data class SignupResponse(
 @Schema(description = "내 프로필 응답 데이터")
 data class UserProfileResponse(
     @field:Schema(description = "사용자 번호", example = "1")
-    val user_no: Int,
+    val user_no: Long,
     @field:Schema(description = "닉네임", example = "임의닉네임")
     val user_nick: String,
     @field:Schema(description = "이메일", example = "user@example.com")
@@ -38,7 +38,7 @@ data class UserProfileResponse(
 @Schema(description = "프로필 수정 후 요약 응답 데이터")
 data class UserSummaryResponse(
     @field:Schema(description = "사용자 번호", example = "1")
-    val user_no: Int,
+    val user_no: Long,
     @field:Schema(description = "닉네임", example = "임의닉네임")
     val user_nick: String,
     @field:Schema(description = "이메일", example = "user@example.com")

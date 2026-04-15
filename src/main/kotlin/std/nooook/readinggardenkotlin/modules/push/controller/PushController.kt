@@ -50,7 +50,7 @@ class PushController(
         LegacyDataResponse(
             resp_code = 200,
             resp_msg = "푸시 알림 조회 성공",
-            data = pushService.getPush(principal.userNo.toInt()),
+            data = pushService.getPush(principal.userId),
         )
 
     @PutMapping("")
@@ -77,7 +77,7 @@ class PushController(
         @RequestBody request: PushRequest,
     ): LegacyHttpResponse {
         pushService.updatePush(
-            userNo = principal.userNo.toInt(),
+            userId = principal.userId,
             push_app_ok = request.push_app_ok,
             push_book_ok = request.push_book_ok,
             push_time = request.push_time,
@@ -116,7 +116,7 @@ class PushController(
 @Schema(description = "푸시 설정 조회 응답 데이터")
 data class PushResponse(
     @field:Schema(description = "사용자 번호", example = "1")
-    val user_no: Int,
+    val user_no: Long,
     @field:Schema(description = "앱 푸시 전체 허용 여부", example = "true")
     val push_app_ok: Boolean,
     @field:Schema(description = "독서 푸시 허용 여부", example = "false")

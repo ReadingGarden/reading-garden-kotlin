@@ -7,10 +7,11 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.servlet.autoconfigure.MultipartProperties
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.context.annotation.Import
+import std.nooook.readinggardenkotlin.TestcontainersConfiguration
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
@@ -34,12 +35,12 @@ import std.nooook.readinggardenkotlin.modules.book.repository.BookReadRepository
 import std.nooook.readinggardenkotlin.modules.book.repository.BookRepository
 import std.nooook.readinggardenkotlin.modules.garden.entity.GardenEntity
 import std.nooook.readinggardenkotlin.modules.garden.repository.GardenRepository
-import std.nooook.readinggardenkotlin.modules.garden.repository.GardenUserRepository
+import std.nooook.readinggardenkotlin.modules.garden.repository.GardenMemberRepository
 import std.nooook.readinggardenkotlin.modules.memo.entity.MemoEntity
 import std.nooook.readinggardenkotlin.modules.memo.entity.MemoImageEntity
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoImageRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
-import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
+import std.nooook.readinggardenkotlin.modules.push.repository.PushSettingsRepository
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Comparator
@@ -54,20 +55,20 @@ import org.springframework.test.context.DynamicPropertySource
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(BookControllerIntegrationTest.TestConfig::class)
+@Import(TestcontainersConfiguration::class, BookControllerIntegrationTest.TestConfig::class)
 class BookControllerIntegrationTest(
     @Autowired private val mockMvc: MockMvc,
     @Autowired private val multipartProperties: MultipartProperties,
     @Autowired private val userRepository: UserRepository,
     @Autowired private val refreshTokenRepository: RefreshTokenRepository,
-    @Autowired private val pushRepository: PushRepository,
+    @Autowired private val pushSettingsRepository: PushSettingsRepository,
     @Autowired private val bookRepository: BookRepository,
     @Autowired private val bookReadRepository: BookReadRepository,
     @Autowired private val bookImageRepository: BookImageRepository,
     @Autowired private val memoRepository: MemoRepository,
     @Autowired private val memoImageRepository: MemoImageRepository,
     @Autowired private val gardenRepository: GardenRepository,
-    @Autowired private val gardenUserRepository: GardenUserRepository,
+    @Autowired private val gardenMemberRepository: GardenMemberRepository,
     @Autowired private val recordingAladinClient: RecordingAladinClient,
 ) {
     private val objectMapper: ObjectMapper = JsonMapper.builder().findAndAddModules().build()
@@ -92,8 +93,8 @@ class BookControllerIntegrationTest(
         bookReadRepository.deleteAll()
         bookRepository.deleteAll()
         refreshTokenRepository.deleteAll()
-        pushRepository.deleteAll()
-        gardenUserRepository.deleteAll()
+        pushSettingsRepository.deleteAll()
+        gardenMemberRepository.deleteAll()
         gardenRepository.deleteAll()
         userRepository.deleteAll()
         recordingAladinClient.lastQuery = null
@@ -239,18 +240,19 @@ class BookControllerIntegrationTest(
     @Test
     fun `duplication should return forbidden for existing isbn`() {
         val accessToken = signupAndGetAccessToken("dup@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("dup@example.com")?.userNo)
+        val user = checkNotNull(userRepository.findByEmail("dup@example.com"))
+        val userNo = user.id
         bookRepository.save(
             BookEntity(
-                gardenNo = null,
-                bookTitle = "기존 책",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookStatus = 2,
-                userNo = userNo,
-                bookPage = 120,
-                bookIsbn = "9788937462788",
-                bookInfo = "소개",
+                garden = null,
+                title = "기존 책",
+                author = "저자",
+                publisher = "출판사",
+                status = 2,
+                user = user,
+                page = 120,
+                isbn = "9788937462788",
+                info = "소개",
             ),
         )
 
@@ -267,13 +269,14 @@ class BookControllerIntegrationTest(
     @Test
     fun `create should persist book and return created payload`() {
         val accessToken = signupAndGetAccessToken("create@example.com")
-        val gardenNo = gardenRepository.save(
+        val gardenEntity = gardenRepository.save(
             GardenEntity(
-                gardenTitle = "책 가든",
-                gardenInfo = "소개",
-                gardenColor = "blue",
+                title = "책 가든",
+                info = "소개",
+                color = "blue",
             ),
-        ).gardenNo ?: error("gardenNo was not generated")
+        )
+        val gardenNo = gardenEntity.id
 
         val response = mockMvc.perform(
             post("/api/v1/book/")
@@ -291,35 +294,36 @@ class BookControllerIntegrationTest(
         val bookNo = objectMapper.readTree(response.response.contentAsString)
             .path("data")
             .path("book_no")
-            .asInt()
+            .asLong()
         val savedBook = checkNotNull(bookRepository.findById(bookNo).orElse(null))
 
-        assertEquals(gardenNo, savedBook.gardenNo)
-        assertEquals("새 책", savedBook.bookTitle)
-        assertEquals("저자", savedBook.bookAuthor)
-        assertEquals("출판사", savedBook.bookPublisher)
-        assertEquals("seed", savedBook.bookTree)
-        assertEquals("https://example.com/book.jpg", savedBook.bookImageUrl)
-        assertEquals(2, savedBook.bookStatus)
-        assertEquals(300, savedBook.bookPage)
-        assertEquals("9788937462788", savedBook.bookIsbn)
+        assertEquals(gardenNo, savedBook.garden?.id)
+        assertEquals("새 책", savedBook.title)
+        assertEquals("저자", savedBook.author)
+        assertEquals("출판사", savedBook.publisher)
+        assertEquals("seed", savedBook.tree)
+        assertEquals("https://example.com/book.jpg", savedBook.imageUrl)
+        assertEquals(2, savedBook.status)
+        assertEquals(300, savedBook.page)
+        assertEquals("9788937462788", savedBook.isbn)
     }
 
     @Test
     fun `create should allow unlimited books when garden_no is null like legacy`() {
         val accessToken = signupAndGetAccessToken("createlimit@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("createlimit@example.com")?.userNo)
+        val user = checkNotNull(userRepository.findByEmail("createlimit@example.com"))
+        val userNo = user.id
         repeat(30) { index ->
             bookRepository.save(
                 BookEntity(
-                    gardenNo = null,
-                    bookTitle = "기존 책 $index",
-                    bookAuthor = "저자",
-                    bookPublisher = "출판사",
-                    bookStatus = 2,
-                    userNo = userNo,
-                    bookPage = 120,
-                    bookInfo = "소개",
+                    garden = null,
+                    title = "기존 책 $index",
+                    author = "저자",
+                    publisher = "출판사",
+                    status = 2,
+                    user = user,
+                    page = 120,
+                    info = "소개",
                 ),
             )
         }
@@ -340,33 +344,37 @@ class BookControllerIntegrationTest(
     @Test
     fun `update should mutate the targeted book and return legacy message`() {
         val accessToken = signupAndGetAccessToken("update@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("update@example.com")?.userNo)
-        val sourceGardenNo = gardenRepository.save(
+        val user = checkNotNull(userRepository.findByEmail("update@example.com"))
+        val userNo = user.id
+        val sourceGardenEntity = gardenRepository.save(
             GardenEntity(
-                gardenTitle = "원본 가든",
-                gardenInfo = "소개",
-                gardenColor = "green",
+                title = "원본 가든",
+                info = "소개",
+                color = "green",
             ),
-        ).gardenNo ?: error("source gardenNo was not generated")
-        val targetGardenNo = gardenRepository.save(
+        )
+        val sourceGardenNo = sourceGardenEntity.id
+        val targetGardenEntity = gardenRepository.save(
             GardenEntity(
-                gardenTitle = "목표 가든",
-                gardenInfo = "소개",
-                gardenColor = "yellow",
+                title = "목표 가든",
+                info = "소개",
+                color = "yellow",
             ),
-        ).gardenNo ?: error("target gardenNo was not generated")
-        val savedBookNo = bookRepository.save(
+        )
+        val targetGardenNo = targetGardenEntity.id
+        val savedBookEntity = bookRepository.save(
             BookEntity(
-                gardenNo = sourceGardenNo,
-                bookTitle = "수정 전",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookStatus = 2,
-                userNo = userNo,
-                bookPage = 200,
-                bookInfo = "소개",
+                garden = sourceGardenEntity,
+                title = "수정 전",
+                author = "저자",
+                publisher = "출판사",
+                status = 2,
+                user = user,
+                page = 200,
+                info = "소개",
             ),
-        ).bookNo ?: error("bookNo was not generated")
+        )
+        val savedBookNo = savedBookEntity.id
 
         mockMvc.perform(
             put("/api/v1/book/")
@@ -380,71 +388,74 @@ class BookControllerIntegrationTest(
             .andExpect(jsonPath("$.resp_msg").value("책 수정 성공"))
 
         val savedBook = checkNotNull(bookRepository.findById(savedBookNo).orElse(null))
-        assertEquals(targetGardenNo, savedBook.gardenNo)
-        assertEquals("새싹", savedBook.bookTree)
-        assertEquals(1, savedBook.bookStatus)
+        assertEquals(targetGardenNo, savedBook.garden?.id)
+        assertEquals("새싹", savedBook.tree)
+        assertEquals(1, savedBook.status)
     }
 
     @Test
     fun `status should include reading and read books when status is three`() {
         val accessToken = signupAndGetAccessToken("status@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("status@example.com")?.userNo)
+        val user = checkNotNull(userRepository.findByEmail("status@example.com"))
+        val userNo = user.id
         val now = LocalDateTime.of(2026, 4, 6, 12, 0, 0)
-        val readingBookNo = bookRepository.save(
+        val readingBookEntity = bookRepository.save(
             BookEntity(
-                userNo = userNo,
-                bookTitle = "읽는중",
-                bookAuthor = "a",
-                bookPublisher = "p",
-                bookInfo = "i",
-                bookStatus = 0,
-                bookPage = 100,
+                user = user,
+                title = "읽는중",
+                author = "a",
+                publisher = "p",
+                info = "i",
+                status = 0,
+                page = 100,
             ),
-        ).bookNo ?: error("reading bookNo was not generated")
-        val readBookNo = bookRepository.save(
+        )
+        val readingBookNo = readingBookEntity.id
+        val readBookEntity = bookRepository.save(
             BookEntity(
-                userNo = userNo,
-                bookTitle = "읽음",
-                bookAuthor = "a",
-                bookPublisher = "p",
-                bookInfo = "i",
-                bookStatus = 1,
-                bookPage = 100,
+                user = user,
+                title = "읽음",
+                author = "a",
+                publisher = "p",
+                info = "i",
+                status = 1,
+                page = 100,
             ),
-        ).bookNo ?: error("read bookNo was not generated")
+        )
+        val readBookNo = readBookEntity.id
         bookRepository.save(
             BookEntity(
-                userNo = userNo,
-                bookTitle = "읽고싶음",
-                bookAuthor = "a",
-                bookPublisher = "p",
-                bookInfo = "i",
-                bookStatus = 2,
-                bookPage = 100,
+                user = user,
+                title = "읽고싶음",
+                author = "a",
+                publisher = "p",
+                info = "i",
+                status = 2,
+                page = 100,
             ),
         )
         bookReadRepository.save(
             BookReadEntity(
-                bookNo = readingBookNo,
-                bookCurrentPage = 20,
+                book = readingBookEntity,
+                currentPage = 20,
                 createdAt = now.minusHours(2),
-                userNo = userNo,
+                
             ),
         )
         bookReadRepository.save(
             BookReadEntity(
-                bookNo = readingBookNo,
-                bookCurrentPage = 40,
+                book = readingBookEntity,
+                currentPage = 40,
                 createdAt = now.minusHours(1),
-                userNo = userNo,
+                
             ),
         )
         bookReadRepository.save(
             BookReadEntity(
-                bookNo = readBookNo,
-                bookCurrentPage = 100,
+                book = readBookEntity,
+                currentPage = 100,
                 createdAt = now,
-                userNo = userNo,
+                
             ),
         )
 
@@ -503,23 +514,25 @@ class BookControllerIntegrationTest(
     @Test
     fun `status should keep legacy internal error for zero page percent`() {
         val accessToken = signupAndGetAccessToken("statuszeropage@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("statuszeropage@example.com")?.userNo)
-        val bookNo = bookRepository.save(
+        val user = checkNotNull(userRepository.findByEmail("statuszeropage@example.com"))
+        val userNo = user.id
+        val bookEntity = bookRepository.save(
             BookEntity(
-                userNo = userNo,
-                bookTitle = "제로 페이지 상태 책",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookInfo = "소개",
-                bookStatus = 0,
-                bookPage = 0,
+                user = user,
+                title = "제로 페이지 상태 책",
+                author = "저자",
+                publisher = "출판사",
+                info = "소개",
+                status = 0,
+                page = 0,
             ),
-        ).bookNo ?: error("bookNo was not generated")
+        )
+        val bookNo = bookEntity.id
         bookReadRepository.save(
             BookReadEntity(
-                bookNo = bookNo,
-                bookCurrentPage = 1,
-                userNo = userNo,
+                book = bookEntity,
+                currentPage = 1,
+                
             ),
         )
 
@@ -536,16 +549,17 @@ class BookControllerIntegrationTest(
     @Test
     fun `status should keep legacy internal error for zero page size`() {
         val accessToken = signupAndGetAccessToken("statuszeropagesize@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("statuszeropagesize@example.com")?.userNo)
+        val user = checkNotNull(userRepository.findByEmail("statuszeropagesize@example.com"))
+        val userNo = user.id
         bookRepository.save(
             BookEntity(
-                userNo = userNo,
-                bookTitle = "페이지사이즈 제로 책",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookInfo = "소개",
-                bookStatus = 0,
-                bookPage = 100,
+                user = user,
+                title = "페이지사이즈 제로 책",
+                author = "저자",
+                publisher = "출판사",
+                info = "소개",
+                status = 0,
+                page = 100,
             ),
         )
 
@@ -563,53 +577,56 @@ class BookControllerIntegrationTest(
     @Test
     fun `read detail should keep legacy shape and ordering`() {
         val accessToken = signupAndGetAccessToken("readshape@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("readshape@example.com")?.userNo)
-        val gardenNo = gardenRepository.save(
+        val user = checkNotNull(userRepository.findByEmail("readshape@example.com"))
+        val userNo = user.id
+        val gardenEntity = gardenRepository.save(
             GardenEntity(
-                gardenTitle = "읽기 가든",
-                gardenInfo = "소개",
-                gardenColor = "blue",
+                title = "읽기 가든",
+                info = "소개",
+                color = "blue",
             ),
-        ).gardenNo ?: error("gardenNo was not generated")
-        val bookNo = bookRepository.save(
+        )
+        val gardenNo = gardenEntity.id
+        val bookEntity = bookRepository.save(
             BookEntity(
-                gardenNo = gardenNo,
-                userNo = userNo,
-                bookTitle = "읽기 책",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookInfo = "소개",
-                bookStatus = 0,
-                bookPage = 100,
+                garden = gardenEntity,
+                user = user,
+                title = "읽기 책",
+                author = "저자",
+                publisher = "출판사",
+                info = "소개",
+                status = 0,
+                page = 100,
             ),
-        ).bookNo ?: error("bookNo was not generated")
+        )
+        val bookNo = bookEntity.id
         val now = LocalDateTime.of(2026, 4, 6, 12, 0, 0)
 
         memoRepository.save(
             MemoEntity(
-                bookNo = bookNo,
-                memoContent = "늦은 메모",
-                memoCreatedAt = now.minusMinutes(10),
-                userNo = userNo,
-                memoLike = true,
+                book = bookEntity,
+                content = "늦은 메모",
+                createdAt = now.minusMinutes(10),
+                user = user,
+                isLiked = true,
             ),
         )
         memoRepository.save(
             MemoEntity(
-                bookNo = bookNo,
-                memoContent = "빠른 메모",
-                memoCreatedAt = now.minusHours(1),
-                userNo = userNo,
-                memoLike = true,
+                book = bookEntity,
+                content = "빠른 메모",
+                createdAt = now.minusHours(1),
+                user = user,
+                isLiked = true,
             ),
         )
         memoRepository.save(
             MemoEntity(
-                bookNo = bookNo,
-                memoContent = "싫어요 메모",
-                memoCreatedAt = now,
-                userNo = userNo,
-                memoLike = false,
+                book = bookEntity,
+                content = "싫어요 메모",
+                createdAt = now,
+                user = user,
+                isLiked = false,
             ),
         )
 
@@ -631,22 +648,22 @@ class BookControllerIntegrationTest(
 
         val firstRead = bookReadRepository.save(
             BookReadEntity(
-                bookNo = bookNo,
-                bookCurrentPage = 20,
-                bookStartDate = LocalDateTime.of(2026, 4, 6, 10, 0, 0),
-                bookEndDate = LocalDateTime.of(2026, 4, 6, 10, 30, 0),
+                book = bookEntity,
+                currentPage = 20,
+                startDate = LocalDateTime.of(2026, 4, 6, 10, 0, 0),
+                endDate = LocalDateTime.of(2026, 4, 6, 10, 30, 0),
                 createdAt = LocalDateTime.of(2026, 4, 6, 10, 0, 0),
-                userNo = userNo,
+                
             ),
         )
         bookReadRepository.save(
             BookReadEntity(
-                bookNo = bookNo,
-                bookCurrentPage = 40,
-                bookStartDate = LocalDateTime.of(2026, 4, 6, 11, 0, 0),
-                bookEndDate = LocalDateTime.of(2026, 4, 6, 11, 30, 0),
+                book = bookEntity,
+                currentPage = 40,
+                startDate = LocalDateTime.of(2026, 4, 6, 11, 0, 0),
+                endDate = LocalDateTime.of(2026, 4, 6, 11, 30, 0),
                 createdAt = LocalDateTime.of(2026, 4, 6, 11, 0, 0),
-                userNo = userNo,
+                
             ),
         )
 
@@ -698,19 +715,21 @@ class BookControllerIntegrationTest(
     @Test
     fun `read detail should return bad request when garden is missing`() {
         val accessToken = signupAndGetAccessToken("readnogarden1@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("readnogarden1@example.com")?.userNo)
-        val bookNo = bookRepository.save(
+        val user = checkNotNull(userRepository.findByEmail("readnogarden1@example.com"))
+        val userNo = user.id
+        val bookEntity = bookRepository.save(
             BookEntity(
-                gardenNo = null,
-                userNo = userNo,
-                bookTitle = "가든 없는 책",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookInfo = "소개",
-                bookStatus = 0,
-                bookPage = 100,
+                garden = null,
+                user = user,
+                title = "가든 없는 책",
+                author = "저자",
+                publisher = "출판사",
+                info = "소개",
+                status = 0,
+                page = 100,
             ),
-        ).bookNo ?: error("bookNo was not generated")
+        )
+        val bookNo = bookEntity.id
 
         mockMvc.perform(
             get("/api/v1/book/read")
@@ -725,26 +744,29 @@ class BookControllerIntegrationTest(
     @Test
     fun `read detail should return bad request when linked garden is deleted`() {
         val accessToken = signupAndGetAccessToken("readmissing1@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("readmissing1@example.com")?.userNo)
-        val gardenNo = gardenRepository.save(
+        val user = checkNotNull(userRepository.findByEmail("readmissing1@example.com"))
+        val userNo = user.id
+        val gardenEntity = gardenRepository.save(
             GardenEntity(
-                gardenTitle = "임시 가든",
-                gardenInfo = "소개",
-                gardenColor = "green",
+                title = "임시 가든",
+                info = "소개",
+                color = "green",
             ),
-        ).gardenNo ?: error("gardenNo was not generated")
-        val bookNo = bookRepository.save(
+        )
+        val gardenNo = gardenEntity.id
+        val bookEntity = bookRepository.save(
             BookEntity(
-                gardenNo = gardenNo,
-                userNo = userNo,
-                bookTitle = "가든 삭제 책",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookInfo = "소개",
-                bookStatus = 0,
-                bookPage = 100,
+                garden = gardenEntity,
+                user = user,
+                title = "가든 삭제 책",
+                author = "저자",
+                publisher = "출판사",
+                info = "소개",
+                status = 0,
+                page = 100,
             ),
-        ).bookNo ?: error("bookNo was not generated")
+        )
+        val bookNo = bookEntity.id
         gardenRepository.deleteById(gardenNo)
 
         mockMvc.perform(
@@ -760,31 +782,34 @@ class BookControllerIntegrationTest(
     @Test
     fun `read detail should keep legacy internal error for zero page percent`() {
         val accessToken = signupAndGetAccessToken("readzeropage@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("readzeropage@example.com")?.userNo)
-        val gardenNo = gardenRepository.save(
+        val user = checkNotNull(userRepository.findByEmail("readzeropage@example.com"))
+        val userNo = user.id
+        val gardenEntity = gardenRepository.save(
             GardenEntity(
-                gardenTitle = "제로 페이지 가든",
-                gardenInfo = "소개",
-                gardenColor = "yellow",
+                title = "제로 페이지 가든",
+                info = "소개",
+                color = "yellow",
             ),
-        ).gardenNo ?: error("gardenNo was not generated")
-        val bookNo = bookRepository.save(
+        )
+        val gardenNo = gardenEntity.id
+        val bookEntity = bookRepository.save(
             BookEntity(
-                gardenNo = gardenNo,
-                userNo = userNo,
-                bookTitle = "제로 페이지 책",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookInfo = "소개",
-                bookStatus = 0,
-                bookPage = 0,
+                garden = gardenEntity,
+                user = user,
+                title = "제로 페이지 책",
+                author = "저자",
+                publisher = "출판사",
+                info = "소개",
+                status = 0,
+                page = 0,
             ),
-        ).bookNo ?: error("bookNo was not generated")
+        )
+        val bookNo = bookEntity.id
         bookReadRepository.save(
             BookReadEntity(
-                bookNo = bookNo,
-                bookCurrentPage = 1,
-                userNo = userNo,
+                book = bookEntity,
+                currentPage = 1,
+                
             ),
         )
 
@@ -801,18 +826,20 @@ class BookControllerIntegrationTest(
     @Test
     fun `create read should transition book status on first and final page`() {
         val accessToken = signupAndGetAccessToken("readstatus@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("readstatus@example.com")?.userNo)
-        val bookNo = bookRepository.save(
+        val user = checkNotNull(userRepository.findByEmail("readstatus@example.com"))
+        val userNo = user.id
+        val bookEntity = bookRepository.save(
             BookEntity(
-                userNo = userNo,
-                bookTitle = "상태 책",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookInfo = "소개",
-                bookStatus = 2,
-                bookPage = 100,
+                user = user,
+                title = "상태 책",
+                author = "저자",
+                publisher = "출판사",
+                info = "소개",
+                status = 2,
+                page = 100,
             ),
-        ).bookNo ?: error("bookNo was not generated")
+        )
+        val bookNo = bookEntity.id
 
         mockMvc.perform(
             post("/api/v1/book/read")
@@ -828,9 +855,9 @@ class BookControllerIntegrationTest(
             .andExpect(jsonPath("$.data.id").doesNotExist())
             .andExpect(jsonPath("$.data.book_read_no").doesNotExist())
 
-        val firstRead = checkNotNull(bookReadRepository.findAllByBookNoOrderByCreatedAtDesc(bookNo).firstOrNull())
-        assertNotNull(firstRead.bookStartDate)
-        assertEquals(0, checkNotNull(bookRepository.findById(bookNo).orElse(null)).bookStatus)
+        val firstRead = checkNotNull(bookReadRepository.findAllByBookIdOrderByCreatedAtDesc(bookNo).firstOrNull())
+        assertNotNull(firstRead.startDate)
+        assertEquals(0, checkNotNull(bookRepository.findById(bookNo).orElse(null)).status)
 
         mockMvc.perform(
             post("/api/v1/book/read")
@@ -846,10 +873,10 @@ class BookControllerIntegrationTest(
             .andExpect(jsonPath("$.data.id").doesNotExist())
             .andExpect(jsonPath("$.data.book_read_no").doesNotExist())
 
-        val secondRead = checkNotNull(bookReadRepository.findAllByBookNoOrderByCreatedAtDesc(bookNo).firstOrNull())
-        assertEquals(30, secondRead.bookCurrentPage)
-        assertEquals(null, secondRead.bookStartDate)
-        assertEquals(0, checkNotNull(bookRepository.findById(bookNo).orElse(null)).bookStatus)
+        val secondRead = checkNotNull(bookReadRepository.findAllByBookIdOrderByCreatedAtDesc(bookNo).firstOrNull())
+        assertEquals(30, secondRead.currentPage)
+        assertEquals(null, secondRead.startDate)
+        assertEquals(0, checkNotNull(bookRepository.findById(bookNo).orElse(null)).status)
 
         mockMvc.perform(
             post("/api/v1/book/read")
@@ -865,11 +892,11 @@ class BookControllerIntegrationTest(
             .andExpect(jsonPath("$.data.id").doesNotExist())
             .andExpect(jsonPath("$.data.book_read_no").doesNotExist())
 
-        val reads = bookReadRepository.findAllByBookNoOrderByCreatedAtDesc(bookNo)
+        val reads = bookReadRepository.findAllByBookIdOrderByCreatedAtDesc(bookNo)
         val latestRead = checkNotNull(reads.firstOrNull())
-        assertEquals(null, latestRead.bookStartDate)
-        assertNotNull(latestRead.bookEndDate)
-        assertEquals(1, checkNotNull(bookRepository.findById(bookNo).orElse(null)).bookStatus)
+        assertEquals(null, latestRead.startDate)
+        assertNotNull(latestRead.endDate)
+        assertEquals(1, checkNotNull(bookRepository.findById(bookNo).orElse(null)).status)
 
         mockMvc.perform(
             post("/api/v1/book/read")
@@ -885,27 +912,29 @@ class BookControllerIntegrationTest(
             .andExpect(jsonPath("$.data.id").doesNotExist())
             .andExpect(jsonPath("$.data.book_read_no").doesNotExist())
 
-        val latestAfterRegression = checkNotNull(bookReadRepository.findAllByBookNoOrderByCreatedAtDesc(bookNo).firstOrNull())
-        assertEquals(40, latestAfterRegression.bookCurrentPage)
-        assertEquals(null, latestAfterRegression.bookStartDate)
-        assertEquals(1, checkNotNull(bookRepository.findById(bookNo).orElse(null)).bookStatus)
+        val latestAfterRegression = checkNotNull(bookReadRepository.findAllByBookIdOrderByCreatedAtDesc(bookNo).firstOrNull())
+        assertEquals(40, latestAfterRegression.currentPage)
+        assertEquals(null, latestAfterRegression.startDate)
+        assertEquals(1, checkNotNull(bookRepository.findById(bookNo).orElse(null)).status)
     }
 
     @Test
     fun `create read should accept Dart DateTime format with space separator`() {
         val accessToken = signupAndGetAccessToken("dartdate@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("dartdate@example.com")?.userNo)
-        val bookNo = bookRepository.save(
+        val user = checkNotNull(userRepository.findByEmail("dartdate@example.com"))
+        val userNo = user.id
+        val bookEntity = bookRepository.save(
             BookEntity(
-                userNo = userNo,
-                bookTitle = "Dart 날짜 책",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookInfo = "소개",
-                bookStatus = 2,
-                bookPage = 200,
+                user = user,
+                title = "Dart 날짜 책",
+                author = "저자",
+                publisher = "출판사",
+                info = "소개",
+                status = 2,
+                page = 200,
             ),
-        ).bookNo ?: error("bookNo was not generated")
+        )
+        val bookNo = bookEntity.id
 
         mockMvc.perform(
             post("/api/v1/book/read")
@@ -917,32 +946,34 @@ class BookControllerIntegrationTest(
             .andExpect(jsonPath("$.resp_code").value(201))
             .andExpect(jsonPath("$.resp_msg").value("책 기록 성공"))
 
-        val read = checkNotNull(bookReadRepository.findAllByBookNoOrderByCreatedAtDesc(bookNo).firstOrNull())
-        assertNotNull(read.bookStartDate)
+        val read = checkNotNull(bookReadRepository.findAllByBookIdOrderByCreatedAtDesc(bookNo).firstOrNull())
+        assertNotNull(read.startDate)
     }
 
     @Test
     fun `update and delete read should use id without ownership guard`() {
         val accessToken = signupAndGetAccessToken("readmutate@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("readmutate@example.com")?.userNo)
-        val bookNo = bookRepository.save(
+        val user = checkNotNull(userRepository.findByEmail("readmutate@example.com"))
+        val userNo = user.id
+        val bookEntity = bookRepository.save(
             BookEntity(
-                userNo = userNo,
-                bookTitle = "수정 책",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookInfo = "소개",
-                bookStatus = 0,
-                bookPage = 100,
+                user = user,
+                title = "수정 책",
+                author = "저자",
+                publisher = "출판사",
+                info = "소개",
+                status = 0,
+                page = 100,
             ),
-        ).bookNo ?: error("bookNo was not generated")
+        )
+        val bookNo = bookEntity.id
         val readId = bookReadRepository.save(
             BookReadEntity(
-                bookNo = bookNo,
-                bookCurrentPage = 10,
-                userNo = userNo,
+                book = bookEntity,
+                currentPage = 10,
+                
             ),
-        ).id ?: error("read id was not generated")
+        ).id
 
         mockMvc.perform(
             put("/api/v1/book/read")
@@ -956,8 +987,8 @@ class BookControllerIntegrationTest(
             .andExpect(jsonPath("$.resp_msg").value("독서 기록 수정 성공"))
 
         val updatedRead = checkNotNull(bookReadRepository.findById(readId).orElse(null))
-        assertEquals(LocalDateTime.of(2026, 4, 6, 11, 0, 0), updatedRead.bookStartDate)
-        assertEquals(LocalDateTime.of(2026, 4, 6, 12, 0, 0), updatedRead.bookEndDate)
+        assertEquals(LocalDateTime.of(2026, 4, 6, 11, 0, 0), updatedRead.startDate)
+        assertEquals(LocalDateTime.of(2026, 4, 6, 12, 0, 0), updatedRead.endDate)
 
         mockMvc.perform(
             delete("/api/v1/book/read")
@@ -1004,18 +1035,20 @@ class BookControllerIntegrationTest(
     @Test
     fun `upload image should persist file and serve it publicly`() {
         val accessToken = signupAndGetAccessToken("bookimageupload@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("bookimageupload@example.com")?.userNo)
-        val bookNo = bookRepository.save(
+        val user = checkNotNull(userRepository.findByEmail("bookimageupload@example.com"))
+        val userNo = user.id
+        val bookEntity = bookRepository.save(
             BookEntity(
-                userNo = userNo,
-                bookTitle = "이미지 책",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookInfo = "소개",
-                bookStatus = 0,
-                bookPage = 100,
+                user = user,
+                title = "이미지 책",
+                author = "저자",
+                publisher = "출판사",
+                info = "소개",
+                status = 0,
+                page = 100,
             ),
-        ).bookNo ?: error("bookNo was not generated")
+        )
+        val bookNo = bookEntity.id
         val file = MockMultipartFile(
             "file",
             "cover.png",
@@ -1033,13 +1066,13 @@ class BookControllerIntegrationTest(
             .andExpect(jsonPath("$.resp_code").value(201))
             .andExpect(jsonPath("$.resp_msg").value("이미지 업로드 성공"))
 
-        val image = checkNotNull(bookImageRepository.findByBookNo(bookNo))
-        val storedPath = imagesRoot.resolve(image.imageUrl)
+        val image = checkNotNull(bookImageRepository.findByBookId(bookNo))
+        val storedPath = imagesRoot.resolve(image.url)
         assertTrue(Files.exists(storedPath))
-        assertTrue(image.imageUrl.startsWith("book/"))
+        assertTrue(image.url.startsWith("book/"))
 
         val imageResponse = mockMvc.perform(
-            get("/images/${image.imageUrl}"),
+            get("/images/${image.url}"),
         )
             .andExpect(status().isOk)
             .andReturn()
@@ -1050,7 +1083,7 @@ class BookControllerIntegrationTest(
         )
 
         val legacyImageResponse = mockMvc.perform(
-            get("/api/images/${image.imageUrl}"),
+            get("/api/images/${image.url}"),
         )
             .andExpect(status().isOk)
             .andReturn()
@@ -1064,18 +1097,20 @@ class BookControllerIntegrationTest(
     @Test
     fun `upload image should replace existing file and keep one row`() {
         val accessToken = signupAndGetAccessToken("bookimagereplace@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("bookimagereplace@example.com")?.userNo)
-        val bookNo = bookRepository.save(
+        val user = checkNotNull(userRepository.findByEmail("bookimagereplace@example.com"))
+        val userNo = user.id
+        val bookEntity = bookRepository.save(
             BookEntity(
-                userNo = userNo,
-                bookTitle = "교체 책",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookInfo = "소개",
-                bookStatus = 0,
-                bookPage = 100,
+                user = user,
+                title = "교체 책",
+                author = "저자",
+                publisher = "출판사",
+                info = "소개",
+                status = 0,
+                page = 100,
             ),
-        ).bookNo ?: error("bookNo was not generated")
+        )
+        val bookNo = bookEntity.id
         val firstFile = MockMultipartFile(
             "file",
             "first.png",
@@ -1097,8 +1132,8 @@ class BookControllerIntegrationTest(
         )
             .andExpect(status().isCreated)
 
-        val firstImage = checkNotNull(bookImageRepository.findByBookNo(bookNo))
-        val firstStoredPath = imagesRoot.resolve(firstImage.imageUrl)
+        val firstImage = checkNotNull(bookImageRepository.findByBookId(bookNo))
+        val firstStoredPath = imagesRoot.resolve(firstImage.url)
         assertTrue(Files.exists(firstStoredPath))
 
         mockMvc.perform(
@@ -1110,29 +1145,31 @@ class BookControllerIntegrationTest(
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.resp_msg").value("이미지 업로드 성공"))
 
-        val replacedImage = checkNotNull(bookImageRepository.findByBookNo(bookNo))
-        val replacedStoredPath = imagesRoot.resolve(replacedImage.imageUrl)
+        val replacedImage = checkNotNull(bookImageRepository.findByBookId(bookNo))
+        val replacedStoredPath = imagesRoot.resolve(replacedImage.url)
         assertFalse(Files.exists(firstStoredPath))
         assertTrue(Files.exists(replacedStoredPath))
         assertEquals(1, bookImageRepository.count())
-        assertFalse(firstImage.imageUrl == replacedImage.imageUrl)
+        assertFalse(firstImage.url == replacedImage.url)
     }
 
     @Test
     fun `upload image should reject files over five megabytes`() {
         val accessToken = signupAndGetAccessToken("bookimageoversize@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("bookimageoversize@example.com")?.userNo)
-        val bookNo = bookRepository.save(
+        val user = checkNotNull(userRepository.findByEmail("bookimageoversize@example.com"))
+        val userNo = user.id
+        val bookEntity = bookRepository.save(
             BookEntity(
-                userNo = userNo,
-                bookTitle = "큰 이미지 책",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookInfo = "소개",
-                bookStatus = 0,
-                bookPage = 100,
+                user = user,
+                title = "큰 이미지 책",
+                author = "저자",
+                publisher = "출판사",
+                info = "소개",
+                status = 0,
+                page = 100,
             ),
-        ).bookNo ?: error("bookNo was not generated")
+        )
+        val bookNo = bookEntity.id
         val oversizedBytes = ByteArray(5 * 1024 * 1024 + 1)
         val file = MockMultipartFile(
             "file",
@@ -1151,24 +1188,26 @@ class BookControllerIntegrationTest(
             .andExpect(jsonPath("$.resp_code").value(400))
             .andExpect(jsonPath("$.resp_msg").value("이미지 용량은 5MB를 초과할 수 없습니다."))
 
-        assertTrue(bookImageRepository.findByBookNo(bookNo) == null)
+        assertTrue(bookImageRepository.findByBookId(bookNo) == null)
     }
 
     @Test
     fun `delete image should remove file and record`() {
         val accessToken = signupAndGetAccessToken("bookimagedelete@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("bookimagedelete@example.com")?.userNo)
-        val bookNo = bookRepository.save(
+        val user = checkNotNull(userRepository.findByEmail("bookimagedelete@example.com"))
+        val userNo = user.id
+        val bookEntity = bookRepository.save(
             BookEntity(
-                userNo = userNo,
-                bookTitle = "삭제 이미지 책",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookInfo = "소개",
-                bookStatus = 0,
-                bookPage = 100,
+                user = user,
+                title = "삭제 이미지 책",
+                author = "저자",
+                publisher = "출판사",
+                info = "소개",
+                status = 0,
+                page = 100,
             ),
-        ).bookNo ?: error("bookNo was not generated")
+        )
+        val bookNo = bookEntity.id
         val file = MockMultipartFile(
             "file",
             "delete.png",
@@ -1184,8 +1223,8 @@ class BookControllerIntegrationTest(
         )
             .andExpect(status().isCreated)
 
-        val storedImage = checkNotNull(bookImageRepository.findByBookNo(bookNo))
-        val storedPath = imagesRoot.resolve(storedImage.imageUrl)
+        val storedImage = checkNotNull(bookImageRepository.findByBookId(bookNo))
+        val storedPath = imagesRoot.resolve(storedImage.url)
         assertTrue(Files.exists(storedPath))
 
         mockMvc.perform(
@@ -1197,25 +1236,27 @@ class BookControllerIntegrationTest(
             .andExpect(jsonPath("$.resp_code").value(201))
             .andExpect(jsonPath("$.resp_msg").value("이미지 삭제 성공"))
 
-        assertTrue(bookImageRepository.findByBookNo(bookNo) == null)
+        assertTrue(bookImageRepository.findByBookId(bookNo) == null)
         assertFalse(Files.exists(storedPath))
     }
 
     @Test
     fun `delete image should return bad request when missing`() {
         val accessToken = signupAndGetAccessToken("bookimagemissing@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("bookimagemissing@example.com")?.userNo)
-        val bookNo = bookRepository.save(
+        val user = checkNotNull(userRepository.findByEmail("bookimagemissing@example.com"))
+        val userNo = user.id
+        val bookEntity = bookRepository.save(
             BookEntity(
-                userNo = userNo,
-                bookTitle = "이미지 없는 책",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookInfo = "소개",
-                bookStatus = 0,
-                bookPage = 100,
+                user = user,
+                title = "이미지 없는 책",
+                author = "저자",
+                publisher = "출판사",
+                info = "소개",
+                status = 0,
+                page = 100,
             ),
-        ).bookNo ?: error("bookNo was not generated")
+        )
+        val bookNo = bookEntity.id
 
         mockMvc.perform(
             delete("/api/v1/book/image")
@@ -1230,23 +1271,25 @@ class BookControllerIntegrationTest(
     @Test
     fun `delete book should cascade delete related rows and files`() {
         val accessToken = signupAndGetAccessToken("bookdeletecascade@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("bookdeletecascade@example.com")?.userNo)
-        val bookNo = bookRepository.save(
+        val user = checkNotNull(userRepository.findByEmail("bookdeletecascade@example.com"))
+        val userNo = user.id
+        val bookEntity = bookRepository.save(
             BookEntity(
-                userNo = userNo,
-                bookTitle = "삭제 대상 책",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookInfo = "소개",
-                bookStatus = 0,
-                bookPage = 100,
+                user = user,
+                title = "삭제 대상 책",
+                author = "저자",
+                publisher = "출판사",
+                info = "소개",
+                status = 0,
+                page = 100,
             ),
-        ).bookNo ?: error("bookNo was not generated")
+        )
+        val bookNo = bookEntity.id
         bookReadRepository.save(
             BookReadEntity(
-                bookNo = bookNo,
-                bookCurrentPage = 20,
-                userNo = userNo,
+                book = bookEntity,
+                currentPage = 20,
+                
             ),
         )
         val bookImageRelativePath = "book/delete-book-image.png"
@@ -1255,18 +1298,18 @@ class BookControllerIntegrationTest(
         Files.writeString(bookImagePath, "book-image")
         bookImageRepository.save(
             BookImageEntity(
-                bookNo = bookNo,
-                imageName = "delete-book-image.png",
-                imageUrl = bookImageRelativePath,
+                book = bookEntity,
+                name = "delete-book-image.png",
+                url = bookImageRelativePath,
             ),
         )
         val memo = memoRepository.save(
             MemoEntity(
-                bookNo = bookNo,
-                memoContent = "메모",
-                memoCreatedAt = LocalDateTime.of(2026, 4, 6, 13, 0, 0),
-                userNo = userNo,
-                memoLike = true,
+                book = bookEntity,
+                content = "메모",
+                createdAt = LocalDateTime.of(2026, 4, 6, 13, 0, 0),
+                user = user,
+                isLiked = true,
             ),
         )
         val memoId = checkNotNull(memo.id)
@@ -1276,9 +1319,9 @@ class BookControllerIntegrationTest(
         Files.writeString(memoImagePath, "memo-image")
         memoImageRepository.save(
             MemoImageEntity(
-                memoNo = memoId,
-                imageName = "delete-memo-image.png",
-                imageUrl = memoImageRelativePath,
+                memo = memo,
+                name = "delete-memo-image.png",
+                url = memoImageRelativePath,
             ),
         )
 
@@ -1292,10 +1335,10 @@ class BookControllerIntegrationTest(
             .andExpect(jsonPath("$.resp_msg").value("책 삭제 성공"))
 
         assertFalse(bookRepository.findById(bookNo).isPresent)
-        assertTrue(bookReadRepository.findAllByBookNoOrderByCreatedAtDesc(bookNo).isEmpty())
-        assertTrue(bookImageRepository.findAllByBookNo(bookNo).isEmpty())
-        assertTrue(memoRepository.findAllByBookNo(bookNo).isEmpty())
-        assertTrue(memoImageRepository.findAllByMemoNoIn(listOf(memoId)).isEmpty())
+        assertTrue(bookReadRepository.findAllByBookIdOrderByCreatedAtDesc(bookNo).isEmpty())
+        assertTrue(bookImageRepository.findAllByBookId(bookNo).isEmpty())
+        assertTrue(memoRepository.findAllByBookId(bookNo).isEmpty())
+        assertTrue(memoImageRepository.findAllByMemoIdIn(listOf(memoId)).isEmpty())
         assertFalse(Files.exists(bookImagePath))
         assertFalse(Files.exists(memoImagePath))
     }
@@ -1303,39 +1346,41 @@ class BookControllerIntegrationTest(
     @Test
     fun `delete book should ignore missing related image files`() {
         val accessToken = signupAndGetAccessToken("bookdeletefilemissing@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("bookdeletefilemissing@example.com")?.userNo)
-        val bookNo = bookRepository.save(
+        val user = checkNotNull(userRepository.findByEmail("bookdeletefilemissing@example.com"))
+        val userNo = user.id
+        val bookEntity = bookRepository.save(
             BookEntity(
-                userNo = userNo,
-                bookTitle = "누락 파일 책",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookInfo = "소개",
-                bookStatus = 0,
-                bookPage = 100,
+                user = user,
+                title = "누락 파일 책",
+                author = "저자",
+                publisher = "출판사",
+                info = "소개",
+                status = 0,
+                page = 100,
             ),
-        ).bookNo ?: error("bookNo was not generated")
+        )
+        val bookNo = bookEntity.id
         bookImageRepository.save(
             BookImageEntity(
-                bookNo = bookNo,
-                imageName = "missing-book.png",
-                imageUrl = "book/missing-book.png",
+                book = bookEntity,
+                name = "missing-book.png",
+                url = "book/missing-book.png",
             ),
         )
         val memo = memoRepository.save(
             MemoEntity(
-                bookNo = bookNo,
-                memoContent = "메모",
-                memoCreatedAt = LocalDateTime.of(2026, 4, 6, 14, 0, 0),
-                userNo = userNo,
-                memoLike = false,
+                book = bookEntity,
+                content = "메모",
+                createdAt = LocalDateTime.of(2026, 4, 6, 14, 0, 0),
+                user = user,
+                isLiked = false,
             ),
         )
         memoImageRepository.save(
             MemoImageEntity(
-                memoNo = checkNotNull(memo.id),
-                imageName = "missing-memo.png",
-                imageUrl = "memo/missing-memo.png",
+                memo = memo,
+                name = "missing-memo.png",
+                url = "memo/missing-memo.png",
             ),
         )
 
@@ -1349,53 +1394,55 @@ class BookControllerIntegrationTest(
             .andExpect(jsonPath("$.resp_msg").value("책 삭제 성공"))
 
         assertFalse(bookRepository.findById(bookNo).isPresent)
-        assertTrue(bookImageRepository.findAllByBookNo(bookNo).isEmpty())
-        assertTrue(memoRepository.findAllByBookNo(bookNo).isEmpty())
+        assertTrue(bookImageRepository.findAllByBookId(bookNo).isEmpty())
+        assertTrue(memoRepository.findAllByBookId(bookNo).isEmpty())
     }
 
     @Test
     fun `delete book should reject another users book and keep related data`() {
         signupAndGetAccessToken("bookdeleteowner@example.com")
-        val ownerNo = checkNotNull(userRepository.findByUserEmail("bookdeleteowner@example.com")?.userNo)
+        val owner = checkNotNull(userRepository.findByEmail("bookdeleteowner@example.com"))
+        val ownerNo = owner.id
         val attackerAccessToken = signupAndGetAccessToken("bookdeleteattacker@example.com")
-        val bookNo = bookRepository.save(
+        val bookEntity = bookRepository.save(
             BookEntity(
-                userNo = ownerNo,
-                bookTitle = "타인 책",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookInfo = "소개",
-                bookStatus = 0,
-                bookPage = 100,
+                user = owner,
+                title = "타인 책",
+                author = "저자",
+                publisher = "출판사",
+                info = "소개",
+                status = 0,
+                page = 100,
             ),
-        ).bookNo ?: error("bookNo was not generated")
+        )
+        val bookNo = bookEntity.id
         val bookImageRelativePath = "book/owner-book.png"
         val bookImagePath = imagesRoot.resolve(bookImageRelativePath)
         Files.createDirectories(bookImagePath.parent)
         Files.writeString(bookImagePath, "owner-book-image")
         bookImageRepository.save(
             BookImageEntity(
-                bookNo = bookNo,
-                imageName = "owner-book.png",
-                imageUrl = bookImageRelativePath,
+                book = bookEntity,
+                name = "owner-book.png",
+                url = bookImageRelativePath,
             ),
         )
         val readId = checkNotNull(
             bookReadRepository.save(
                 BookReadEntity(
-                    bookNo = bookNo,
-                    bookCurrentPage = 12,
-                    userNo = ownerNo,
+                    book = bookEntity,
+                    currentPage = 12,
+                    
                 ),
             ).id,
         )
         val memo = memoRepository.save(
             MemoEntity(
-                bookNo = bookNo,
-                memoContent = "비소유자 삭제 방지",
-                memoCreatedAt = LocalDateTime.of(2026, 4, 6, 16, 0, 0),
-                userNo = ownerNo,
-                memoLike = true,
+                book = bookEntity,
+                content = "비소유자 삭제 방지",
+                createdAt = LocalDateTime.of(2026, 4, 6, 16, 0, 0),
+                user = owner,
+                isLiked = true,
             ),
         )
         val memoId = checkNotNull(memo.id)
@@ -1405,9 +1452,9 @@ class BookControllerIntegrationTest(
         Files.writeString(memoImagePath, "owner-memo-image")
         memoImageRepository.save(
             MemoImageEntity(
-                memoNo = memoId,
-                imageName = "owner-memo.png",
-                imageUrl = memoImageRelativePath,
+                memo = memo,
+                name = "owner-memo.png",
+                url = memoImageRelativePath,
             ),
         )
 
@@ -1422,9 +1469,9 @@ class BookControllerIntegrationTest(
 
         assertTrue(bookRepository.findById(bookNo).isPresent)
         assertTrue(bookReadRepository.findById(readId).isPresent)
-        assertFalse(bookImageRepository.findAllByBookNo(bookNo).isEmpty())
+        assertFalse(bookImageRepository.findAllByBookId(bookNo).isEmpty())
         assertTrue(memoRepository.findById(memoId).isPresent)
-        assertFalse(memoImageRepository.findAllByMemoNoIn(listOf(memoId)).isEmpty())
+        assertFalse(memoImageRepository.findAllByMemoIdIn(listOf(memoId)).isEmpty())
         assertTrue(Files.exists(bookImagePath))
         assertTrue(Files.exists(memoImagePath))
     }

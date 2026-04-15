@@ -32,10 +32,10 @@ class BookQueryService(
 
     @Transactional
     fun checkDuplication(
-        userNo: Int,
+        userId: Long,
         isbn: String,
     ): String {
-        if (bookRepository.findByBookIsbnAndUserNo(isbn, userNo) != null) {
+        if (bookRepository.findByIsbnAndUserId(isbn, userId) != null) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "책 중복")
         }
         return "책 등록 가능"
@@ -43,22 +43,22 @@ class BookQueryService(
 
     @Transactional
     fun getBookStatus(
-        userNo: Int,
-        gardenNo: Int?,
+        userId: Long,
+        gardenNo: Long?,
         status: Int?,
         page: Int,
         pageSize: Int,
     ): BookStatusResponse {
         val books = when {
-            gardenNo != null -> bookRepository.findAllByUserNoAndGardenNo(userNo, gardenNo)
-            else -> bookRepository.findAllByUserNo(userNo)
+            gardenNo != null -> bookRepository.findAllByUserIdAndGardenId(userId, gardenNo)
+            else -> bookRepository.findAllByUserId(userId)
         }
             .asSequence()
             .filter {
                 when (status) {
                     null -> true
-                    3 -> it.bookStatus == 0 || it.bookStatus == 1
-                    else -> it.bookStatus == status
+                    3 -> it.status == 0 || it.status == 1
+                    else -> it.status == status
                 }
             }
             .toList()
@@ -75,75 +75,70 @@ class BookQueryService(
             total_items = totalItems,
             page_size = pageSize,
             list = pageBooks.map { book ->
-                val bookNo = checkNotNull(book.bookNo) { "Book id is required" }
-                val latestRead = bookReadRepository.findTopByBookNoOrderByCreatedAtDesc(bookNo)
-                val percent = latestRead?.let { calculatePercent(it.bookCurrentPage, book.bookPage) } ?: 0.0
+                val latestRead = bookReadRepository.findTopByBookIdOrderByCreatedAtDesc(book.id)
+                val percent = latestRead?.let { calculatePercent(it.currentPage, book.page) } ?: 0.0
 
                 BookStatusItemResponse(
-                    book_no = bookNo,
-                    book_title = book.bookTitle,
-                    book_author = book.bookAuthor,
-                    book_publisher = book.bookPublisher,
-                    book_info = book.bookInfo,
-                    book_image_url = book.bookImageUrl,
-                    book_tree = book.bookTree,
-                    book_status = book.bookStatus,
+                    book_no = book.id,
+                    book_title = book.title,
+                    book_author = book.author,
+                    book_publisher = book.publisher,
+                    book_info = book.info,
+                    book_image_url = book.imageUrl,
+                    book_tree = book.tree,
+                    book_status = book.status,
                     percent = percent,
-                    book_page = book.bookPage,
-                    garden_no = book.gardenNo,
+                    book_page = book.page,
+                    garden_no = book.garden?.id,
                 )
             },
         )
     }
 
     @Transactional
-    fun getBookRead(bookNo: Int): BookReadDetailResponse {
+    fun getBookRead(bookNo: Long): BookReadDetailResponse {
         val book = bookRepository.findById(bookNo)
             .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 책 정보가 없습니다.") }
-        val gardenNo = book.gardenNo
+        val garden = book.garden
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 책 정보가 없습니다.")
-        val garden = gardenRepository.findById(gardenNo)
-            .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 책 정보가 없습니다.") }
-        val latestRead = bookReadRepository.findTopByBookNoOrderByCreatedAtDesc(bookNo)
-        val reads = bookReadRepository.findAllByBookNoOrderByCreatedAtDesc(bookNo)
-        val currentPage = latestRead?.bookCurrentPage ?: 0
-        val percent = latestRead?.let { calculatePercent(it.bookCurrentPage, book.bookPage) } ?: 0.0
-        val memoList = memoRepository.findAllByBookNoOrderByMemoLikeDescMemoCreatedAtDesc(bookNo)
+        val latestRead = bookReadRepository.findTopByBookIdOrderByCreatedAtDesc(bookNo)
+        val reads = bookReadRepository.findAllByBookIdOrderByCreatedAtDesc(bookNo)
+        val currentPage = latestRead?.currentPage ?: 0
+        val percent = latestRead?.let { calculatePercent(it.currentPage, book.page) } ?: 0.0
+        val memoList = memoRepository.findAllByBookIdOrderByIsLikedDescCreatedAtDesc(bookNo)
             .map { memo ->
-                val memoId = checkNotNull(memo.id) { "Memo id is required" }
-                val memoImage = memoImageRepository.findFirstByMemoNoOrderByImageCreatedAtDesc(memoId)
+                val memoImage = memoImageRepository.findFirstByMemoIdOrderByCreatedAtDesc(memo.id)
                 BookReadMemoItemResponse(
-                    id = memoId,
-                    memo_content = memo.memoContent,
-                    memo_like = memo.memoLike,
-                    memo_created_at = formatDateTime(memo.memoCreatedAt),
-                    image_url = memoImage?.imageUrl,
+                    id = memo.id,
+                    memo_content = memo.content,
+                    memo_like = memo.isLiked,
+                    memo_created_at = formatDateTime(memo.createdAt),
+                    image_url = memoImage?.url,
                 )
             }
 
         return BookReadDetailResponse(
             book_no = bookNo,
-            user_no = book.userNo,
-            book_title = book.bookTitle,
-            book_author = book.bookAuthor,
-            book_publisher = book.bookPublisher,
-            book_info = book.bookInfo,
-            book_image_url = book.bookImageUrl,
-            book_tree = book.bookTree,
-            book_status = book.bookStatus,
-            book_page = book.bookPage,
-            garden_no = book.gardenNo,
-            garden_title = garden.gardenTitle,
-            garden_color = garden.gardenColor,
+            user_no = book.user.id,
+            book_title = book.title,
+            book_author = book.author,
+            book_publisher = book.publisher,
+            book_info = book.info,
+            book_image_url = book.imageUrl,
+            book_tree = book.tree,
+            book_status = book.status,
+            book_page = book.page,
+            garden_no = book.garden?.id,
+            garden_title = garden.title,
+            garden_color = garden.color,
             book_current_page = currentPage,
             percent = percent,
             book_read_list = reads.map { read ->
-                val readId = checkNotNull(read.id) { "Book read id is required" }
                 BookReadHistoryItemResponse(
-                    id = readId,
-                    book_current_page = read.bookCurrentPage,
-                    book_start_date = read.bookStartDate?.let(::formatDateTime),
-                    book_end_date = read.bookEndDate?.let(::formatDateTime),
+                    id = read.id,
+                    book_current_page = read.currentPage,
+                    book_start_date = read.startDate?.let(::formatDateTime),
+                    book_end_date = read.endDate?.let(::formatDateTime),
                     book_created_at = formatDateTime(read.createdAt),
                 )
             },

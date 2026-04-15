@@ -2,29 +2,30 @@ package std.nooook.readinggardenkotlin.modules.book.entity
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.FetchType
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
+import jakarta.persistence.JoinColumn
+import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 import java.time.LocalDateTime
 
 @Entity
-@Table(name = "BOOK_READ")
+@Table(name = "book_reads")
 class BookReadEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id")
-    var id: Int? = null,
-    @Column(name = "book_no", nullable = false)
-    var bookNo: Int = 0,
-    @Column(name = "book_current_page", nullable = false)
-    var bookCurrentPage: Int = 0,
-    @Column(name = "book_start_date")
-    var bookStartDate: LocalDateTime? = null,
-    @Column(name = "book_end_date")
-    var bookEndDate: LocalDateTime? = null,
-    @Column(name = "created_at", nullable = false)
-    var createdAt: LocalDateTime = LocalDateTime.now(),
-    @Column(name = "user_no", nullable = false)
-    var userNo: Int = 0,
-)
+    val id: Long = 0,
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "book_id", nullable = false)
+    val book: BookEntity,
+    @Column(nullable = false)
+    var currentPage: Int = 0,
+    var startDate: LocalDateTime? = null,
+    var endDate: LocalDateTime? = null,
+    @Column(nullable = false)
+    val createdAt: LocalDateTime = LocalDateTime.now(),
+) {
+    protected constructor() : this(book = BookEntity(user = std.nooook.readinggardenkotlin.modules.auth.entity.UserEntity()))
+}
