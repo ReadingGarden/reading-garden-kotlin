@@ -3,7 +3,7 @@ name: native-amd64-image
 on:
   push:
     branches:
-      - main
+      - main-legacy
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
