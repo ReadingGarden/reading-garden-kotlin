@@ -1,0 +1,109 @@
+name: jvm-image
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-jvm:
+    runs-on: ubuntu-latest
+    env:
+      JVM_IMAGE_NAME: ghcr.io/readinggarden/reading-garden-kotlin:jvm-${{ github.sha }}
+      REGISTRY_IMAGE: ghcr.io/readinggarden/reading-garden-kotlin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run tests
+        run: ./gradlew test
+
+      - name: Build JVM image
+        run: ./gradlew bootBuildImage
+        env:
+          JVM_IMAGE_NAME: ${{ env.JVM_IMAGE_NAME }}
+
+      - name: Push sha tag
+        run: docker push "$JVM_IMAGE_NAME"
+
+      - name: Tag latest
+        if: github.ref == 'refs/heads/main'
+        run: docker tag "$JVM_IMAGE_NAME" "$REGISTRY_IMAGE:jvm-latest"
+
+      - name: Push latest tag
+        if: github.ref == 'refs/heads/main'
+        run: docker push "$REGISTRY_IMAGE:jvm-latest"
+
+  deploy-oci:
+    needs: build-jvm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      IMAGE_REF: ghcr.io/readinggarden/reading-garden-kotlin:jvm-${{ github.sha }}
+      REMOTE_APP_DIR: /opt/reading-garden
+      OCI_PORT: ${{ vars.OCI_PORT || '22' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Prepare SSH key
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.OCI_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "$OCI_PORT" "${{ secrets.OCI_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Copy deployment files
+        run: |
+          ssh -p "$OCI_PORT" "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}" "mkdir -p '$REMOTE_APP_DIR'"
+          scp -P "$OCI_PORT" deploy/docker-compose.oci.yml "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$REMOTE_APP_DIR/docker-compose.yml"
+          scp -P "$OCI_PORT" deploy/nginx.conf "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$REMOTE_APP_DIR/nginx.conf"
+          scp -P "$OCI_PORT" deploy/blue-green-deploy.sh "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$REMOTE_APP_DIR/blue-green-deploy.sh"
+          scp -P "$OCI_PORT" deploy/cutover-smoke-check.sh "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$REMOTE_APP_DIR/cutover-smoke-check.sh"
+          ssh -p "$OCI_PORT" "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}" "chmod +x '$REMOTE_APP_DIR/blue-green-deploy.sh' '$REMOTE_APP_DIR/cutover-smoke-check.sh'"
+
+      - name: Deploy with blue-green
+        run: |
+          ssh -T -p "$OCI_PORT" \
+            "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}" \
+            IMAGE_REF="$IMAGE_REF" REMOTE_APP_DIR="$REMOTE_APP_DIR" /bin/bash -seu <<'EOF'
+          set -euo pipefail
+          cd "$REMOTE_APP_DIR"
+          test -f .env
+          test -f secrets/firebase-service-account.json
+
+          # Log in to GHCR
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+
+          # Run blue-green deployment
+          export IMAGE_REF="$IMAGE_REF"
+          ./blue-green-deploy.sh
+          EOF
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
