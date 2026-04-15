@@ -137,7 +137,7 @@ class AuthController(
     fun logout(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
     ): LegacyDataResponse<Map<String, Any>> {
-        authService.logout(principal.userNo.toInt())
+        authService.logout(principal.userId)
         return LegacyDataResponse(
             resp_code = 200,
             resp_msg = "로그아웃 성공",
@@ -185,7 +185,7 @@ class AuthController(
     fun deleteUser(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
     ): LegacyDataResponse<Map<String, Any>> {
-        authService.deleteUser(principal.userNo.toInt())
+        authService.deleteUser(principal.userId)
         return LegacyDataResponse(
             resp_code = 200,
             resp_msg = "회원 탈퇴 성공",
@@ -266,7 +266,7 @@ class AuthController(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @RequestBody request: UpdateUserPasswordRequest,
     ): LegacyHttpResponse {
-        authService.updatePassword(principal.userNo.toInt(), request.user_password)
+        authService.updatePassword(principal.userId, request.user_password)
         return LegacyHttpResponse(
             resp_code = 200,
             resp_msg = "비밀번호 변경 성공",
@@ -296,7 +296,7 @@ class AuthController(
         LegacyDataResponse(
             resp_code = 200,
             resp_msg = "조회 성공",
-            data = authService.getProfile(principal.userNo.toInt()),
+            data = authService.getProfile(principal.userId),
         )
 
     @PutMapping("")
@@ -317,7 +317,7 @@ class AuthController(
             resp_code = 200,
             resp_msg = "프로필 변경 성공",
             data = authService.updateProfile(
-                userNo = principal.userNo.toInt(),
+                userId = principal.userId,
                 userNick = request.user_nick,
                 userImage = request.user_image,
             ),

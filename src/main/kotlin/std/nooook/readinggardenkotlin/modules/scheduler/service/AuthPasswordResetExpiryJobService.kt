@@ -9,19 +9,20 @@ import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.slf4j.LoggerFactory
 import std.nooook.readinggardenkotlin.modules.auth.repository.UserRepository
-import std.nooook.readinggardenkotlin.modules.scheduler.entity.ApschedulerJobEntity
-import std.nooook.readinggardenkotlin.modules.scheduler.repository.ApschedulerJobRepository
-import java.nio.charset.StandardCharsets
+import std.nooook.readinggardenkotlin.modules.scheduler.entity.ScheduledJobEntity
+import std.nooook.readinggardenkotlin.modules.scheduler.repository.ScheduledJobRepository
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ScheduledFuture
 import kotlin.jvm.optionals.getOrNull
 
 @Service
 class AuthPasswordResetExpiryJobService(
-    private val apschedulerJobRepository: ApschedulerJobRepository,
+    private val scheduledJobRepository: ScheduledJobRepository,
     private val userRepository: UserRepository,
     private val taskScheduler: TaskScheduler,
     private val schedulerJobExecutionRunner: SchedulerJobExecutionRunner,
@@ -37,13 +38,13 @@ class AuthPasswordResetExpiryJobService(
     }
 
     fun schedulePasswordResetExpiry(
-        userNo: Int,
+        userId: Long,
         authNumber: String,
     ) {
         val job = PasswordResetExpiryJob(
             type = JOB_TYPE,
             version = JOB_VERSION,
-            userNo = userNo,
+            userId = userId,
             authNumber = authNumber,
             runAt = Instant.now(utcClock).plus(passwordResetAuthTtl),
         )
@@ -51,10 +52,10 @@ class AuthPasswordResetExpiryJobService(
     }
 
     fun isPasswordResetAuthValid(
-        userNo: Int,
+        userId: Long,
         authNumber: String,
     ): Boolean {
-        val job = findPasswordResetExpiryJob(userNo) ?: return false
+        val job = findPasswordResetExpiryJob(userId) ?: return false
         if (job.isExpired(Instant.now(utcClock))) {
             expire(job)
             return false
@@ -62,11 +63,13 @@ class AuthPasswordResetExpiryJobService(
         return job.authNumber == authNumber
     }
 
-    fun findPasswordResetExpiryJob(userNo: Int): PasswordResetExpiryJob? =
-        apschedulerJobRepository.findById(jobId(userNo)).getOrNull()?.toPasswordResetJobOrNull()
+    fun findPasswordResetExpiryJob(userId: Long): PasswordResetExpiryJob? {
+        val entity = scheduledJobRepository.findById(jobId(userId)).getOrNull() ?: return null
+        return entity.toPasswordResetJobOrNull()
+    }
 
     fun rehydratePasswordResetExpiryJobs() {
-        val persistedJobs = apschedulerJobRepository.findAllByIdStartingWith(JOB_ID_PREFIX)
+        val persistedJobs = scheduledJobRepository.findAllByIdStartingWith(JOB_ID_PREFIX)
             .mapNotNull { entity ->
                 entity.toPasswordResetJobOrNull() ?: run {
                     deleteMalformedJob(entity)
@@ -94,7 +97,16 @@ class AuthPasswordResetExpiryJobService(
     }
 
     private fun upsertAndSchedule(job: PasswordResetExpiryJob) {
-        apschedulerJobRepository.save(job.toEntity())
+        val user = userRepository.findById(job.userId).orElse(null)
+        scheduledJobRepository.save(
+            ScheduledJobEntity(
+                id = job.id,
+                jobType = JOB_TYPE,
+                targetUser = user,
+                scheduledAt = OffsetDateTime.ofInstant(job.runAt, ZoneOffset.UTC),
+                payload = """{"type":"${job.type}","version":${job.version},"authNumber":"${job.authNumber}"}""",
+            ),
+        )
         scheduleAfterCommit(job)
     }
 
@@ -129,19 +141,19 @@ class AuthPasswordResetExpiryJobService(
     }
 
     private fun expire(job: PasswordResetExpiryJob) {
-        val persistedJob = findPasswordResetExpiryJob(job.userNo)
+        val persistedJob = findPasswordResetExpiryJob(job.userId)
         if (persistedJob != job) {
             clearScheduledJobHandle(job)
             return
         }
 
         clearScheduledJobHandle(job)
-        val user = userRepository.findByUserNo(job.userNo)
-        if (user != null && user.userAuthNumber == job.authNumber) {
-            user.userAuthNumber = null
+        val user = userRepository.findById(job.userId).orElse(null)
+        if (user != null && user.authNumber == job.authNumber) {
+            user.authNumber = null
             userRepository.save(user)
         }
-        apschedulerJobRepository.deleteById(job.id)
+        scheduledJobRepository.deleteById(job.id)
     }
 
     private fun scheduleAfterCommit(job: PasswordResetExpiryJob) {
@@ -159,16 +171,33 @@ class AuthPasswordResetExpiryJobService(
         )
     }
 
-    private fun deleteMalformedJob(entity: ApschedulerJobEntity) {
+    private fun deleteMalformedJob(entity: ScheduledJobEntity) {
         cancelScheduledJob(entity.id)
-        apschedulerJobRepository.delete(entity)
+        scheduledJobRepository.delete(entity)
         logger.warn("Deleted malformed password reset expiry job during rehydrate: {}", entity.id)
+    }
+
+    private fun ScheduledJobEntity.toPasswordResetJobOrNull(): PasswordResetExpiryJob? {
+        if (jobType != JOB_TYPE) return null
+        val userId = targetUser?.id ?: return null
+        val payloadStr = payload ?: return null
+        // Parse simple JSON payload: {"type":"...","version":N,"authNumber":"..."}
+        val authNumber = AUTH_NUMBER_REGEX.find(payloadStr)?.groupValues?.get(1) ?: return null
+        val version = VERSION_REGEX.find(payloadStr)?.groupValues?.get(1)?.toIntOrNull() ?: return null
+        if (version != JOB_VERSION) return null
+        return PasswordResetExpiryJob(
+            type = JOB_TYPE,
+            version = version,
+            userId = userId,
+            authNumber = authNumber,
+            runAt = scheduledAt.toInstant(),
+        )
     }
 
     private fun jobContext(job: PasswordResetExpiryJob): Map<String, String> =
         mapOf(
             "job_type" to "auth_password_reset_expiry",
-            "user_no" to job.userNo.toString(),
+            "user_id" to job.userId.toString(),
             "run_at_epoch_millis" to job.runAt.toEpochMilli().toString(),
         )
 
@@ -186,42 +215,15 @@ class AuthPasswordResetExpiryJobService(
         scheduledJobs.remove(jobId)?.future?.cancel(false)
     }
 
-    private fun ApschedulerJobEntity.toPasswordResetJobOrNull(): PasswordResetExpiryJob? {
-        val nextRunInstant = nextRunTime?.let { Instant.ofEpochMilli((it * 1000).toLong()) } ?: return null
-        val payload = PasswordResetExpiryPayload.parse(jobState) ?: return null
-        if (payload.type != JOB_TYPE || payload.version != JOB_VERSION) {
-            return null
-        }
-        return PasswordResetExpiryJob(
-            type = payload.type,
-            version = payload.version,
-            userNo = payload.userNo,
-            authNumber = payload.authNumber,
-            runAt = nextRunInstant,
-        )
-    }
-
-    private fun PasswordResetExpiryJob.toEntity(): ApschedulerJobEntity =
-        ApschedulerJobEntity(
-            id = id,
-            nextRunTime = runAt.toEpochMilli() / 1000.0,
-            jobState = PasswordResetExpiryPayload(
-                type = type,
-                version = version,
-                userNo = userNo,
-                authNumber = authNumber,
-            ).toBytes(),
-        )
-
     data class PasswordResetExpiryJob(
         val type: String,
         val version: Int,
-        val userNo: Int,
+        val userId: Long,
         val authNumber: String,
         val runAt: Instant,
     ) {
         val id: String
-            get() = jobId(userNo)
+            get() = jobId(userId)
 
         fun isExpired(now: Instant): Boolean = !now.isBefore(runAt)
     }
@@ -231,40 +233,15 @@ class AuthPasswordResetExpiryJobService(
         val future: ScheduledFuture<*>,
     )
 
-    private data class PasswordResetExpiryPayload(
-        val type: String,
-        val version: Int,
-        val userNo: Int,
-        val authNumber: String,
-    ) {
-        fun toBytes(): ByteArray =
-            "$type|$version|$userNo|$authNumber".toByteArray(StandardCharsets.UTF_8)
-
-        companion object {
-            fun parse(bytes: ByteArray): PasswordResetExpiryPayload? {
-                val parts = bytes.toString(StandardCharsets.UTF_8).split('|', limit = 4)
-                if (parts.size != 4) {
-                    return null
-                }
-                val version = parts[1].toIntOrNull() ?: return null
-                val userNo = parts[2].toIntOrNull() ?: return null
-                return PasswordResetExpiryPayload(
-                    type = parts[0],
-                    version = version,
-                    userNo = userNo,
-                    authNumber = parts[3],
-                )
-            }
-        }
-    }
-
     companion object {
         private val logger = LoggerFactory.getLogger(AuthPasswordResetExpiryJobService::class.java)
         private const val JOB_NAME = "auth-password-reset-expiry"
         private const val JOB_TYPE = "AUTH_PASSWORD_RESET_EXPIRY"
         private const val JOB_VERSION = 1
         private const val JOB_ID_PREFIX = "auth:password-reset-expiry:"
+        private val AUTH_NUMBER_REGEX = Regex(""""authNumber"\s*:\s*"([^"]+)"""")
+        private val VERSION_REGEX = Regex(""""version"\s*:\s*(\d+)""")
 
-        fun jobId(userNo: Int): String = "$JOB_ID_PREFIX$userNo"
+        fun jobId(userId: Long): String = "$JOB_ID_PREFIX$userId"
     }
 }

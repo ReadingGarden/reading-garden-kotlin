@@ -9,10 +9,11 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.context.annotation.Import
+import std.nooook.readinggardenkotlin.TestcontainersConfiguration
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
 import org.springframework.core.io.ClassPathResource
 import org.springframework.http.HttpHeaders
@@ -30,26 +31,26 @@ import std.nooook.readinggardenkotlin.modules.book.entity.BookEntity
 import std.nooook.readinggardenkotlin.modules.book.integration.AladinClient
 import std.nooook.readinggardenkotlin.modules.book.repository.BookRepository
 import std.nooook.readinggardenkotlin.modules.garden.entity.GardenEntity
-import std.nooook.readinggardenkotlin.modules.garden.entity.GardenUserEntity
+import std.nooook.readinggardenkotlin.modules.garden.entity.GardenMemberEntity
 import std.nooook.readinggardenkotlin.modules.garden.repository.GardenRepository
-import std.nooook.readinggardenkotlin.modules.garden.repository.GardenUserRepository
+import std.nooook.readinggardenkotlin.modules.garden.repository.GardenMemberRepository
 import std.nooook.readinggardenkotlin.modules.memo.entity.MemoEntity
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoImageRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
-import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
+import std.nooook.readinggardenkotlin.modules.push.repository.PushSettingsRepository
 import java.time.LocalDateTime
 import kotlin.test.assertNotNull
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(LegacyApiCompatibilityTest.TestConfig::class)
+@Import(TestcontainersConfiguration::class, LegacyApiCompatibilityTest.TestConfig::class)
 class LegacyApiCompatibilityTest(
     @Autowired private val mockMvc: MockMvc,
     @Autowired private val userRepository: UserRepository,
     @Autowired private val refreshTokenRepository: RefreshTokenRepository,
-    @Autowired private val pushRepository: PushRepository,
+    @Autowired private val pushSettingsRepository: PushSettingsRepository,
     @Autowired private val gardenRepository: GardenRepository,
-    @Autowired private val gardenUserRepository: GardenUserRepository,
+    @Autowired private val gardenMemberRepository: GardenMemberRepository,
     @Autowired private val bookRepository: BookRepository,
     @Autowired private val memoRepository: MemoRepository,
     @Autowired private val memoImageRepository: MemoImageRepository,
@@ -63,10 +64,10 @@ class LegacyApiCompatibilityTest(
         memoImageRepository.deleteAll()
         memoRepository.deleteAll()
         bookRepository.deleteAll()
-        gardenUserRepository.deleteAll()
+        gardenMemberRepository.deleteAll()
         gardenRepository.deleteAll()
         refreshTokenRepository.deleteAll()
-        pushRepository.deleteAll()
+        pushSettingsRepository.deleteAll()
         userRepository.deleteAll()
 
         fixedAladinClient.searchBooksResponse = mapOf(
@@ -175,71 +176,72 @@ class LegacyApiCompatibilityTest(
     @Test
     fun `get garden list should match legacy contract shape`() {
         val accessToken = signupAndGetAccessToken("gardenlist@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("gardenlist@example.com")?.userNo)
+        val user = checkNotNull(userRepository.findByEmail("gardenlist@example.com"))
+        val userNo = user.id
         removeSignupGarden(userNo)
 
         val mainGarden = gardenRepository.save(
             GardenEntity(
-                gardenTitle = "메인 가든",
-                gardenInfo = "첫 번째",
-                gardenColor = "green",
-                gardenCreatedAt = LocalDateTime.of(2024, 1, 5, 8, 30, 0),
+                title = "메인 가든",
+                info = "첫 번째",
+                color = "green",
+                createdAt = LocalDateTime.of(2024, 1, 5, 8, 30, 0),
             ),
         )
         val secondaryGarden = gardenRepository.save(
             GardenEntity(
-                gardenTitle = "서브 가든",
-                gardenInfo = "두 번째",
-                gardenColor = "blue",
-                gardenCreatedAt = LocalDateTime.of(2024, 1, 10, 9, 0, 0),
+                title = "서브 가든",
+                info = "두 번째",
+                color = "blue",
+                createdAt = LocalDateTime.of(2024, 1, 10, 9, 0, 0),
             ),
         )
-        gardenUserRepository.save(
-            GardenUserEntity(
-                gardenNo = checkNotNull(mainGarden.gardenNo),
-                userNo = userNo,
-                gardenLeader = true,
-                gardenMain = true,
-                gardenSignDate = LocalDateTime.of(2024, 1, 6, 7, 0, 0),
+        gardenMemberRepository.save(
+            GardenMemberEntity(
+                garden = mainGarden,
+                user = user,
+                isLeader = true,
+                isMain = true,
+                joinDate = LocalDateTime.of(2024, 1, 6, 7, 0, 0),
             ),
         )
-        gardenUserRepository.save(
-            GardenUserEntity(
-                gardenNo = checkNotNull(secondaryGarden.gardenNo),
-                userNo = userNo,
-                gardenLeader = false,
-                gardenMain = false,
-                gardenSignDate = LocalDateTime.of(2024, 1, 11, 10, 0, 0),
-            ),
-        )
-        bookRepository.save(
-            BookEntity(
-                gardenNo = checkNotNull(mainGarden.gardenNo),
-                bookTitle = "메인 책",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookStatus = 1,
-                userNo = userNo,
-                bookPage = 100,
-                bookIsbn = "9781111111111",
-                bookTree = "소설",
-                bookImageUrl = "https://example.com/main.jpg",
-                bookInfo = "메인 책 소개",
+        gardenMemberRepository.save(
+            GardenMemberEntity(
+                garden = secondaryGarden,
+                user = user,
+                isLeader = false,
+                isMain = false,
+                joinDate = LocalDateTime.of(2024, 1, 11, 10, 0, 0),
             ),
         )
         bookRepository.save(
             BookEntity(
-                gardenNo = checkNotNull(secondaryGarden.gardenNo),
-                bookTitle = "서브 책",
-                bookAuthor = "저자2",
-                bookPublisher = "출판사2",
-                bookStatus = 0,
-                userNo = userNo,
-                bookPage = 200,
-                bookIsbn = "9782222222222",
-                bookTree = "에세이",
-                bookImageUrl = "https://example.com/sub.jpg",
-                bookInfo = "서브 책 소개",
+                garden = mainGarden,
+                title = "메인 책",
+                author = "저자",
+                publisher = "출판사",
+                status = 1,
+                user = user,
+                page = 100,
+                isbn = "9781111111111",
+                tree = "소설",
+                imageUrl = "https://example.com/main.jpg",
+                info = "메인 책 소개",
+            ),
+        )
+        bookRepository.save(
+            BookEntity(
+                garden = secondaryGarden,
+                title = "서브 책",
+                author = "저자2",
+                publisher = "출판사2",
+                status = 0,
+                user = user,
+                page = 200,
+                isbn = "9782222222222",
+                tree = "에세이",
+                imageUrl = "https://example.com/sub.jpg",
+                info = "서브 책 소개",
             ),
         )
 
@@ -259,82 +261,83 @@ class LegacyApiCompatibilityTest(
     @Test
     fun `get garden detail should match legacy contract shape`() {
         val accessToken = signupAndGetAccessToken("gardendetail@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("gardendetail@example.com")?.userNo)
+        val user = checkNotNull(userRepository.findByEmail("gardendetail@example.com"))
+        val userNo = user.id
         removeSignupGarden(userNo)
 
         val garden = gardenRepository.save(
             GardenEntity(
-                gardenTitle = "상세 가든",
-                gardenInfo = "상세 설명",
-                gardenColor = "orange",
-                gardenCreatedAt = LocalDateTime.of(2024, 2, 1, 12, 0, 0),
+                title = "상세 가든",
+                info = "상세 설명",
+                color = "orange",
+                createdAt = LocalDateTime.of(2024, 2, 1, 12, 0, 0),
             ),
         )
-        gardenUserRepository.save(
-            GardenUserEntity(
-                gardenNo = checkNotNull(garden.gardenNo),
-                userNo = userNo,
-                gardenLeader = true,
-                gardenMain = true,
-                gardenSignDate = LocalDateTime.of(2024, 2, 1, 12, 5, 0),
+        gardenMemberRepository.save(
+            GardenMemberEntity(
+                garden = garden,
+                user = user,
+                isLeader = true,
+                isMain = true,
+                joinDate = LocalDateTime.of(2024, 2, 1, 12, 5, 0),
             ),
         )
         val member = userRepository.save(
             UserEntity(
-                userEmail = "gardendetail-member@example.com",
-                userPassword = "pw1234",
-                userCreatedAt = LocalDateTime.of(2024, 2, 1, 12, 10, 0),
-                userNick = "멤버",
-                userImage = "member.png",
-                userFcm = "fcm-member",
-                userSocialId = "",
-                userSocialType = "",
+                email = "gardendetail-member@example.com",
+                password = "pw1234",
+                createdAt = LocalDateTime.of(2024, 2, 1, 12, 10, 0),
+                nick = "멤버",
+                image = "member.png",
+                fcm = "fcm-member",
+                socialId = "",
+                socialType = "",
             ),
         )
-        gardenUserRepository.save(
-            GardenUserEntity(
-                gardenNo = checkNotNull(garden.gardenNo),
-                userNo = checkNotNull(member.userNo),
-                gardenLeader = false,
-                gardenMain = false,
-                gardenSignDate = LocalDateTime.of(2024, 2, 2, 9, 0, 0),
-            ),
-        )
-        bookRepository.save(
-            BookEntity(
-                gardenNo = checkNotNull(garden.gardenNo),
-                bookTitle = "가든 책",
-                bookAuthor = "작가",
-                bookPublisher = "출판사",
-                bookStatus = 1,
-                userNo = userNo,
-                bookPage = 400,
-                bookIsbn = "9783333333333",
-                bookTree = "인문",
-                bookImageUrl = "https://example.com/detail.jpg",
-                bookInfo = "가든 책 소개",
+        gardenMemberRepository.save(
+            GardenMemberEntity(
+                garden = garden,
+                user = member,
+                isLeader = false,
+                isMain = false,
+                joinDate = LocalDateTime.of(2024, 2, 2, 9, 0, 0),
             ),
         )
         bookRepository.save(
             BookEntity(
-                gardenNo = checkNotNull(garden.gardenNo),
-                bookTitle = "보조 책",
-                bookAuthor = "작가2",
-                bookPublisher = "출판사2",
-                bookStatus = 0,
-                userNo = userNo,
-                bookPage = 0,
-                bookIsbn = null,
-                bookTree = null,
-                bookImageUrl = null,
-                bookInfo = "보조 책 소개",
+                garden = garden,
+                title = "가든 책",
+                author = "작가",
+                publisher = "출판사",
+                status = 1,
+                user = user,
+                page = 400,
+                isbn = "9783333333333",
+                tree = "인문",
+                imageUrl = "https://example.com/detail.jpg",
+                info = "가든 책 소개",
+            ),
+        )
+        bookRepository.save(
+            BookEntity(
+                garden = garden,
+                title = "보조 책",
+                author = "작가2",
+                publisher = "출판사2",
+                status = 0,
+                user = user,
+                page = 0,
+                isbn = null,
+                tree = null,
+                imageUrl = null,
+                info = "보조 책 소개",
             ),
         )
 
         val response = mockMvc.perform(
             get("/api/v1/garden/detail")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                .queryParam("garden_no", checkNotNull(garden.gardenNo).toString()),
+                .queryParam("garden_no", checkNotNull(garden.id).toString()),
         )
             .andExpect(status().isOk)
             .andReturn()
@@ -348,35 +351,38 @@ class LegacyApiCompatibilityTest(
     @Test
     fun `get memo list should match legacy contract shape`() {
         val accessToken = signupAndGetAccessToken("memocontract@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("memocontract@example.com")?.userNo)
-        val gardenNo = gardenRepository.save(
+        val user = checkNotNull(userRepository.findByEmail("memocontract@example.com"))
+        val userNo = user.id
+        val gardenEntity = gardenRepository.save(
             GardenEntity(
-                gardenTitle = "메모 가든",
-                gardenInfo = "소개",
-                gardenColor = "green",
+                title = "메모 가든",
+                info = "소개",
+                color = "green",
             ),
-        ).gardenNo ?: error("gardenNo was not generated")
-        val bookNo = bookRepository.save(
+        )
+        val gardenNo = gardenEntity.id
+        val bookEntity = bookRepository.save(
             BookEntity(
-                gardenNo = gardenNo,
-                bookTitle = "책 제목",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookStatus = 1,
-                userNo = userNo,
-                bookPage = 240,
-                bookImageUrl = "https://example.com/book.jpg",
-                bookInfo = "책 소개",
+                garden = gardenEntity,
+                title = "책 제목",
+                author = "저자",
+                publisher = "출판사",
+                status = 1,
+                user = user,
+                page = 240,
+                imageUrl = "https://example.com/book.jpg",
+                info = "책 소개",
             ),
-        ).bookNo ?: error("bookNo was not generated")
+        )
+        val bookNo = bookEntity.id
 
         memoRepository.save(
             MemoEntity(
-                bookNo = bookNo,
-                memoContent = "메모 내용",
-                userNo = userNo,
-                memoLike = true,
-                memoCreatedAt = java.time.LocalDateTime.of(2026, 4, 6, 12, 0, 0),
+                book = bookEntity,
+                content = "메모 내용",
+                user = user,
+                isLiked = true,
+                createdAt = java.time.LocalDateTime.of(2026, 4, 6, 12, 0, 0),
             ),
         )
 
@@ -396,30 +402,32 @@ class LegacyApiCompatibilityTest(
     @Test
     fun `get memo detail should match legacy contract shape`() {
         val accessToken = signupAndGetAccessToken("memodetailcontract@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("memodetailcontract@example.com")?.userNo)
-        val bookNo = bookRepository.save(
+        val user = checkNotNull(userRepository.findByEmail("memodetailcontract@example.com"))
+        val userNo = user.id
+        val bookEntity = bookRepository.save(
             BookEntity(
-                gardenNo = null,
-                bookTitle = "상세 메모 책",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookStatus = 1,
-                userNo = userNo,
-                bookPage = 300,
-                bookImageUrl = "https://example.com/memo-book.jpg",
-                bookInfo = "메모 상세용 책 소개",
+                garden = null,
+                title = "상세 메모 책",
+                author = "저자",
+                publisher = "출판사",
+                status = 1,
+                user = user,
+                page = 300,
+                imageUrl = "https://example.com/memo-book.jpg",
+                info = "메모 상세용 책 소개",
             ),
-        ).bookNo ?: error("bookNo was not generated")
+        )
+        val bookNo = bookEntity.id
 
         val memoId = memoRepository.save(
             MemoEntity(
-                bookNo = bookNo,
-                memoContent = "상세 메모 내용",
-                userNo = userNo,
-                memoLike = true,
-                memoCreatedAt = LocalDateTime.of(2026, 4, 9, 16, 30, 0),
+                book = bookEntity,
+                content = "상세 메모 내용",
+                user = user,
+                isLiked = true,
+                createdAt = LocalDateTime.of(2026, 4, 9, 16, 30, 0),
             ),
-        ).id ?: error("memoId was not generated")
+        ).id
 
         val response = mockMvc.perform(
             get("/api/v1/memo/detail")
@@ -452,11 +460,12 @@ class LegacyApiCompatibilityTest(
     @Test
     fun `put garden update should match legacy contract shape`() {
         val accessToken = signupAndGetAccessToken("gardenupdate@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("gardenupdate@example.com")?.userNo)
+        val user = checkNotNull(userRepository.findByEmail("gardenupdate@example.com"))
+        val userNo = user.id
         removeSignupGarden(userNo)
 
         val gardenNo = createGardenMembership(
-            userNo = userNo,
+            userId = userNo,
             title = "수정 전 가든",
             info = "수정 전 소개",
             color = "blue",
@@ -483,10 +492,11 @@ class LegacyApiCompatibilityTest(
     @Test
     fun `delete garden should match legacy contract shape`() {
         val accessToken = signupAndGetAccessToken("gardendelete@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("gardendelete@example.com")?.userNo)
+        val user = checkNotNull(userRepository.findByEmail("gardendelete@example.com"))
+        val userNo = user.id
 
         val gardenNo = createGardenMembership(
-            userNo = userNo,
+            userId = userNo,
             title = "삭제 대상 가든",
             info = "삭제 소개",
             color = "red",
@@ -511,11 +521,12 @@ class LegacyApiCompatibilityTest(
     @Test
     fun `put garden move should match legacy contract shape`() {
         val accessToken = signupAndGetAccessToken("gardenmove@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("gardenmove@example.com")?.userNo)
+        val user = checkNotNull(userRepository.findByEmail("gardenmove@example.com"))
+        val userNo = user.id
         removeSignupGarden(userNo)
 
         val sourceGardenNo = createGardenMembership(
-            userNo = userNo,
+            userId = userNo,
             title = "이동 전 가든",
             info = "출발",
             color = "yellow",
@@ -523,26 +534,27 @@ class LegacyApiCompatibilityTest(
             main = true,
         )
         val destinationGardenNo = createGardenMembership(
-            userNo = userNo,
+            userId = userNo,
             title = "이동 후 가든",
             info = "도착",
             color = "purple",
             leader = false,
             main = false,
         )
+        val sourceGarden = gardenRepository.findById(sourceGardenNo).orElseThrow()
         bookRepository.save(
             BookEntity(
-                gardenNo = sourceGardenNo,
-                bookTitle = "이동할 책",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookStatus = 1,
-                userNo = userNo,
-                bookPage = 210,
-                bookIsbn = "9784444444444",
-                bookTree = "소설",
-                bookImageUrl = "https://example.com/move.jpg",
-                bookInfo = "이동용 책",
+                garden = sourceGarden,
+                title = "이동할 책",
+                author = "저자",
+                publisher = "출판사",
+                status = 1,
+                user = user,
+                page = 210,
+                isbn = "9784444444444",
+                tree = "소설",
+                imageUrl = "https://example.com/move.jpg",
+                info = "이동용 책",
             ),
         )
 
@@ -564,45 +576,46 @@ class LegacyApiCompatibilityTest(
     @Test
     fun `delete garden member leave should match legacy contract shape`() {
         val accessToken = signupAndGetAccessToken("gardenleave@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("gardenleave@example.com")?.userNo)
+        val user = checkNotNull(userRepository.findByEmail("gardenleave@example.com"))
+        val userNo = user.id
 
         val leader = userRepository.save(
             UserEntity(
-                userEmail = "garden-leave-leader@example.com",
-                userPassword = "pw1234",
-                userCreatedAt = LocalDateTime.of(2024, 3, 1, 9, 0, 0),
-                userNick = "리더",
-                userImage = "leader.png",
-                userFcm = "leader-fcm",
-                userSocialId = "",
-                userSocialType = "",
+                email = "garden-leave-leader@example.com",
+                password = "pw1234",
+                createdAt = LocalDateTime.of(2024, 3, 1, 9, 0, 0),
+                nick = "리더",
+                image = "leader.png",
+                fcm = "leader-fcm",
+                socialId = "",
+                socialType = "",
             ),
         )
         val garden = gardenRepository.save(
             GardenEntity(
-                gardenTitle = "탈퇴 가든",
-                gardenInfo = "탈퇴 소개",
-                gardenColor = "mint",
-                gardenCreatedAt = LocalDateTime.of(2024, 3, 1, 8, 30, 0),
+                title = "탈퇴 가든",
+                info = "탈퇴 소개",
+                color = "mint",
+                createdAt = LocalDateTime.of(2024, 3, 1, 8, 30, 0),
             ),
         )
-        val gardenNo = checkNotNull(garden.gardenNo)
-        gardenUserRepository.save(
-            GardenUserEntity(
-                gardenNo = gardenNo,
-                userNo = checkNotNull(leader.userNo),
-                gardenLeader = true,
-                gardenMain = true,
-                gardenSignDate = LocalDateTime.of(2024, 3, 1, 8, 40, 0),
+        val gardenNo = checkNotNull(garden.id)
+        gardenMemberRepository.save(
+            GardenMemberEntity(
+                garden = garden,
+                user = leader,
+                isLeader = true,
+                isMain = true,
+                joinDate = LocalDateTime.of(2024, 3, 1, 8, 40, 0),
             ),
         )
-        gardenUserRepository.save(
-            GardenUserEntity(
-                gardenNo = gardenNo,
-                userNo = userNo,
-                gardenLeader = false,
-                gardenMain = false,
-                gardenSignDate = LocalDateTime.of(2024, 3, 1, 8, 50, 0),
+        gardenMemberRepository.save(
+            GardenMemberEntity(
+                garden = garden,
+                user = user,
+                isLeader = false,
+                isMain = false,
+                joinDate = LocalDateTime.of(2024, 3, 1, 8, 50, 0),
             ),
         )
 
@@ -623,46 +636,47 @@ class LegacyApiCompatibilityTest(
     @Test
     fun `put garden leader transfer should match legacy contract shape`() {
         val accessToken = signupAndGetAccessToken("gardenleader@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("gardenleader@example.com")?.userNo)
+        val user = checkNotNull(userRepository.findByEmail("gardenleader@example.com"))
+        val userNo = user.id
         removeSignupGarden(userNo)
 
         val member = userRepository.save(
             UserEntity(
-                userEmail = "garden-leader-member@example.com",
-                userPassword = "pw1234",
-                userCreatedAt = LocalDateTime.of(2024, 4, 1, 9, 30, 0),
-                userNick = "새 리더",
-                userImage = "member.png",
-                userFcm = "member-fcm",
-                userSocialId = "",
-                userSocialType = "",
+                email = "garden-leader-member@example.com",
+                password = "pw1234",
+                createdAt = LocalDateTime.of(2024, 4, 1, 9, 30, 0),
+                nick = "새 리더",
+                image = "member.png",
+                fcm = "member-fcm",
+                socialId = "",
+                socialType = "",
             ),
         )
         val garden = gardenRepository.save(
             GardenEntity(
-                gardenTitle = "리더 변경 가든",
-                gardenInfo = "리더 소개",
-                gardenColor = "navy",
-                gardenCreatedAt = LocalDateTime.of(2024, 4, 1, 9, 0, 0),
+                title = "리더 변경 가든",
+                info = "리더 소개",
+                color = "navy",
+                createdAt = LocalDateTime.of(2024, 4, 1, 9, 0, 0),
             ),
         )
-        val gardenNo = checkNotNull(garden.gardenNo)
-        gardenUserRepository.save(
-            GardenUserEntity(
-                gardenNo = gardenNo,
-                userNo = userNo,
-                gardenLeader = true,
-                gardenMain = true,
-                gardenSignDate = LocalDateTime.of(2024, 4, 1, 9, 10, 0),
+        val gardenNo = checkNotNull(garden.id)
+        gardenMemberRepository.save(
+            GardenMemberEntity(
+                garden = garden,
+                user = user,
+                isLeader = true,
+                isMain = true,
+                joinDate = LocalDateTime.of(2024, 4, 1, 9, 10, 0),
             ),
         )
-        gardenUserRepository.save(
-            GardenUserEntity(
-                gardenNo = gardenNo,
-                userNo = checkNotNull(member.userNo),
-                gardenLeader = false,
-                gardenMain = false,
-                gardenSignDate = LocalDateTime.of(2024, 4, 1, 9, 20, 0),
+        gardenMemberRepository.save(
+            GardenMemberEntity(
+                garden = garden,
+                user = member,
+                isLeader = false,
+                isMain = false,
+                joinDate = LocalDateTime.of(2024, 4, 1, 9, 20, 0),
             ),
         )
 
@@ -670,7 +684,7 @@ class LegacyApiCompatibilityTest(
             put("/api/v1/garden/member")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .queryParam("garden_no", gardenNo.toString())
-                .queryParam("user_no", checkNotNull(member.userNo).toString()),
+                .queryParam("user_no", checkNotNull(member.id).toString()),
         )
             .andExpect(status().isOk)
             .andReturn()
@@ -684,10 +698,11 @@ class LegacyApiCompatibilityTest(
     @Test
     fun `put garden main should match legacy contract shape`() {
         val accessToken = signupAndGetAccessToken("gardenmain@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("gardenmain@example.com")?.userNo)
+        val user = checkNotNull(userRepository.findByEmail("gardenmain@example.com"))
+        val userNo = user.id
 
         val targetGardenNo = createGardenMembership(
-            userNo = userNo,
+            userId = userNo,
             title = "메인 변경 대상",
             info = "메인 소개",
             color = "white",
@@ -712,36 +727,37 @@ class LegacyApiCompatibilityTest(
     @Test
     fun `post garden invite should match legacy contract shape`() {
         val accessToken = signupAndGetAccessToken("gardeninvite@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("gardeninvite@example.com")?.userNo)
+        val user = checkNotNull(userRepository.findByEmail("gardeninvite@example.com"))
+        val userNo = user.id
 
         val leader = userRepository.save(
             UserEntity(
-                userEmail = "garden-invite-leader@example.com",
-                userPassword = "pw1234",
-                userCreatedAt = LocalDateTime.of(2024, 5, 1, 9, 0, 0),
-                userNick = "초대 리더",
-                userImage = "leader.png",
-                userFcm = "invite-leader-fcm",
-                userSocialId = "",
-                userSocialType = "",
+                email = "garden-invite-leader@example.com",
+                password = "pw1234",
+                createdAt = LocalDateTime.of(2024, 5, 1, 9, 0, 0),
+                nick = "초대 리더",
+                image = "leader.png",
+                fcm = "invite-leader-fcm",
+                socialId = "",
+                socialType = "",
             ),
         )
         val garden = gardenRepository.save(
             GardenEntity(
-                gardenTitle = "초대 가든",
-                gardenInfo = "초대 소개",
-                gardenColor = "pink",
-                gardenCreatedAt = LocalDateTime.of(2024, 5, 1, 8, 0, 0),
+                title = "초대 가든",
+                info = "초대 소개",
+                color = "pink",
+                createdAt = LocalDateTime.of(2024, 5, 1, 8, 0, 0),
             ),
         )
-        val gardenNo = checkNotNull(garden.gardenNo)
-        gardenUserRepository.save(
-            GardenUserEntity(
-                gardenNo = gardenNo,
-                userNo = checkNotNull(leader.userNo),
-                gardenLeader = true,
-                gardenMain = true,
-                gardenSignDate = LocalDateTime.of(2024, 5, 1, 8, 10, 0),
+        val gardenNo = checkNotNull(garden.id)
+        gardenMemberRepository.save(
+            GardenMemberEntity(
+                garden = garden,
+                user = leader,
+                isLeader = true,
+                isMain = true,
+                joinDate = LocalDateTime.of(2024, 5, 1, 8, 10, 0),
             ),
         )
 
@@ -813,38 +829,38 @@ class LegacyApiCompatibilityTest(
     }
 
     private fun createGardenMembership(
-        userNo: Int,
+        userId: Long,
         title: String,
         info: String,
         color: String,
         leader: Boolean,
         main: Boolean,
-    ): Int {
+    ): Long {
+        val user = checkNotNull(userRepository.findById(userId).orElse(null))
         val garden = gardenRepository.save(
             GardenEntity(
-                gardenTitle = title,
-                gardenInfo = info,
-                gardenColor = color,
-                gardenCreatedAt = LocalDateTime.of(2024, 1, 1, 9, 0, 0),
+                title = title,
+                info = info,
+                color = color,
+                createdAt = LocalDateTime.of(2024, 1, 1, 9, 0, 0),
             ),
         )
-        return checkNotNull(garden.gardenNo).also { gardenNo ->
-            gardenUserRepository.save(
-                GardenUserEntity(
-                    gardenNo = gardenNo,
-                    userNo = userNo,
-                    gardenLeader = leader,
-                    gardenMain = main,
-                    gardenSignDate = LocalDateTime.of(2024, 1, 1, 9, 5, 0),
-                ),
-            )
-        }
+        gardenMemberRepository.save(
+            GardenMemberEntity(
+                garden = garden,
+                user = user,
+                isLeader = leader,
+                isMain = main,
+                joinDate = LocalDateTime.of(2024, 1, 1, 9, 5, 0),
+            ),
+        )
+        return garden.id
     }
 
-    private fun removeSignupGarden(userNo: Int) {
-        gardenUserRepository.findAllByUserNo(userNo).forEach { membership ->
-            gardenUserRepository.delete(membership)
-            gardenRepository.deleteById(membership.gardenNo)
+    private fun removeSignupGarden(userNo: Long) {
+        gardenMemberRepository.findAllByUserId(userNo).forEach { membership ->
+            gardenMemberRepository.delete(membership)
+            gardenRepository.deleteById(membership.garden.id)
         }
     }
 

@@ -7,22 +7,18 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import std.nooook.readinggardenkotlin.modules.auth.entity.UserEntity
 
-interface UserRepository : JpaRepository<UserEntity, Int> {
-    fun findByUserNo(userNo: Int): UserEntity?
-
-    fun findAllByUserNoIn(userNos: Collection<Int>): List<UserEntity>
+interface UserRepository : JpaRepository<UserEntity, Long> {
+    fun findAllByIdIn(ids: Collection<Long>): List<UserEntity>
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select user from UserEntity user where user.userNo = :userNo")
-    fun findByUserNoForUpdate(
-        @Param("userNo") userNo: Int,
-    ): UserEntity?
+    @Query("select u from UserEntity u where u.id = :id")
+    fun findByIdForUpdate(@Param("id") id: Long): UserEntity?
 
-    fun findByUserEmail(userEmail: String): UserEntity?
+    fun findByEmail(email: String): UserEntity?
 
-    fun findByUserSocialIdAndUserSocialType(userSocialId: String, userSocialType: String): UserEntity?
+    fun findBySocialIdAndSocialType(socialId: String, socialType: String): UserEntity?
 
-    fun existsByUserEmail(userEmail: String): Boolean
+    fun existsByEmail(email: String): Boolean
 
-    fun existsByUserSocialIdAndUserSocialType(userSocialId: String, userSocialType: String): Boolean
+    fun existsBySocialIdAndSocialType(socialId: String, socialType: String): Boolean
 }

@@ -9,7 +9,7 @@ typealias BookLookupResponse = Map<String, Any?>
 @Schema(description = "책 등록 성공 응답")
 data class CreateBookResponse(
     @field:Schema(description = "생성된 책 번호", example = "1")
-    val book_no: Int,
+    val book_no: Long,
 )
 
 @Schema(description = "독서 기록 생성 성공 응답")
@@ -23,7 +23,7 @@ data class CreateReadResponse(
 @Schema(description = "독서 기록 이력 항목")
 data class BookReadHistoryItemResponse(
     @field:Schema(description = "독서 기록 id", example = "1")
-    val id: Int,
+    val id: Long,
     @field:Schema(description = "해당 시점의 현재 페이지", example = "150")
     val book_current_page: Int,
     @field:Schema(description = "시작 시각", example = "2026-04-10T09:00:00", nullable = true)
@@ -37,7 +37,7 @@ data class BookReadHistoryItemResponse(
 @Schema(description = "독서 기록에 연결된 메모 항목")
 data class BookReadMemoItemResponse(
     @field:Schema(description = "메모 id", example = "1")
-    val id: Int,
+    val id: Long,
     @field:Schema(description = "메모 내용", example = "좋았던 문장")
     val memo_content: String,
     @field:Schema(description = "좋아요 여부", example = "true")
@@ -51,7 +51,7 @@ data class BookReadMemoItemResponse(
 @Schema(description = "책 상태 목록 항목")
 data class BookStatusItemResponse(
     @field:Schema(description = "책 번호", example = "1")
-    val book_no: Int,
+    val book_no: Long,
     @field:Schema(description = "책 제목", example = "클린 코드")
     val book_title: String,
     @field:Schema(description = "저자", example = "로버트 C. 마틴")
@@ -71,7 +71,7 @@ data class BookStatusItemResponse(
     @field:Schema(description = "전체 페이지 수", example = "321")
     val book_page: Int,
     @field:Schema(description = "소속 가든 번호", example = "10", nullable = true)
-    val garden_no: Int?,
+    val garden_no: Long?,
 )
 
 @Schema(description = "책 상태 목록 응답")
@@ -117,9 +117,9 @@ data class BookDetailResponse(
 @Schema(description = "독서 기록 상세 응답")
 data class BookReadDetailResponse(
     @field:Schema(description = "책 번호", example = "1")
-    val book_no: Int,
+    val book_no: Long,
     @field:Schema(description = "사용자 번호", example = "1")
-    val user_no: Int,
+    val user_no: Long,
     @field:Schema(description = "책 제목", example = "클린 코드")
     val book_title: String,
     @field:Schema(description = "저자", example = "로버트 C. 마틴")
@@ -137,7 +137,7 @@ data class BookReadDetailResponse(
     @field:Schema(description = "전체 페이지 수", example = "321")
     val book_page: Int,
     @field:Schema(description = "가든 번호", example = "10", nullable = true)
-    val garden_no: Int?,
+    val garden_no: Long?,
     @field:Schema(description = "가든 제목", example = "나의 가든")
     val garden_title: String = "",
     @field:Schema(description = "가든 색상", example = "blue")

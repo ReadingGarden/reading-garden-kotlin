@@ -7,10 +7,11 @@ import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.context.annotation.Import
+import std.nooook.readinggardenkotlin.TestcontainersConfiguration
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Import
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
@@ -18,7 +19,7 @@ import std.nooook.readinggardenkotlin.modules.push.service.GardenMemberJoinedPus
 import std.nooook.readinggardenkotlin.modules.push.service.PushService
 
 @SpringBootTest
-@Import(PushEventListenerIntegrationTest.TestConfig::class)
+@Import(TestcontainersConfiguration::class, PushEventListenerIntegrationTest.TestConfig::class)
 class PushEventListenerIntegrationTest(
     @Autowired private val transactionProbe: TransactionalEventProbe,
 ) {
@@ -35,7 +36,7 @@ class PushEventListenerIntegrationTest(
         transactionProbe.publishAndCommit(
             GardenMemberJoinedPushEvent(
                 gardenNo = 101,
-                recipientUserNos = listOf(7, 9),
+                recipientUserIds = listOf(7, 9),
             ),
         )
 
@@ -47,7 +48,7 @@ class PushEventListenerIntegrationTest(
         transactionProbe.publishAndRollback(
             GardenMemberJoinedPushEvent(
                 gardenNo = 202,
-                recipientUserNos = listOf(11, 13),
+                recipientUserIds = listOf(11, 13),
             ),
         )
 

@@ -9,17 +9,17 @@ class PushService(
     private val pushPreferenceService: PushPreferenceService,
     private val pushDeliveryService: PushDeliveryService,
 ) {
-    fun getPush(userNo: Int): PushResponse = pushPreferenceService.getPush(userNo)
+    fun getPush(userId: Long): PushResponse = pushPreferenceService.getPush(userId)
 
     fun sendBookPush(): List<Map<String, Any>> = pushDeliveryService.sendBookPush()
 
     fun updatePush(
-        userNo: Int,
+        userId: Long,
         push_app_ok: Boolean?,
         push_book_ok: Boolean?,
         push_time: LocalDateTime?,
     ) = pushPreferenceService.updatePush(
-        userNo = userNo,
+        userId = userId,
         push_app_ok = push_app_ok,
         push_book_ok = push_book_ok,
         push_time = push_time,
@@ -28,7 +28,7 @@ class PushService(
     fun sendNoticePush(content: String): List<Map<String, Any>> = pushDeliveryService.sendNoticePush(content)
 
     fun sendNewMemberPush(
-        userNo: Int,
-        gardenNo: Int,
-    ): List<Map<String, Any>> = pushDeliveryService.sendNewMemberPush(userNo, gardenNo)
+        userId: Long,
+        gardenNo: Long,
+    ): List<Map<String, Any>> = pushDeliveryService.sendNewMemberPush(userId, gardenNo)
 }
