@@ -6,7 +6,7 @@ services:
     ports:
       - "80:80"
     volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - /opt/reading-garden/nginx.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       app-blue:
         condition: service_healthy
