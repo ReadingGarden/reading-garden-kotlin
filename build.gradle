@@ -1,8 +1,4 @@
-import org.springframework.boot.gradle.tasks.bundling.BootBuildImage
-import org.springframework.boot.gradle.tasks.bundling.BootJar
-
 plugins {
-    id 'org.graalvm.buildtools.native' version '0.11.3'
     id 'org.jetbrains.kotlin.jvm' version '2.3.20'
     id 'org.jetbrains.kotlin.plugin.allopen' version '2.3.20'
     id 'org.jetbrains.kotlin.plugin.jpa' version '2.3.20'
@@ -62,39 +58,17 @@ allOpen {
     annotation 'jakarta.persistence.Embeddable'
 }
 
-graalvmNative {
-    binaries {
-        main {
-            imageName = project.name
-        }
-    }
-}
-
-def localJvmImageName = providers.environmentVariable('JVM_IMAGE_NAME')
+def jvmImageName = providers.environmentVariable('JVM_IMAGE_NAME')
     .orElse("docker.io/library/${project.name}:${project.version}-jvm")
-def nativeAmd64ImageName = providers.environmentVariable('NATIVE_IMAGE_NAME')
-    .orElse("docker.io/library/${project.name}:${project.version}-native-amd64")
 
 tasks.named('bootBuildImage') {
     group = 'image'
-    description = 'Build a local JVM Docker image for development on the host platform.'
+    description = 'Build a JVM Docker image.'
     builder = 'paketobuildpacks/builder-noble-java-tiny'
-    imageName = localJvmImageName.get()
+    imageName = jvmImageName.get()
     buildpacks = ['urn:cnb:builder:paketo-buildpacks/java']
     environment = [
         'BP_JVM_VERSION': '25',
-    ]
-}
-
-tasks.register('bootBuildNativeAmd64Image', BootBuildImage) {
-    group = 'image'
-    description = 'Build a production native Docker image for linux/amd64.'
-    archiveFile.set(tasks.named('bootJar', BootJar).flatMap { it.archiveFile })
-    builder = 'paketobuildpacks/builder-noble-java-tiny'
-    imageName = nativeAmd64ImageName.get()
-    imagePlatform = 'linux/amd64'
-    environment = [
-        'BP_NATIVE_IMAGE': 'true',
     ]
 }
 
