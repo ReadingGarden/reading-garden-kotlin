@@ -24,7 +24,7 @@ data class CreateBookRequest(
     @field:Schema(description = "책 ISBN13, 없으면 null", example = "9788937462788", nullable = true)
     val book_isbn: String? = null,
     @field:Schema(description = "책을 담을 가든 번호", example = "10", nullable = true)
-    val garden_no: Int? = null,
+    val garden_no: Long? = null,
     @field:Schema(description = "책 제목", example = "클린 코드")
     val book_title: String,
     @field:Schema(description = "책 소개", example = "소개")
@@ -46,7 +46,7 @@ data class CreateBookRequest(
 @Schema(description = "책 수정 요청")
 data class UpdateBookRequest(
     @field:Schema(description = "이동할 가든 번호", example = "12", nullable = true)
-    val garden_no: Int? = null,
+    val garden_no: Long? = null,
     @field:Schema(description = "수정할 카테고리", example = "에세이", nullable = true)
     val book_tree: String? = null,
     @field:Schema(description = "수정할 독서 상태 코드", example = "2", nullable = true)
@@ -62,7 +62,7 @@ data class UpdateBookRequest(
 @Schema(description = "독서 기록 생성 요청")
 data class CreateReadRequest(
     @field:Schema(description = "책 번호", example = "1")
-    val book_no: Int,
+    val book_no: Long,
     @field:Schema(description = "독서 시작 시각", example = "2026-04-10T09:00:00", nullable = true)
     val book_start_date: LocalDateTime? = null,
     @field:Schema(description = "독서 종료 시각", example = "2026-04-10T11:00:00", nullable = true)
@@ -82,7 +82,7 @@ data class UpdateReadRequest(
 @Schema(description = "책 이미지 업로드용 multipart 요청")
 data class UploadBookImageRequest(
     @field:Schema(description = "이미지를 연결할 책 번호", example = "1")
-    val book_no: Int,
+    val book_no: Long,
     @field:Schema(description = "업로드할 이미지 파일", type = "string", format = "binary")
     val file: String,
 )

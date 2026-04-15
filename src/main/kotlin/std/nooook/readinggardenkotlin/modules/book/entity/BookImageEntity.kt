@@ -27,5 +27,5 @@ class BookImageEntity(
     @JoinColumn(name = "book_id", nullable = false)
     val book: BookEntity,
 ) {
-    protected constructor() : this(book = BookEntity())
+    protected constructor() : this(book = BookEntity(user = std.nooook.readinggardenkotlin.modules.auth.entity.UserEntity()))
 }

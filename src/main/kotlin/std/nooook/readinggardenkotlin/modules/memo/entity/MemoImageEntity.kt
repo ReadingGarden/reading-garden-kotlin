@@ -27,5 +27,5 @@ class MemoImageEntity(
     @JoinColumn(name = "memo_id", nullable = false)
     val memo: MemoEntity,
 ) {
-    protected constructor() : this(memo = MemoEntity())
+    protected constructor() : this(memo = MemoEntity(book = std.nooook.readinggardenkotlin.modules.book.entity.BookEntity(user = std.nooook.readinggardenkotlin.modules.auth.entity.UserEntity()), user = std.nooook.readinggardenkotlin.modules.auth.entity.UserEntity()))
 }

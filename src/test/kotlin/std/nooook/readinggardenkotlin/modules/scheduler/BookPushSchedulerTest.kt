@@ -9,9 +9,9 @@ import org.springframework.scheduling.annotation.Scheduled
 import std.nooook.readinggardenkotlin.modules.auth.entity.UserEntity
 import std.nooook.readinggardenkotlin.modules.auth.repository.UserRepository
 import std.nooook.readinggardenkotlin.modules.garden.repository.GardenRepository
-import std.nooook.readinggardenkotlin.modules.push.entity.PushEntity
+import std.nooook.readinggardenkotlin.modules.push.entity.PushSettingsEntity
 import std.nooook.readinggardenkotlin.modules.push.integration.FcmClient
-import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
+import std.nooook.readinggardenkotlin.modules.push.repository.PushSettingsRepository
 import std.nooook.readinggardenkotlin.modules.push.service.PushDeliveryService
 import std.nooook.readinggardenkotlin.modules.push.service.PushPreferenceService
 import std.nooook.readinggardenkotlin.modules.push.service.PushService
@@ -29,13 +29,13 @@ import java.time.ZoneOffset
 class BookPushSchedulerTest {
     private val fixedInstant = Instant.parse("2026-04-09T12:34:00Z")
     private val clock = Clock.fixed(fixedInstant, ZoneOffset.UTC)
-    private val pushRepository: PushRepository = mock(PushRepository::class.java)
+    private val pushSettingsRepository: PushSettingsRepository = mock(PushSettingsRepository::class.java)
     private val userRepository: UserRepository = mock(UserRepository::class.java)
     private val gardenRepository: GardenRepository = mock(GardenRepository::class.java)
     private val fcmClient: FcmClient = mock(FcmClient::class.java)
-    private val pushPreferenceService = PushPreferenceService(pushRepository)
+    private val pushPreferenceService = PushPreferenceService(pushSettingsRepository)
     private val pushDeliveryService = PushDeliveryService(
-        pushRepository = pushRepository,
+        pushSettingsRepository = pushSettingsRepository,
         userRepository = userRepository,
         gardenRepository = gardenRepository,
         fcmClient = fcmClient,
@@ -62,23 +62,19 @@ class BookPushSchedulerTest {
 
     @Test
     fun `scheduled method should execute through runner and push service`() {
-        given(pushRepository.findAllByPushBookOkTrueAndPushTimeIsNotNull()).willReturn(
+        val mockUser = UserEntity(id = 7L, fcm = "token-7")
+        given(pushSettingsRepository.findAllByBookOkTrueAndPushTimeIsNotNull()).willReturn(
             listOf(
-                PushEntity(
-                    userNo = 7,
-                    pushAppOk = true,
-                    pushBookOk = true,
+                PushSettingsEntity(
+                    user = mockUser,
+                    appOk = true,
+                    bookOk = true,
                     pushTime = LocalDateTime.ofInstant(fixedInstant, ZoneOffset.UTC),
                 ),
             ),
         )
-        given(userRepository.findAllByUserNoIn(listOf(7))).willReturn(
-            listOf(
-                UserEntity(
-                    userNo = 7,
-                    userFcm = "token-7",
-                ),
-            ),
+        given(userRepository.findAllByIdIn(listOf(7L))).willReturn(
+            listOf(mockUser),
         )
         given(
             fcmClient.sendToMany(

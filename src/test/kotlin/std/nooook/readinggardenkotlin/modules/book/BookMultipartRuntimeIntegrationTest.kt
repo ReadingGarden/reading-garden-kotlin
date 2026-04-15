@@ -17,6 +17,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.context.annotation.Import
+import std.nooook.readinggardenkotlin.TestcontainersConfiguration
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
@@ -27,24 +29,25 @@ import std.nooook.readinggardenkotlin.modules.book.repository.BookImageRepositor
 import std.nooook.readinggardenkotlin.modules.book.repository.BookReadRepository
 import std.nooook.readinggardenkotlin.modules.book.repository.BookRepository
 import std.nooook.readinggardenkotlin.modules.garden.repository.GardenRepository
-import std.nooook.readinggardenkotlin.modules.garden.repository.GardenUserRepository
+import std.nooook.readinggardenkotlin.modules.garden.repository.GardenMemberRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoImageRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
-import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
+import std.nooook.readinggardenkotlin.modules.push.repository.PushSettingsRepository
 
+@Import(TestcontainersConfiguration::class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class BookMultipartRuntimeIntegrationTest(
     @LocalServerPort private val port: Int,
     @Autowired private val userRepository: UserRepository,
     @Autowired private val refreshTokenRepository: RefreshTokenRepository,
-    @Autowired private val pushRepository: PushRepository,
+    @Autowired private val pushSettingsRepository: PushSettingsRepository,
     @Autowired private val bookRepository: BookRepository,
     @Autowired private val bookReadRepository: BookReadRepository,
     @Autowired private val bookImageRepository: BookImageRepository,
     @Autowired private val memoRepository: MemoRepository,
     @Autowired private val memoImageRepository: MemoImageRepository,
     @Autowired private val gardenRepository: GardenRepository,
-    @Autowired private val gardenUserRepository: GardenUserRepository,
+    @Autowired private val gardenMemberRepository: GardenMemberRepository,
 ) {
     companion object {
         private val imagesRoot: Path = Files.createTempDirectory("reading-garden-runtime-images")
@@ -69,8 +72,8 @@ class BookMultipartRuntimeIntegrationTest(
         bookReadRepository.deleteAll()
         bookRepository.deleteAll()
         refreshTokenRepository.deleteAll()
-        pushRepository.deleteAll()
-        gardenUserRepository.deleteAll()
+        pushSettingsRepository.deleteAll()
+        gardenMemberRepository.deleteAll()
         gardenRepository.deleteAll()
         userRepository.deleteAll()
     }
@@ -79,18 +82,18 @@ class BookMultipartRuntimeIntegrationTest(
     fun `runtime multipart upload should accept two megabytes and use external temp directory`() {
         val email = "runtimeupload@example.com"
         val accessToken = signupAndGetAccessToken(email)
-        val userNo = checkNotNull(userRepository.findByUserEmail(email)?.userNo)
+        val user = checkNotNull(userRepository.findByEmail(email))
         val bookNo = bookRepository.save(
             BookEntity(
-                userNo = userNo,
-                bookTitle = "런타임 업로드 책",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookInfo = "소개",
-                bookStatus = 0,
-                bookPage = 100,
+                user = user,
+                title = "런타임 업로드 책",
+                author = "저자",
+                publisher = "출판사",
+                info = "소개",
+                status = 0,
+                page = 100,
             ),
-        ).bookNo ?: error("bookNo was not generated")
+        ).id
         val fileBytes = ByteArray(2 * 1024 * 1024) { 1 }
         val boundary = "----ReadingGardenBoundary${System.nanoTime()}"
         val requestBody = buildMultipartBody(boundary, "cover.png", "image/png", fileBytes)
@@ -110,8 +113,8 @@ class BookMultipartRuntimeIntegrationTest(
         assertEquals(201, body.path("resp_code").asInt())
         assertEquals("이미지 업로드 성공", body.path("resp_msg").asText())
 
-        val image = checkNotNull(bookImageRepository.findByBookNo(bookNo))
-        assertTrue(Files.exists(imagesRoot.resolve(image.imageUrl)))
+        val image = checkNotNull(bookImageRepository.findByBookId(bookNo))
+        assertTrue(Files.exists(imagesRoot.resolve(image.url)))
         assertTrue(Files.isDirectory(imagesRoot.resolve("multipart-temp")))
     }
 

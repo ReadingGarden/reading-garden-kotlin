@@ -36,5 +36,5 @@ class MemoEntity(
     @Column(nullable = false)
     var updatedAt: LocalDateTime = LocalDateTime.now(),
 ) {
-    protected constructor() : this(book = BookEntity(), user = UserEntity())
+    protected constructor() : this(book = BookEntity(user = UserEntity()), user = UserEntity())
 }

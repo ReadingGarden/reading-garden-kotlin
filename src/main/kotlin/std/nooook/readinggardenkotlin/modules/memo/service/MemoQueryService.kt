@@ -23,27 +23,27 @@ class MemoQueryService(
 
     @Transactional
     fun getMemoDetail(
-        userNo: Int,
-        id: Int,
+        userId: Long,
+        id: Long,
     ): MemoDetailResponse {
-        val memo = memoRepository.findByIdAndUserNo(id, userNo)
+        val memo = memoRepository.findByIdAndUserId(id, userId)
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 메모가 없습니다.")
 
-        val book = bookRepository.findByBookNoAndUserNo(memo.bookNo, userNo)
+        val book = bookRepository.findByIdAndUserId(memo.book.id, userId)
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 메모가 없습니다.")
 
-        val imageUrl = memoImageRepository.findFirstByMemoNoOrderByImageCreatedAtDesc(memo.id ?: id)?.imageUrl
+        val imageUrl = memoImageRepository.findFirstByMemoIdOrderByCreatedAtDesc(memo.id)?.url
 
         return MemoDetailResponse(
-            id = memo.id ?: id,
-            book_no = memo.bookNo,
-            book_title = book.bookTitle,
-            book_author = book.bookAuthor,
-            book_publisher = book.bookPublisher,
-            book_info = book.bookInfo,
-            memo_content = memo.memoContent,
+            id = memo.id,
+            book_no = memo.book.id,
+            book_title = book.title,
+            book_author = book.author,
+            book_publisher = book.publisher,
+            book_info = book.info,
+            memo_content = memo.content,
             image_url = imageUrl,
-            memo_created_at = memo.memoCreatedAt.format(LEGACY_DATE_TIME_FORMATTER),
+            memo_created_at = memo.createdAt.format(LEGACY_DATE_TIME_FORMATTER),
         )
     }
 }

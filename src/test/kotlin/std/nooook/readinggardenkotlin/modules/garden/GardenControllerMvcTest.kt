@@ -5,6 +5,8 @@ import org.mockito.BDDMockito.given
 import org.mockito.Mockito.verify
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.context.annotation.Import
+import std.nooook.readinggardenkotlin.TestcontainersConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.HttpStatus
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
@@ -32,6 +34,7 @@ import std.nooook.readinggardenkotlin.modules.garden.service.GardenCommandServic
 import std.nooook.readinggardenkotlin.modules.garden.service.GardenMembershipService
 import std.nooook.readinggardenkotlin.modules.garden.service.GardenQueryService
 
+@Import(TestcontainersConfiguration::class)
 @SpringBootTest
 @AutoConfigureMockMvc
 class GardenControllerMvcTest(
@@ -50,7 +53,7 @@ class GardenControllerMvcTest(
     fun `create garden should return legacy success envelope`() {
         given(
             gardenCommandService.createGarden(
-                userNo = 1,
+                userId = 1L,
                 request = CreateGardenRequest(
                     garden_title = "새 가든",
                     garden_info = "소개",
@@ -71,7 +74,7 @@ class GardenControllerMvcTest(
                 .with(
                     authentication(
                         UsernamePasswordAuthenticationToken(
-                            LegacyAuthenticationPrincipal(1, "테스터"),
+                            LegacyAuthenticationPrincipal(1L, "테스터"),
                             null,
                             listOf(SimpleGrantedAuthority("ROLE_USER")),
                         ),
@@ -211,14 +214,14 @@ class GardenControllerMvcTest(
             .andExpect(jsonPath("$.resp_code").value(HttpStatus.BAD_REQUEST.value()))
             .andExpect(jsonPath("$.resp_msg").value("Required parameter 'garden_no' is not present."))
             .andExpect(jsonPath("$.errors[0].parameter").value("garden_no"))
-            .andExpect(jsonPath("$.errors[0].expectedType").value("int"))
+            .andExpect(jsonPath("$.errors[0].expectedType").value("long"))
     }
 
     @Test
     fun `update garden should return legacy success envelope`() {
         given(
             gardenCommandService.updateGarden(
-                userNo = 1,
+                userId = 1L,
                 gardenNo = 10,
                 request = UpdateGardenRequest(
                     garden_title = "수정된 가든",
@@ -278,7 +281,7 @@ class GardenControllerMvcTest(
             .andExpect(jsonPath("$.resp_code").value(HttpStatus.BAD_REQUEST.value()))
             .andExpect(jsonPath("$.resp_msg").value("Required parameter 'to_garden_no' is not present."))
             .andExpect(jsonPath("$.errors[0].parameter").value("to_garden_no"))
-            .andExpect(jsonPath("$.errors[0].expectedType").value("int"))
+            .andExpect(jsonPath("$.errors[0].expectedType").value("long"))
     }
 
     @Test
@@ -308,7 +311,7 @@ class GardenControllerMvcTest(
             .andExpect(jsonPath("$.resp_code").value(HttpStatus.BAD_REQUEST.value()))
             .andExpect(jsonPath("$.resp_msg").value("Required parameter 'garden_no' is not present."))
             .andExpect(jsonPath("$.errors[0].parameter").value("garden_no"))
-            .andExpect(jsonPath("$.errors[0].expectedType").value("int"))
+            .andExpect(jsonPath("$.errors[0].expectedType").value("long"))
     }
 
     @Test
@@ -380,7 +383,7 @@ class GardenControllerMvcTest(
     private fun gardenAuth() =
         authentication(
             UsernamePasswordAuthenticationToken(
-                LegacyAuthenticationPrincipal(1, "테스터"),
+                LegacyAuthenticationPrincipal(1L, "테스터"),
                 null,
                 listOf(SimpleGrantedAuthority("ROLE_USER")),
             ),

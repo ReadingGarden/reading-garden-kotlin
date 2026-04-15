@@ -8,6 +8,7 @@ import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.server.ResponseStatusException
 import std.nooook.readinggardenkotlin.common.storage.ImageStorage
+import std.nooook.readinggardenkotlin.modules.auth.repository.UserRepository
 import std.nooook.readinggardenkotlin.modules.book.controller.CreateBookRequest
 import std.nooook.readinggardenkotlin.modules.book.controller.CreateBookResponse
 import std.nooook.readinggardenkotlin.modules.book.controller.UpdateBookRequest
@@ -28,10 +29,11 @@ class BookCommandService(
     private val memoRepository: MemoRepository,
     private val memoImageRepository: MemoImageRepository,
     private val imageStorage: ImageStorage,
+    private val userRepository: UserRepository,
 ) {
     @Transactional
     fun createBook(
-        userNo: Int,
+        userId: Long,
         request: CreateBookRequest,
     ): CreateBookResponse {
         if (request.garden_no != null) {
@@ -39,78 +41,82 @@ class BookCommandService(
             if (!gardenRepository.existsById(gardenNo)) {
                 throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 가든이 없습니다.")
             }
-            if (bookRepository.countByGardenNo(gardenNo) >= MAX_GARDEN_BOOK_COUNT) {
+            if (bookRepository.countByGardenId(gardenNo) >= MAX_GARDEN_BOOK_COUNT) {
                 throw ResponseStatusException(HttpStatus.FORBIDDEN, "책 생성 개수 초과")
             }
         }
 
+        val user = userRepository.findById(userId)
+            .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 사용자 정보가 없습니다.") }
+        val garden = request.garden_no?.let { gardenRepository.findById(it).orElse(null) }
+
         val saved = bookRepository.save(
             BookEntity(
-                gardenNo = request.garden_no,
-                bookTitle = request.book_title,
-                bookAuthor = request.book_author,
-                bookPublisher = request.book_publisher,
-                bookStatus = request.book_status,
-                userNo = userNo,
-                bookPage = request.book_page,
-                bookIsbn = request.book_isbn,
-                bookTree = request.book_tree,
-                bookImageUrl = request.book_image_url,
-                bookInfo = request.book_info,
+                garden = garden,
+                title = request.book_title,
+                author = request.book_author,
+                publisher = request.book_publisher,
+                status = request.book_status,
+                user = user,
+                page = request.book_page,
+                isbn = request.book_isbn,
+                tree = request.book_tree,
+                imageUrl = request.book_image_url,
+                info = request.book_info,
             ),
         )
 
         return CreateBookResponse(
-            book_no = checkNotNull(saved.bookNo) { "Book id was not generated" },
+            book_no = saved.id,
         )
     }
 
     @Transactional
     fun updateBook(
-        userNo: Int,
-        bookNo: Int,
+        userId: Long,
+        bookNo: Long,
         request: UpdateBookRequest,
     ): String {
-        val book = bookRepository.findByBookNoAndUserNo(bookNo, userNo)
+        val book = bookRepository.findByIdAndUserId(bookNo, userId)
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 책 정보가 없습니다.")
 
         request.garden_no?.let { targetGardenNo ->
-            if (targetGardenNo != book.gardenNo && bookRepository.countByGardenNo(targetGardenNo) >= MAX_GARDEN_BOOK_COUNT) {
+            if (targetGardenNo != book.garden?.id && bookRepository.countByGardenId(targetGardenNo) >= MAX_GARDEN_BOOK_COUNT) {
                 throw ResponseStatusException(HttpStatus.FORBIDDEN, "가든 옮기기 불가")
             }
-            book.gardenNo = targetGardenNo
+            book.garden = gardenRepository.findById(targetGardenNo).orElse(null)
         }
-        request.book_tree?.let { book.bookTree = it }
-        request.book_status?.let { book.bookStatus = it }
-        request.book_title?.let { book.bookTitle = it }
-        request.book_author?.let { book.bookAuthor = it }
-        request.book_image_url?.let { book.bookImageUrl = it }
+        request.book_tree?.let { book.tree = it }
+        request.book_status?.let { book.status = it }
+        request.book_title?.let { book.title = it }
+        request.book_author?.let { book.author = it }
+        request.book_image_url?.let { book.imageUrl = it }
         bookRepository.save(book)
         return "책 수정 성공"
     }
 
     @Transactional
     fun deleteBook(
-        userNo: Int,
-        bookNo: Int,
+        userId: Long,
+        bookNo: Long,
     ): String {
-        val book = bookRepository.findByBookNoAndUserNo(bookNo, userNo)
+        val book = bookRepository.findByIdAndUserId(bookNo, userId)
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 책 정보가 없습니다.")
 
         val stagedDeletes = mutableListOf<ImageStorage.StagedDelete>()
         try {
-            bookReadRepository.deleteAllByBookNo(bookNo)
+            bookReadRepository.deleteAllByBookId(bookNo)
 
-            bookImageRepository.findAllByBookNo(bookNo).forEach { image ->
-                stagedDeletes += imageStorage.stageDelete(image.imageUrl)
+            bookImageRepository.findAllByBookId(bookNo).forEach { image ->
+                stagedDeletes += imageStorage.stageDelete(image.url)
                 bookImageRepository.delete(image)
             }
 
-            val memos = memoRepository.findAllByBookNo(bookNo)
-            val memoIds = memos.mapNotNull { it.id }
+            val memos = memoRepository.findAllByBookId(bookNo)
+            val memoIds = memos.map { it.id }
             if (memoIds.isNotEmpty()) {
-                memoImageRepository.findAllByMemoNoIn(memoIds).forEach { memoImage ->
-                    stagedDeletes += imageStorage.stageDelete(memoImage.imageUrl)
+                memoImageRepository.findAllByMemoIdIn(memoIds).forEach { memoImage ->
+                    stagedDeletes += imageStorage.stageDelete(memoImage.url)
                     memoImageRepository.delete(memoImage)
                 }
             }
