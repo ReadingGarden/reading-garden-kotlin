@@ -91,7 +91,9 @@ jobs:
         run: |
           ssh -T -p "$OCI_PORT" \
             "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}" \
-            IMAGE_REF="$IMAGE_REF" REMOTE_APP_DIR="$REMOTE_APP_DIR" /bin/bash -seu <<'EOF'
+            IMAGE_REF="$IMAGE_REF" REMOTE_APP_DIR="$REMOTE_APP_DIR" \
+            GHCR_TOKEN="$GHCR_TOKEN" GHCR_USER="$GHCR_USER" \
+            /bin/bash -seu <<'EOF'
           set -euo pipefail
           cd "$REMOTE_APP_DIR"
           test -f .env
