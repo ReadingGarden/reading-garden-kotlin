@@ -13,10 +13,8 @@ permissions:
   packages: write
 
 jobs:
-  build-jvm:
+  test:
     runs-on: ubuntu-latest
-    env:
-      REGISTRY_IMAGE: ghcr.io/readinggarden/reading-garden-kotlin
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -31,11 +29,24 @@ jobs:
       - name: Run tests
         run: ./gradlew test
 
+  build-arm64:
+    needs: test
+    runs-on: ubuntu-24.04-arm
+    env:
+      REGISTRY_IMAGE: ghcr.io/readinggarden/reading-garden-kotlin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+
       - name: Build JAR
         run: ./gradlew bootJar
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -47,18 +58,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push multi-platform image
+      - name: Build and push ARM64 image
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/arm64
           push: true
           tags: |
             ${{ env.REGISTRY_IMAGE }}:jvm-${{ github.sha }}
             ${{ env.REGISTRY_IMAGE }}:jvm-latest
 
   deploy-oci:
-    needs: build-jvm
+    needs: build-arm64
     runs-on: ubuntu-latest
     permissions:
       contents: read
