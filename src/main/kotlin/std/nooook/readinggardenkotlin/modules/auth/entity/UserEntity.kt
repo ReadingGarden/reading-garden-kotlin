@@ -9,28 +9,29 @@ import jakarta.persistence.Table
 import java.time.LocalDateTime
 
 @Entity
-@Table(name = "USER")
+@Table(name = "users")
 class UserEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "user_no")
-    var userNo: Int? = null,
-    @Column(name = "user_email", nullable = false, length = 300)
-    var userEmail: String = "",
-    @Column(name = "user_password", nullable = false, columnDefinition = "text")
-    var userPassword: String = "",
-    @Column(name = "user_created_at", nullable = false)
-    var userCreatedAt: LocalDateTime = LocalDateTime.now(),
-    @Column(name = "user_nick", nullable = false, length = 30)
-    var userNick: String = "",
-    @Column(name = "user_image", nullable = false, length = 30)
-    var userImage: String = "",
-    @Column(name = "user_fcm", nullable = false, columnDefinition = "text")
-    var userFcm: String = "",
-    @Column(name = "user_social_id", nullable = false, length = 100)
-    var userSocialId: String = "",
-    @Column(name = "user_social_type", nullable = false, length = 30)
-    var userSocialType: String = "",
-    @Column(name = "user_auth_number", length = 10)
-    var userAuthNumber: String? = null,
+    val id: Long = 0,
+    @Column(nullable = false, length = 300)
+    var email: String = "",
+    @Column(nullable = false, columnDefinition = "TEXT")
+    var password: String = "",
+    @Column(nullable = false)
+    val createdAt: LocalDateTime = LocalDateTime.now(),
+    @Column(nullable = false, length = 30)
+    var nick: String = "",
+    @Column(nullable = false, length = 30)
+    var image: String = "",
+    @Column(nullable = false, columnDefinition = "TEXT")
+    var fcm: String = "",
+    @Column(nullable = false, length = 100)
+    var socialId: String = "",
+    @Column(nullable = false, length = 30)
+    var socialType: String = "",
+    @Column(length = 10)
+    var authNumber: String? = null,
+    @Column(nullable = false)
+    var updatedAt: LocalDateTime = LocalDateTime.now(),
 )

@@ -3,10 +3,8 @@ package std.nooook.readinggardenkotlin.modules.book.repository
 import org.springframework.data.jpa.repository.JpaRepository
 import std.nooook.readinggardenkotlin.modules.book.entity.BookReadEntity
 
-interface BookReadRepository : JpaRepository<BookReadEntity, Int> {
-    fun deleteAllByBookNo(bookNo: Int)
-
-    fun findTopByBookNoOrderByCreatedAtDesc(bookNo: Int): BookReadEntity?
-
-    fun findAllByBookNoOrderByCreatedAtDesc(bookNo: Int): List<BookReadEntity>
+interface BookReadRepository : JpaRepository<BookReadEntity, Long> {
+    fun deleteAllByBookId(bookId: Long)
+    fun findTopByBookIdOrderByCreatedAtDesc(bookId: Long): BookReadEntity?
+    fun findAllByBookIdOrderByCreatedAtDesc(bookId: Long): List<BookReadEntity>
 }

@@ -8,9 +8,10 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.DisposableBean
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.context.annotation.Import
+import std.nooook.readinggardenkotlin.TestcontainersConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
@@ -36,13 +37,13 @@ import std.nooook.readinggardenkotlin.modules.book.repository.BookImageRepositor
 import std.nooook.readinggardenkotlin.modules.book.repository.BookReadRepository
 import std.nooook.readinggardenkotlin.modules.book.repository.BookRepository
 import std.nooook.readinggardenkotlin.modules.garden.repository.GardenRepository
-import std.nooook.readinggardenkotlin.modules.garden.repository.GardenUserRepository
+import std.nooook.readinggardenkotlin.modules.garden.repository.GardenMemberRepository
 import std.nooook.readinggardenkotlin.modules.memo.entity.MemoEntity
 import std.nooook.readinggardenkotlin.modules.memo.entity.MemoImageEntity
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoImageRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
-import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
-import std.nooook.readinggardenkotlin.modules.scheduler.repository.ApschedulerJobRepository
+import std.nooook.readinggardenkotlin.modules.push.repository.PushSettingsRepository
+import std.nooook.readinggardenkotlin.modules.scheduler.repository.ScheduledJobRepository
 import std.nooook.readinggardenkotlin.modules.scheduler.service.AuthPasswordResetExpiryJobService
 import std.nooook.readinggardenkotlin.modules.scheduler.service.SchedulerJobExecutionPhase
 import std.nooook.readinggardenkotlin.modules.scheduler.service.SchedulerJobExecutionRecord
@@ -65,7 +66,7 @@ import org.springframework.transaction.support.TransactionTemplate
     ],
 )
 @AutoConfigureMockMvc
-@Import(AuthControllerIntegrationTest.TestConfig::class)
+@Import(TestcontainersConfiguration::class, AuthControllerIntegrationTest.TestConfig::class)
 class AuthControllerIntegrationTest(
     @Autowired private val mockMvc: MockMvc,
     @Autowired private val userRepository: UserRepository,
@@ -74,11 +75,11 @@ class AuthControllerIntegrationTest(
     @Autowired private val bookReadRepository: BookReadRepository,
     @Autowired private val bookImageRepository: BookImageRepository,
     @Autowired private val gardenRepository: GardenRepository,
-    @Autowired private val gardenUserRepository: GardenUserRepository,
+    @Autowired private val gardenMemberRepository: GardenMemberRepository,
     @Autowired private val memoRepository: MemoRepository,
     @Autowired private val memoImageRepository: MemoImageRepository,
-    @Autowired private val pushRepository: PushRepository,
-    @Autowired private val apschedulerJobRepository: ApschedulerJobRepository,
+    @Autowired private val pushSettingsRepository: PushSettingsRepository,
+    @Autowired private val scheduledJobRepository: ScheduledJobRepository,
     @Autowired private val passwordResetExpiryJobService: AuthPasswordResetExpiryJobService,
     @Autowired private val authService: AuthService,
     @Autowired private val transactionTemplate: TransactionTemplate,
@@ -94,12 +95,12 @@ class AuthControllerIntegrationTest(
         bookReadRepository.deleteAll()
         bookImageRepository.deleteAll()
         bookRepository.deleteAll()
-        pushRepository.deleteAll()
-        gardenUserRepository.deleteAll()
+        pushSettingsRepository.deleteAll()
+        gardenMemberRepository.deleteAll()
         gardenRepository.deleteAll()
         memoImageRepository.deleteAll()
         memoRepository.deleteAll()
-        apschedulerJobRepository.deleteAll()
+        scheduledJobRepository.deleteAll()
         userRepository.deleteAll()
         recordingMailSender.sentMessages.clear()
         recordingTaskScheduler.clear()
@@ -123,17 +124,17 @@ class AuthControllerIntegrationTest(
             .andReturn()
 
         val body = objectMapper.readTree(response.response.contentAsString)
-        val user = userRepository.findByUserEmail("new@example.com")
+        val user = userRepository.findByEmail("new@example.com")
         checkNotNull(user)
-        val userNo = checkNotNull(user.userNo)
+        val userNo = checkNotNull(user.id)
 
-        kotlin.test.assertNotEquals("pw1234", user.userPassword)
-        kotlin.test.assertEquals("first-fcm", user.userFcm)
-        kotlin.test.assertEquals(1L, gardenUserRepository.countByUserNo(userNo))
-        kotlin.test.assertNotNull(pushRepository.findByUserNo(userNo))
+        kotlin.test.assertNotEquals("pw1234", user.password)
+        kotlin.test.assertEquals("first-fcm", user.fcm)
+        kotlin.test.assertEquals(1L, gardenMemberRepository.countByUserId(userNo))
+        kotlin.test.assertNotNull(pushSettingsRepository.findByUserId(userNo))
         kotlin.test.assertEquals(
             body.path("data").path("refresh_token").asText(),
-            refreshTokenRepository.findByUserNo(userNo)?.token,
+            refreshTokenRepository.findByUserId(userNo)?.token,
         )
     }
 
@@ -167,7 +168,7 @@ class AuthControllerIntegrationTest(
             .andExpect(jsonPath("$.resp_msg").value("Request body validation failed."))
             .andExpect(jsonPath("$.errors[0].field").value("user_email"))
 
-        kotlin.test.assertNull(userRepository.findByUserEmail("invalid-email"))
+        kotlin.test.assertNull(userRepository.findByEmail("invalid-email"))
     }
 
     @Test
@@ -191,10 +192,10 @@ class AuthControllerIntegrationTest(
         val loginBody = objectMapper.readTree(loginResponse.response.contentAsString)
         val accessToken = loginBody.path("data").path("access_token").asText()
         val refreshToken = loginBody.path("data").path("refresh_token").asText()
-        val user = userRepository.findByUserEmail("flow@example.com")
+        val user = userRepository.findByEmail("flow@example.com")
         checkNotNull(user)
 
-        kotlin.test.assertEquals("updated-fcm", user.userFcm)
+        kotlin.test.assertEquals("updated-fcm", user.fcm)
 
         mockMvc.perform(
             get("/api/v1/auth")
@@ -224,8 +225,8 @@ class AuthControllerIntegrationTest(
             .andExpect(jsonPath("$.resp_code").value(200))
             .andExpect(jsonPath("$.resp_msg").value("로그아웃 성공"))
 
-        kotlin.test.assertEquals("", userRepository.findByUserEmail("flow@example.com")?.userFcm)
-        kotlin.test.assertNull(refreshTokenRepository.findByUserNo(checkNotNull(user.userNo)))
+        kotlin.test.assertEquals("", userRepository.findByEmail("flow@example.com")?.fcm)
+        kotlin.test.assertNull(refreshTokenRepository.findByUserId(checkNotNull(user.id)))
 
         mockMvc.perform(
             post("/api/v1/auth/refresh")
@@ -256,8 +257,9 @@ class AuthControllerIntegrationTest(
 
             val loginBody = objectMapper.readTree(loginResponse.response.contentAsString)
             val refreshToken = loginBody.path("data").path("refresh_token").asText()
-            val userNo = checkNotNull(userRepository.findByUserEmail("tz@example.com")?.userNo)
-            val storedToken = checkNotNull(refreshTokenRepository.findByUserNo(userNo))
+            val user = checkNotNull(userRepository.findByEmail("tz@example.com"))
+        val userNo = user.id
+            val storedToken = checkNotNull(refreshTokenRepository.findByUserId(userNo))
             storedToken.exp = LocalDateTime.now(ZoneOffset.UTC).plusMinutes(30)
             refreshTokenRepository.save(storedToken)
 
@@ -278,18 +280,19 @@ class AuthControllerIntegrationTest(
     @Test
     fun `login should delete all previous refresh tokens before issuing a new one`() {
         signup("refreshcleanup@example.com", "pw1234", "fcm-a")
-        val userNo = checkNotNull(userRepository.findByUserEmail("refreshcleanup@example.com")?.userNo)
+        val user = checkNotNull(userRepository.findByEmail("refreshcleanup@example.com"))
+        val userNo = user.id
 
         refreshTokenRepository.save(
             RefreshTokenEntity(
-                userNo = userNo,
+                user = user,
                 token = "stale-token-1",
                 exp = LocalDateTime.now(ZoneOffset.UTC).plusDays(1),
             ),
         )
         refreshTokenRepository.save(
             RefreshTokenEntity(
-                userNo = userNo,
+                user = user,
                 token = "stale-token-2",
                 exp = LocalDateTime.now(ZoneOffset.UTC).plusDays(1),
             ),
@@ -307,7 +310,7 @@ class AuthControllerIntegrationTest(
 
         val loginBody = objectMapper.readTree(loginResponse.response.contentAsString)
         val newRefreshToken = loginBody.path("data").path("refresh_token").asText()
-        val storedTokens = refreshTokenRepository.findAllByUserNo(userNo)
+        val storedTokens = refreshTokenRepository.findAllByUserId(userNo)
 
         assertEquals(1, storedTokens.size)
         assertEquals(newRefreshToken, storedTokens.single().token)
@@ -331,7 +334,7 @@ class AuthControllerIntegrationTest(
         kotlin.test.assertEquals("reset@example.com", sentMessage.email)
         kotlin.test.assertEquals("[독서가든] 인증번호 안내드립니다", sentMessage.title)
 
-        val authNumber = userRepository.findByUserEmail("reset@example.com")?.userAuthNumber
+        val authNumber = userRepository.findByEmail("reset@example.com")?.authNumber
         checkNotNull(authNumber)
         kotlin.test.assertEquals(authNumber, sentMessage.content)
 
@@ -375,11 +378,12 @@ class AuthControllerIntegrationTest(
         )
             .andExpect(status().isOk)
 
-        val userNo = checkNotNull(userRepository.findByUserEmail("resetpersist@example.com")?.userNo)
-        val persistedJob = apschedulerJobRepository.findById(AuthPasswordResetExpiryJobService.jobId(userNo))
+        val user = checkNotNull(userRepository.findByEmail("resetpersist@example.com"))
+        val userNo = user.id
+        val persistedJob = scheduledJobRepository.findById(AuthPasswordResetExpiryJobService.jobId(userNo))
 
         kotlin.test.assertTrue(persistedJob.isPresent)
-        kotlin.test.assertNotNull(persistedJob.get().nextRunTime)
+        kotlin.test.assertNotNull(persistedJob.get().scheduledAt)
     }
 
     @Test
@@ -389,22 +393,24 @@ class AuthControllerIntegrationTest(
         transactionTemplate.executeWithoutResult {
             authService.sendPasswordResetMail("resetaftercommit@example.com")
 
-            val userNo = checkNotNull(userRepository.findByUserEmail("resetaftercommit@example.com")?.userNo)
+            val user = checkNotNull(userRepository.findByEmail("resetaftercommit@example.com"))
+        val userNo = user.id
             kotlin.test.assertTrue(
-                apschedulerJobRepository.findById(AuthPasswordResetExpiryJobService.jobId(userNo)).isPresent,
+                scheduledJobRepository.findById(AuthPasswordResetExpiryJobService.jobId(userNo)).isPresent,
             )
             kotlin.test.assertTrue(recordingTaskScheduler.scheduledTasks.isEmpty())
         }
 
         kotlin.test.assertEquals(1, recordingTaskScheduler.scheduledTasks.size)
         val scheduledTask = recordingTaskScheduler.scheduledTasks.single()
-        val userNo = checkNotNull(userRepository.findByUserEmail("resetaftercommit@example.com")?.userNo)
+        val user = checkNotNull(userRepository.findByEmail("resetaftercommit@example.com"))
+        val userNo = user.id
         val persistedJob = checkNotNull(
-            apschedulerJobRepository.findById(AuthPasswordResetExpiryJobService.jobId(userNo)).orElse(null),
+            scheduledJobRepository.findById(AuthPasswordResetExpiryJobService.jobId(userNo)).orElse(null),
         )
 
         kotlin.test.assertEquals(
-            (persistedJob.nextRunTime!! * 1000).toLong(),
+            persistedJob.scheduledAt.toInstant().toEpochMilli(),
             scheduledTask.runAt.toEpochMilli(),
         )
         kotlin.test.assertTrue(recordingSchedulerJobExecutionRecorder.records.isEmpty())
@@ -421,12 +427,12 @@ class AuthControllerIntegrationTest(
         )
             .andExpect(status().isOk)
 
-        val user = checkNotNull(userRepository.findByUserEmail("resetexpire@example.com"))
-        val authNumber = checkNotNull(user.userAuthNumber)
-        val jobId = AuthPasswordResetExpiryJobService.jobId(checkNotNull(user.userNo))
-        val persistedJob = checkNotNull(apschedulerJobRepository.findById(jobId).orElse(null))
-        persistedJob.nextRunTime = (System.currentTimeMillis() - 1_000).toDouble() / 1000.0
-        apschedulerJobRepository.save(persistedJob)
+        val user = checkNotNull(userRepository.findByEmail("resetexpire@example.com"))
+        val authNumber = checkNotNull(user.authNumber)
+        val jobId = AuthPasswordResetExpiryJobService.jobId(checkNotNull(user.id))
+        val persistedJob = checkNotNull(scheduledJobRepository.findById(jobId).orElse(null))
+        persistedJob.scheduledAt = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).minusSeconds(1)
+        scheduledJobRepository.save(persistedJob)
 
         mockMvc.perform(
             post("/api/v1/auth/find-password/check")
@@ -437,8 +443,8 @@ class AuthControllerIntegrationTest(
             .andExpect(jsonPath("$.resp_code").value(400))
             .andExpect(jsonPath("$.resp_msg").value("인증번호 불일치"))
 
-        kotlin.test.assertNull(userRepository.findByUserEmail("resetexpire@example.com")?.userAuthNumber)
-        kotlin.test.assertFalse(apschedulerJobRepository.findById(jobId).isPresent)
+        kotlin.test.assertNull(userRepository.findByEmail("resetexpire@example.com")?.authNumber)
+        kotlin.test.assertFalse(scheduledJobRepository.findById(jobId).isPresent)
     }
 
     @Test
@@ -459,20 +465,20 @@ class AuthControllerIntegrationTest(
         )
             .andExpect(status().isOk)
 
-        val overdueUser = checkNotNull(userRepository.findByUserEmail("rehydrateoverdue@example.com"))
-        val futureUser = checkNotNull(userRepository.findByUserEmail("rehydratefuture@example.com"))
-        val overdueJobId = AuthPasswordResetExpiryJobService.jobId(checkNotNull(overdueUser.userNo))
-        val futureJobId = AuthPasswordResetExpiryJobService.jobId(checkNotNull(futureUser.userNo))
-        val overdueJob = checkNotNull(apschedulerJobRepository.findById(overdueJobId).orElse(null))
-        overdueJob.nextRunTime = (System.currentTimeMillis() - 1_000).toDouble() / 1000.0
-        apschedulerJobRepository.save(overdueJob)
+        val overdueUser = checkNotNull(userRepository.findByEmail("rehydrateoverdue@example.com"))
+        val futureUser = checkNotNull(userRepository.findByEmail("rehydratefuture@example.com"))
+        val overdueJobId = AuthPasswordResetExpiryJobService.jobId(checkNotNull(overdueUser.id))
+        val futureJobId = AuthPasswordResetExpiryJobService.jobId(checkNotNull(futureUser.id))
+        val overdueJob = checkNotNull(scheduledJobRepository.findById(overdueJobId).orElse(null))
+        overdueJob.scheduledAt = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).minusSeconds(1)
+        scheduledJobRepository.save(overdueJob)
 
         recordingTaskScheduler.clear()
         passwordResetExpiryJobService.rehydratePasswordResetExpiryJobs()
 
-        kotlin.test.assertNull(userRepository.findByUserEmail("rehydrateoverdue@example.com")?.userAuthNumber)
-        kotlin.test.assertFalse(apschedulerJobRepository.findById(overdueJobId).isPresent)
-        kotlin.test.assertTrue(apschedulerJobRepository.findById(futureJobId).isPresent)
+        kotlin.test.assertNull(userRepository.findByEmail("rehydrateoverdue@example.com")?.authNumber)
+        kotlin.test.assertFalse(scheduledJobRepository.findById(overdueJobId).isPresent)
+        kotlin.test.assertTrue(scheduledJobRepository.findById(futureJobId).isPresent)
         kotlin.test.assertEquals(1, recordingTaskScheduler.scheduledTasks.size)
         kotlin.test.assertEquals(
             listOf(
@@ -498,16 +504,15 @@ class AuthControllerIntegrationTest(
         )
         kotlin.test.assertTrue(
             recordingTaskScheduler.scheduledTasks.any { scheduledTask ->
-                scheduledTask.runAt.toEpochMilli() == (
-                    checkNotNull(apschedulerJobRepository.findById(futureJobId).orElse(null)).nextRunTime!! * 1000
-                    ).toLong()
+                scheduledTask.runAt.toEpochMilli() ==
+                    checkNotNull(scheduledJobRepository.findById(futureJobId).orElse(null)).scheduledAt.toInstant().toEpochMilli()
             },
         )
 
         Thread.sleep(2_500)
 
-        kotlin.test.assertNull(userRepository.findByUserEmail("rehydratefuture@example.com")?.userAuthNumber)
-        kotlin.test.assertFalse(apschedulerJobRepository.findById(futureJobId).isPresent)
+        kotlin.test.assertNull(userRepository.findByEmail("rehydratefuture@example.com")?.authNumber)
+        kotlin.test.assertFalse(scheduledJobRepository.findById(futureJobId).isPresent)
     }
 
     @Test
@@ -521,7 +526,7 @@ class AuthControllerIntegrationTest(
         )
             .andExpect(status().isOk)
 
-        val firstAuthNumber = checkNotNull(userRepository.findByUserEmail("reissue@example.com")?.userAuthNumber)
+        val firstAuthNumber = checkNotNull(userRepository.findByEmail("reissue@example.com")?.authNumber)
 
         Thread.sleep(1_400)
 
@@ -532,7 +537,7 @@ class AuthControllerIntegrationTest(
         )
             .andExpect(status().isOk)
 
-        val secondAuthNumber = checkNotNull(userRepository.findByUserEmail("reissue@example.com")?.userAuthNumber)
+        val secondAuthNumber = checkNotNull(userRepository.findByEmail("reissue@example.com")?.authNumber)
         kotlin.test.assertNotEquals(firstAuthNumber, secondAuthNumber)
 
         Thread.sleep(900)
@@ -560,17 +565,18 @@ class AuthControllerIntegrationTest(
 
     @Test
     fun `startup rehydration should delete malformed persisted jobs safely`() {
-        apschedulerJobRepository.save(
-            std.nooook.readinggardenkotlin.modules.scheduler.entity.ApschedulerJobEntity(
+        scheduledJobRepository.save(
+            std.nooook.readinggardenkotlin.modules.scheduler.entity.ScheduledJobEntity(
                 id = "auth:password-reset-expiry:999",
-                nextRunTime = Instant.now().plusSeconds(120).toEpochMilli() / 1000.0,
-                jobState = "malformed".toByteArray(),
+                jobType = "AUTH_PASSWORD_RESET_EXPIRY",
+                scheduledAt = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).plusSeconds(120),
+                payload = """{"malformed": true}""",
             ),
         )
 
         passwordResetExpiryJobService.rehydratePasswordResetExpiryJobs()
 
-        kotlin.test.assertFalse(apschedulerJobRepository.findById("auth:password-reset-expiry:999").isPresent)
+        kotlin.test.assertFalse(scheduledJobRepository.findById("auth:password-reset-expiry:999").isPresent)
         kotlin.test.assertTrue(recordingSchedulerJobExecutionRecorder.records.isEmpty())
     }
 
@@ -592,17 +598,17 @@ class AuthControllerIntegrationTest(
             .andExpect(jsonPath("$.data.user_nick").value("변경닉네임"))
             .andExpect(jsonPath("$.data.user_image").value("데이지"))
 
-        val savedUser = checkNotNull(userRepository.findByUserEmail("profilenick@example.com"))
-        kotlin.test.assertEquals("변경닉네임", savedUser.userNick)
-        kotlin.test.assertEquals("데이지", savedUser.userImage)
+        val savedUser = checkNotNull(userRepository.findByEmail("profilenick@example.com"))
+        kotlin.test.assertEquals("변경닉네임", savedUser.nick)
+        kotlin.test.assertEquals("데이지", savedUser.image)
     }
 
     @Test
     fun `update profile should change image for app client request`() {
         val signupBody = signup("profileimage@example.com", "pw1234", "fcm-profile-image")
         val accessToken = signupBody.path("data").path("access_token").asText()
-        val beforeUser = checkNotNull(userRepository.findByUserEmail("profileimage@example.com"))
-        val beforeNick = beforeUser.userNick
+        val beforeUser = checkNotNull(userRepository.findByEmail("profileimage@example.com"))
+        val beforeNick = beforeUser.nick
 
         mockMvc.perform(
             put("/api/v1/auth/")
@@ -617,44 +623,44 @@ class AuthControllerIntegrationTest(
             .andExpect(jsonPath("$.data.user_nick").value(beforeNick))
             .andExpect(jsonPath("$.data.user_image").value("튤립"))
 
-        val savedUser = checkNotNull(userRepository.findByUserEmail("profileimage@example.com"))
-        kotlin.test.assertEquals(beforeNick, savedUser.userNick)
-        kotlin.test.assertEquals("튤립", savedUser.userImage)
+        val savedUser = checkNotNull(userRepository.findByEmail("profileimage@example.com"))
+        kotlin.test.assertEquals(beforeNick, savedUser.nick)
+        kotlin.test.assertEquals("튤립", savedUser.image)
     }
 
     @Test
     fun `delete user should remove auth garden book and memo data`() {
         val signupBody = signup("delete@example.com", "pw1234", "fcm-delete")
         val accessToken = signupBody.path("data").path("access_token").asText()
-        val user = userRepository.findByUserEmail("delete@example.com")
+        val user = userRepository.findByEmail("delete@example.com")
         checkNotNull(user)
-        val userNo = checkNotNull(user.userNo)
-        val gardenNo = checkNotNull(gardenUserRepository.findAllByUserNo(userNo).singleOrNull()?.gardenNo)
+        val userNo = checkNotNull(user.id)
+        val gardenNo = checkNotNull(gardenMemberRepository.findAllByUserId(userNo).singleOrNull()?.garden?.id)
 
         val book = bookRepository.save(
             BookEntity(
-                userNo = userNo,
-                bookTitle = "테스트 책",
-                bookAuthor = "작가",
-                bookPublisher = "출판사",
-                bookStatus = 1,
-                bookPage = 100,
-                bookInfo = "소개",
+                user = user,
+                title = "테스트 책",
+                author = "작가",
+                publisher = "출판사",
+                status = 1,
+                page = 100,
+                info = "소개",
             ),
         )
-        val bookNo = checkNotNull(book.bookNo)
-        bookReadRepository.save(BookReadEntity(bookNo = bookNo, userNo = userNo))
-        bookImageRepository.save(BookImageEntity(bookNo = bookNo, imageName = "img", imageUrl = "book.png"))
+        val bookNo = book.id
+        bookReadRepository.save(BookReadEntity(book = book))
+        bookImageRepository.save(BookImageEntity(book = book, name = "img", url = "book.png"))
 
         val memo = memoRepository.save(
             MemoEntity(
-                bookNo = bookNo,
-                memoContent = "메모",
-                userNo = userNo,
+                book = book,
+                content = "메모",
+                user = user,
             ),
         )
-        val memoNo = checkNotNull(memo.id)
-        memoImageRepository.save(MemoImageEntity(memoNo = memoNo, imageName = "memo", imageUrl = "memo.png"))
+        val memoNo = memo.id
+        memoImageRepository.save(MemoImageEntity(memo = memo, name = "memo", url = "memo.png"))
 
         mockMvc.perform(
             delete("/api/v1/auth")
@@ -664,12 +670,12 @@ class AuthControllerIntegrationTest(
             .andExpect(jsonPath("$.resp_code").value(200))
             .andExpect(jsonPath("$.resp_msg").value("회원 탈퇴 성공"))
 
-        kotlin.test.assertNull(userRepository.findByUserNo(userNo))
-        kotlin.test.assertNull(refreshTokenRepository.findByUserNo(userNo))
-        kotlin.test.assertNull(pushRepository.findByUserNo(userNo))
-        kotlin.test.assertTrue(bookRepository.findAllByUserNo(userNo).isEmpty())
-        kotlin.test.assertTrue(memoRepository.findAllByUserNo(userNo).isEmpty())
-        kotlin.test.assertEquals(0L, gardenUserRepository.countByUserNo(userNo))
+        kotlin.test.assertFalse(userRepository.findById(userNo).isPresent)
+        kotlin.test.assertNull(refreshTokenRepository.findByUserId(userNo))
+        kotlin.test.assertNull(pushSettingsRepository.findByUserId(userNo))
+        kotlin.test.assertTrue(bookRepository.findAllByUserId(userNo).isEmpty())
+        kotlin.test.assertTrue(memoRepository.findAllByUserId(userNo).isEmpty())
+        kotlin.test.assertEquals(0L, gardenMemberRepository.countByUserId(userNo))
         kotlin.test.assertTrue(gardenRepository.findById(gardenNo).isPresent)
     }
 

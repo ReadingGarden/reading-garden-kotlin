@@ -7,32 +7,29 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import std.nooook.readinggardenkotlin.modules.memo.entity.MemoEntity
 
-interface MemoRepository : JpaRepository<MemoEntity, Int> {
-    fun findAllByUserNo(userNo: Int): List<MemoEntity>
-
-    fun findAllByBookNo(bookNo: Int): List<MemoEntity>
-
-    fun findByIdAndUserNo(id: Int, userNo: Int): MemoEntity?
-
-    fun findAllByBookNoOrderByMemoLikeDescMemoCreatedAtDesc(bookNo: Int): List<MemoEntity>
+interface MemoRepository : JpaRepository<MemoEntity, Long> {
+    fun findAllByUserId(userId: Long): List<MemoEntity>
+    fun findAllByBookId(bookId: Long): List<MemoEntity>
+    fun findByIdAndUserId(id: Long, userId: Long): MemoEntity?
+    fun findAllByBookIdOrderByIsLikedDescCreatedAtDesc(bookId: Long): List<MemoEntity>
 
     @Query(
         value = """
-            select memo
-            from MemoEntity memo
-            join BookEntity book on book.bookNo = memo.bookNo
-            where memo.userNo = :userNo
-            order by memo.memoLike desc, memo.memoCreatedAt desc
+            select m
+            from MemoEntity m
+            join m.book b
+            where m.user.id = :userId
+            order by m.isLiked desc, m.createdAt desc
         """,
         countQuery = """
-            select count(memo)
-            from MemoEntity memo
-            join BookEntity book on book.bookNo = memo.bookNo
-            where memo.userNo = :userNo
+            select count(m)
+            from MemoEntity m
+            join m.book b
+            where m.user.id = :userId
         """,
     )
-    fun findAllByUserNoJoinBookOrderByMemoLikeDescMemoCreatedAtDesc(
-        @Param("userNo") userNo: Int,
+    fun findAllByUserIdJoinBookOrderByIsLikedDescCreatedAtDesc(
+        @Param("userId") userId: Long,
         pageable: Pageable,
     ): Page<MemoEntity>
 }

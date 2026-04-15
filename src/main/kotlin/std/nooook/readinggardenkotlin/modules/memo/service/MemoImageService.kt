@@ -21,22 +21,22 @@ class MemoImageService(
 ) {
     @Transactional
     fun uploadMemoImage(
-        id: Int,
+        id: Long,
         file: MultipartFile,
     ): String {
-        memoRepository.findById(id)
+        val memo = memoRepository.findById(id)
             .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 메모가 없습니다.") }
 
         if (file.size > MAX_IMAGE_SIZE_BYTES) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지 용량은 5MB를 초과할 수 없습니다.")
         }
 
-        val existingImages = memoImageRepository.findAllByMemoNoIn(listOf(id))
+        val existingImages = memoImageRepository.findAllByMemoIdIn(listOf(id))
         val stagedDeletes = mutableListOf<ImageStorage.StagedDelete>()
         var savedImageUrl: String? = null
         try {
             existingImages.forEach { existingImage ->
-                stagedDeletes += imageStorage.stageDelete(existingImage.imageUrl)
+                stagedDeletes += imageStorage.stageDelete(existingImage.url)
             }
             if (existingImages.isNotEmpty()) {
                 memoImageRepository.deleteAll(existingImages)
@@ -46,9 +46,9 @@ class MemoImageService(
             savedImageUrl = imageUrl
             memoImageRepository.save(
                 MemoImageEntity(
-                    memoNo = id,
-                    imageName = file.originalFilename ?: file.name,
-                    imageUrl = imageUrl,
+                    memo = memo,
+                    name = file.originalFilename ?: file.name,
+                    url = imageUrl,
                 ),
             )
             registerRollbackCleanup(imageUrl)
@@ -65,11 +65,11 @@ class MemoImageService(
     }
 
     @Transactional
-    fun deleteMemoImage(id: Int): String {
+    fun deleteMemoImage(id: Long): String {
         memoRepository.findById(id)
             .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 메모가 없습니다.") }
 
-        val existingImages = memoImageRepository.findAllByMemoNoIn(listOf(id))
+        val existingImages = memoImageRepository.findAllByMemoIdIn(listOf(id))
         if (existingImages.isEmpty()) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 이미지가 없습니다.")
         }
@@ -77,7 +77,7 @@ class MemoImageService(
         val stagedDeletes = mutableListOf<ImageStorage.StagedDelete>()
         try {
             existingImages.forEach { existingImage ->
-                stagedDeletes += imageStorage.stageDelete(existingImage.imageUrl)
+                stagedDeletes += imageStorage.stageDelete(existingImage.url)
             }
             memoImageRepository.deleteAll(existingImages)
             finalizeStagedDeletes(stagedDeletes)

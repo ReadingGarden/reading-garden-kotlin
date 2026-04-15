@@ -5,6 +5,8 @@ import org.mockito.BDDMockito.given
 import org.mockito.BDDMockito.doReturn
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.context.annotation.Import
+import std.nooook.readinggardenkotlin.TestcontainersConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
@@ -32,6 +34,7 @@ import std.nooook.readinggardenkotlin.modules.memo.service.MemoImageService
 import std.nooook.readinggardenkotlin.modules.memo.service.MemoQueryService
 import std.nooook.readinggardenkotlin.modules.memo.service.MemoService
 
+@Import(TestcontainersConfiguration::class)
 @SpringBootTest
 @AutoConfigureMockMvc
 class MemoControllerMvcTest(
@@ -51,7 +54,7 @@ class MemoControllerMvcTest(
 
     @Test
     fun `get memo should return legacy success envelope`() {
-        given(memoService.getMemoList(userNo = 1, page = 2, pageSize = 10))
+        given(memoService.getMemoList(userId = 1, page = 2, pageSize = 10))
             .willReturn(
                 MemoListResponse(
                     current_page = 2,
@@ -79,7 +82,7 @@ class MemoControllerMvcTest(
                 .with(
                     authentication(
                         UsernamePasswordAuthenticationToken(
-                            LegacyAuthenticationPrincipal(1, "테스터"),
+                            LegacyAuthenticationPrincipal(1L, "테스터"),
                             null,
                             listOf(SimpleGrantedAuthority("ROLE_USER")),
                         ),
@@ -102,7 +105,7 @@ class MemoControllerMvcTest(
 
     @Test
     fun `get memo detail should return legacy success envelope`() {
-        given(memoQueryService.getMemoDetail(userNo = 1, id = 9))
+        given(memoQueryService.getMemoDetail(userId = 1, id = 9))
             .willReturn(
                 MemoDetailResponse(
                     id = 9,
@@ -122,7 +125,7 @@ class MemoControllerMvcTest(
                 .with(
                     authentication(
                         UsernamePasswordAuthenticationToken(
-                            LegacyAuthenticationPrincipal(1, "테스터"),
+                            LegacyAuthenticationPrincipal(1L, "테스터"),
                             null,
                             listOf(SimpleGrantedAuthority("ROLE_USER")),
                         ),
@@ -142,7 +145,7 @@ class MemoControllerMvcTest(
     fun `create memo should return legacy created envelope`() {
         given(
             memoCommandService.createMemo(
-                userNo = 1,
+                userId = 1,
                 request = CreateMemoRequest(
                     book_no = 17,
                     memo_content = "메모 내용",
@@ -155,7 +158,7 @@ class MemoControllerMvcTest(
                 .with(
                     authentication(
                         UsernamePasswordAuthenticationToken(
-                            LegacyAuthenticationPrincipal(1, "테스터"),
+                            LegacyAuthenticationPrincipal(1L, "테스터"),
                             null,
                             listOf(SimpleGrantedAuthority("ROLE_USER")),
                         ),
@@ -174,7 +177,7 @@ class MemoControllerMvcTest(
     fun `update memo should return legacy success envelope`() {
         given(
             memoCommandService.updateMemo(
-                userNo = 1,
+                userId = 1,
                 id = 9,
                 request = UpdateMemoRequest(
                     book_no = 17,
@@ -188,7 +191,7 @@ class MemoControllerMvcTest(
                 .with(
                     authentication(
                         UsernamePasswordAuthenticationToken(
-                            LegacyAuthenticationPrincipal(1, "테스터"),
+                            LegacyAuthenticationPrincipal(1L, "테스터"),
                             null,
                             listOf(SimpleGrantedAuthority("ROLE_USER")),
                         ),
@@ -210,7 +213,7 @@ class MemoControllerMvcTest(
                 .with(
                     authentication(
                         UsernamePasswordAuthenticationToken(
-                            LegacyAuthenticationPrincipal(1, "테스터"),
+                            LegacyAuthenticationPrincipal(1L, "테스터"),
                             null,
                             listOf(SimpleGrantedAuthority("ROLE_USER")),
                         ),
@@ -223,12 +226,12 @@ class MemoControllerMvcTest(
             .andExpect(jsonPath("$.resp_code").value(400))
             .andExpect(jsonPath("$.resp_msg").value("Required parameter 'id' is not present."))
             .andExpect(jsonPath("$.errors[0].parameter").value("id"))
-            .andExpect(jsonPath("$.errors[0].expectedType").value("int"))
+            .andExpect(jsonPath("$.errors[0].expectedType").value("long"))
     }
 
     @Test
     fun `delete memo should return legacy success envelope`() {
-        given(memoCommandService.deleteMemo(userNo = 1, id = 9))
+        given(memoCommandService.deleteMemo(userId = 1, id = 9))
             .willReturn("메모 삭제 성공")
 
         mockMvc.perform(
@@ -236,7 +239,7 @@ class MemoControllerMvcTest(
                 .with(
                     authentication(
                         UsernamePasswordAuthenticationToken(
-                            LegacyAuthenticationPrincipal(1, "테스터"),
+                            LegacyAuthenticationPrincipal(1L, "테스터"),
                             null,
                             listOf(SimpleGrantedAuthority("ROLE_USER")),
                         ),
@@ -256,7 +259,7 @@ class MemoControllerMvcTest(
                 .with(
                     authentication(
                         UsernamePasswordAuthenticationToken(
-                            LegacyAuthenticationPrincipal(1, "테스터"),
+                            LegacyAuthenticationPrincipal(1L, "테스터"),
                             null,
                             listOf(SimpleGrantedAuthority("ROLE_USER")),
                         ),
@@ -267,7 +270,7 @@ class MemoControllerMvcTest(
             .andExpect(jsonPath("$.resp_code").value(400))
             .andExpect(jsonPath("$.resp_msg").value("Required parameter 'id' is not present."))
             .andExpect(jsonPath("$.errors[0].parameter").value("id"))
-            .andExpect(jsonPath("$.errors[0].expectedType").value("int"))
+            .andExpect(jsonPath("$.errors[0].expectedType").value("long"))
     }
 
     @Test
@@ -289,7 +292,7 @@ class MemoControllerMvcTest(
                 .with(
                     authentication(
                         UsernamePasswordAuthenticationToken(
-                            LegacyAuthenticationPrincipal(1, "테스터"),
+                            LegacyAuthenticationPrincipal(1L, "테스터"),
                             null,
                             listOf(SimpleGrantedAuthority("ROLE_USER")),
                         ),
@@ -336,7 +339,7 @@ class MemoControllerMvcTest(
                 .with(
                     authentication(
                         UsernamePasswordAuthenticationToken(
-                            LegacyAuthenticationPrincipal(1, "테스터"),
+                            LegacyAuthenticationPrincipal(1L, "테스터"),
                             null,
                             listOf(SimpleGrantedAuthority("ROLE_USER")),
                         ),
@@ -347,7 +350,7 @@ class MemoControllerMvcTest(
             .andExpect(jsonPath("$.resp_code").value(400))
             .andExpect(jsonPath("$.resp_msg").value("Required parameter 'id' is not present."))
             .andExpect(jsonPath("$.errors[0].parameter").value("id"))
-            .andExpect(jsonPath("$.errors[0].expectedType").value("int"))
+            .andExpect(jsonPath("$.errors[0].expectedType").value("long"))
     }
 
     @Test
@@ -361,7 +364,7 @@ class MemoControllerMvcTest(
                 .with(
                     authentication(
                         UsernamePasswordAuthenticationToken(
-                            LegacyAuthenticationPrincipal(1, "테스터"),
+                            LegacyAuthenticationPrincipal(1L, "테스터"),
                             null,
                             listOf(SimpleGrantedAuthority("ROLE_USER")),
                         ),
@@ -392,7 +395,7 @@ class MemoControllerMvcTest(
                 .with(
                     authentication(
                         UsernamePasswordAuthenticationToken(
-                            LegacyAuthenticationPrincipal(1, "테스터"),
+                            LegacyAuthenticationPrincipal(1L, "테스터"),
                             null,
                             listOf(SimpleGrantedAuthority("ROLE_USER")),
                         ),
@@ -403,12 +406,12 @@ class MemoControllerMvcTest(
             .andExpect(jsonPath("$.resp_code").value(400))
             .andExpect(jsonPath("$.resp_msg").value("Required parameter 'id' is not present."))
             .andExpect(jsonPath("$.errors[0].parameter").value("id"))
-            .andExpect(jsonPath("$.errors[0].expectedType").value("int"))
+            .andExpect(jsonPath("$.errors[0].expectedType").value("long"))
     }
 
     @Test
     fun `like memo should return legacy success envelope`() {
-        given(memoCommandService.toggleMemoLike(userNo = 1, id = 9))
+        given(memoCommandService.toggleMemoLike(userId = 1, id = 9))
             .willReturn("메모 즐겨찾기 추가/해제")
 
         mockMvc.perform(
@@ -416,7 +419,7 @@ class MemoControllerMvcTest(
                 .with(
                     authentication(
                         UsernamePasswordAuthenticationToken(
-                            LegacyAuthenticationPrincipal(1, "테스터"),
+                            LegacyAuthenticationPrincipal(1L, "테스터"),
                             null,
                             listOf(SimpleGrantedAuthority("ROLE_USER")),
                         ),
@@ -436,7 +439,7 @@ class MemoControllerMvcTest(
                 .with(
                     authentication(
                         UsernamePasswordAuthenticationToken(
-                            LegacyAuthenticationPrincipal(1, "테스터"),
+                            LegacyAuthenticationPrincipal(1L, "테스터"),
                             null,
                             listOf(SimpleGrantedAuthority("ROLE_USER")),
                         ),
@@ -447,6 +450,6 @@ class MemoControllerMvcTest(
             .andExpect(jsonPath("$.resp_code").value(400))
             .andExpect(jsonPath("$.resp_msg").value("Required parameter 'id' is not present."))
             .andExpect(jsonPath("$.errors[0].parameter").value("id"))
-            .andExpect(jsonPath("$.errors[0].expectedType").value("int"))
+            .andExpect(jsonPath("$.errors[0].expectedType").value("long"))
     }
 }

@@ -5,15 +5,15 @@ import io.swagger.v3.oas.annotations.media.Schema
 @Schema(description = "메모 생성 성공 응답")
 data class CreateMemoResponse(
     @field:Schema(description = "생성된 메모 id", example = "1")
-    val id: Int,
+    val id: Long,
 )
 
 @Schema(description = "메모 목록 항목")
 data class MemoListItemResponse(
     @field:Schema(description = "메모 id", example = "1")
-    val id: Int,
+    val id: Long,
     @field:Schema(description = "책 번호", example = "1")
-    val book_no: Int,
+    val book_no: Long,
     @field:Schema(description = "책 제목", example = "클린 코드")
     val book_title: String,
     @field:Schema(description = "저자", example = "저자")
@@ -47,9 +47,9 @@ data class MemoListResponse(
 @Schema(description = "메모 상세 응답")
 data class MemoDetailResponse(
     @field:Schema(description = "메모 id", example = "1")
-    val id: Int,
+    val id: Long,
     @field:Schema(description = "책 번호", example = "1")
-    val book_no: Int,
+    val book_no: Long,
     @field:Schema(description = "책 제목", example = "상세 메모 책")
     val book_title: String,
     @field:Schema(description = "저자", example = "저자")

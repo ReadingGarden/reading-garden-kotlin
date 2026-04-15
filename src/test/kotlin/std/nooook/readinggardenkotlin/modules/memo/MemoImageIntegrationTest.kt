@@ -10,6 +10,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.context.annotation.Import
+import std.nooook.readinggardenkotlin.TestcontainersConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
@@ -33,18 +35,19 @@ import std.nooook.readinggardenkotlin.modules.memo.entity.MemoImageEntity
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoImageRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
 import std.nooook.readinggardenkotlin.modules.memo.service.MemoImageService
-import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
+import std.nooook.readinggardenkotlin.modules.push.repository.PushSettingsRepository
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Comparator
 
+@Import(TestcontainersConfiguration::class)
 @SpringBootTest
 @AutoConfigureMockMvc
 class MemoImageIntegrationTest(
     @Autowired private val mockMvc: MockMvc,
     @Autowired private val userRepository: UserRepository,
     @Autowired private val refreshTokenRepository: RefreshTokenRepository,
-    @Autowired private val pushRepository: PushRepository,
+    @Autowired private val pushSettingsRepository: PushSettingsRepository,
     @Autowired private val bookRepository: BookRepository,
     @Autowired private val memoRepository: MemoRepository,
     @Autowired private val memoImageRepository: MemoImageRepository,
@@ -71,14 +74,15 @@ class MemoImageIntegrationTest(
         memoRepository.deleteAll()
         bookRepository.deleteAll()
         refreshTokenRepository.deleteAll()
-        pushRepository.deleteAll()
+        pushSettingsRepository.deleteAll()
         userRepository.deleteAll()
     }
 
     @Test
     fun `upload memo image should persist file and row`() {
         val accessToken = signupAndGetAccessToken("memoimageupload@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("memoimageupload@example.com")?.userNo)
+        val user = checkNotNull(userRepository.findByEmail("memoimageupload@example.com"))
+        val userNo = user.id
         val memoId = createMemo(userNo, "이미지 업로드 메모")
         val file = MockMultipartFile(
             "file",
@@ -98,14 +102,15 @@ class MemoImageIntegrationTest(
             .andExpect(jsonPath("$.resp_msg").value("이미지 업로드 성공"))
 
         val image = memoImagesFor(memoId).single()
-        assertTrue(image.imageUrl.startsWith("memo/"))
-        assertTrue(Files.exists(imagesRoot.resolve(image.imageUrl)))
+        assertTrue(image.url.startsWith("memo/"))
+        assertTrue(Files.exists(imagesRoot.resolve(image.url)))
     }
 
     @Test
     fun `upload memo image should replace existing file and keep one row`() {
         val accessToken = signupAndGetAccessToken("memoimagereplace@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("memoimagereplace@example.com")?.userNo)
+        val user = checkNotNull(userRepository.findByEmail("memoimagereplace@example.com"))
+        val userNo = user.id
         val memoId = createMemo(userNo, "이미지 교체 메모")
         val firstFile = MockMultipartFile(
             "file",
@@ -129,7 +134,7 @@ class MemoImageIntegrationTest(
             .andExpect(status().isCreated)
 
         val firstImage = memoImagesFor(memoId).single()
-        val firstStoredPath = imagesRoot.resolve(firstImage.imageUrl)
+        val firstStoredPath = imagesRoot.resolve(firstImage.url)
         assertTrue(Files.exists(firstStoredPath))
 
         mockMvc.perform(
@@ -143,15 +148,16 @@ class MemoImageIntegrationTest(
 
         val replacedImage = memoImagesFor(memoId).single()
         assertFalse(Files.exists(firstStoredPath))
-        assertTrue(Files.exists(imagesRoot.resolve(replacedImage.imageUrl)))
+        assertTrue(Files.exists(imagesRoot.resolve(replacedImage.url)))
         assertEquals(1, memoImageRepository.count())
-        assertFalse(firstImage.imageUrl == replacedImage.imageUrl)
+        assertFalse(firstImage.url == replacedImage.url)
     }
 
     @Test
     fun `upload memo image should clean up saved file when outer transaction rolls back`() {
         val accessToken = signupAndGetAccessToken("memoimageuploadrollback@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("memoimageuploadrollback@example.com")?.userNo)
+        val user = checkNotNull(userRepository.findByEmail("memoimageuploadrollback@example.com"))
+        val userNo = user.id
         val memoId = createMemo(userNo, "롤백 메모")
         val originalFile = MockMultipartFile(
             "file",
@@ -175,7 +181,7 @@ class MemoImageIntegrationTest(
             .andExpect(status().isCreated)
 
         val beforeImage = memoImagesFor(memoId).single()
-        val beforePath = imagesRoot.resolve(beforeImage.imageUrl)
+        val beforePath = imagesRoot.resolve(beforeImage.url)
         assertTrue(Files.exists(beforePath))
 
         assertThrows(IllegalStateException::class.java) {
@@ -186,15 +192,16 @@ class MemoImageIntegrationTest(
         }
 
         val afterImage = memoImagesFor(memoId).single()
-        assertEquals(beforeImage.imageUrl, afterImage.imageUrl)
+        assertEquals(beforeImage.url, afterImage.url)
         assertTrue(Files.exists(beforePath))
-        assertEquals(setOf(beforeImage.imageUrl), listRegularFiles())
+        assertEquals(setOf(beforeImage.url), listRegularFiles())
     }
 
     @Test
     fun `upload memo image should clean duplicate rows and files before storing one image`() {
         val accessToken = signupAndGetAccessToken("memoimageduplicateupload@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("memoimageduplicateupload@example.com")?.userNo)
+        val user = checkNotNull(userRepository.findByEmail("memoimageduplicateupload@example.com"))
+        val userNo = user.id
         val memoId = createMemo(userNo, "중복 업로드 메모")
         seedMemoImage(memoId, "memo/duplicate-1.png", "duplicate-one")
         seedMemoImage(memoId, "memo/duplicate-2.png", "duplicate-two")
@@ -216,16 +223,17 @@ class MemoImageIntegrationTest(
 
         val images = memoImagesFor(memoId)
         assertEquals(1, images.size)
-        assertTrue(images.single().imageUrl.startsWith("memo/"))
+        assertTrue(images.single().url.startsWith("memo/"))
         assertFalse(Files.exists(imagesRoot.resolve("memo/duplicate-1.png")))
         assertFalse(Files.exists(imagesRoot.resolve("memo/duplicate-2.png")))
-        assertTrue(Files.exists(imagesRoot.resolve(images.single().imageUrl)))
+        assertTrue(Files.exists(imagesRoot.resolve(images.single().url)))
     }
 
     @Test
     fun `delete memo image should remove duplicate rows and files`() {
         val accessToken = signupAndGetAccessToken("memoimageduplicatedelete@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("memoimageduplicatedelete@example.com")?.userNo)
+        val user = checkNotNull(userRepository.findByEmail("memoimageduplicatedelete@example.com"))
+        val userNo = user.id
         val memoId = createMemo(userNo, "중복 삭제 메모")
         seedMemoImage(memoId, "memo/delete-duplicate-1.png", "delete-duplicate-one")
         seedMemoImage(memoId, "memo/delete-duplicate-2.png", "delete-duplicate-two")
@@ -247,7 +255,8 @@ class MemoImageIntegrationTest(
     @Test
     fun `upload memo image should reject files over five megabytes`() {
         val accessToken = signupAndGetAccessToken("memoimageoversize@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("memoimageoversize@example.com")?.userNo)
+        val user = checkNotNull(userRepository.findByEmail("memoimageoversize@example.com"))
+        val userNo = user.id
         val memoId = createMemo(userNo, "큰 이미지 메모")
         val oversizedBytes = ByteArray(5 * 1024 * 1024 + 1)
         val file = MockMultipartFile(
@@ -294,7 +303,8 @@ class MemoImageIntegrationTest(
     @Test
     fun `delete memo image should remove file and record`() {
         val accessToken = signupAndGetAccessToken("memoimagedelete@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("memoimagedelete@example.com")?.userNo)
+        val user = checkNotNull(userRepository.findByEmail("memoimagedelete@example.com"))
+        val userNo = user.id
         val memoId = createMemo(userNo, "이미지 삭제 메모")
         val file = MockMultipartFile(
             "file",
@@ -312,7 +322,7 @@ class MemoImageIntegrationTest(
             .andExpect(status().isCreated)
 
         val storedImage = memoImagesFor(memoId).single()
-        val storedPath = imagesRoot.resolve(storedImage.imageUrl)
+        val storedPath = imagesRoot.resolve(storedImage.url)
         assertTrue(Files.exists(storedPath))
 
         mockMvc.perform(
@@ -331,7 +341,8 @@ class MemoImageIntegrationTest(
     @Test
     fun `delete memo image should return bad request when image is missing`() {
         val accessToken = signupAndGetAccessToken("memoimagemissing@example.com")
-        val userNo = checkNotNull(userRepository.findByUserEmail("memoimagemissing@example.com")?.userNo)
+        val user = checkNotNull(userRepository.findByEmail("memoimagemissing@example.com"))
+        val userNo = user.id
         val memoId = createMemo(userNo, "이미지 없는 메모")
 
         mockMvc.perform(
@@ -359,31 +370,30 @@ class MemoImageIntegrationTest(
     }
 
     private fun createMemo(
-        userNo: Int,
+        userNo: Long,
         memoContent: String,
-    ): Int {
-        val bookNo = bookRepository.save(
+    ): Long {
+        val userEntity = userRepository.findById(userNo).orElseThrow()
+        val bookEntity = bookRepository.save(
             BookEntity(
-                userNo = userNo,
-                bookTitle = "$memoContent 책",
-                bookAuthor = "저자",
-                bookPublisher = "출판사",
-                bookInfo = "소개",
-                bookStatus = 0,
-                bookPage = 100,
+                user = userEntity,
+                title = "$memoContent 책",
+                author = "저자",
+                publisher = "출판사",
+                info = "소개",
+                status = 0,
+                page = 100,
             ),
-        ).bookNo ?: error("bookNo was not generated")
-
-        return checkNotNull(
-            memoRepository.save(
-                MemoEntity(
-                    bookNo = bookNo,
-                    memoContent = memoContent,
-                    userNo = userNo,
-                    memoLike = false,
-                ),
-            ).id,
         )
+
+        return memoRepository.save(
+            MemoEntity(
+                book = bookEntity,
+                content = memoContent,
+                user = userEntity,
+                isLiked = false,
+            ),
+        ).id
     }
 
     private fun cleanImagesRoot() {
@@ -400,23 +410,24 @@ class MemoImageIntegrationTest(
         }
     }
 
-    private fun memoImagesFor(memoId: Int): List<MemoImageEntity> {
-        return memoImageRepository.findAllByMemoNoIn(listOf(memoId))
+    private fun memoImagesFor(memoId: Long): List<MemoImageEntity> {
+        return memoImageRepository.findAllByMemoIdIn(listOf(memoId))
     }
 
     private fun seedMemoImage(
-        memoId: Int,
+        memoId: Long,
         relativePath: String,
         content: String,
     ) {
         val targetPath = imagesRoot.resolve(relativePath)
         Files.createDirectories(targetPath.parent)
         Files.write(targetPath, content.toByteArray())
+        val memoEntity = memoRepository.findById(memoId).orElseThrow()
         memoImageRepository.save(
             MemoImageEntity(
-                memoNo = memoId,
-                imageName = relativePath.substringAfterLast('/'),
-                imageUrl = relativePath,
+                memo = memoEntity,
+                name = relativePath.substringAfterLast('/'),
+                url = relativePath,
             ),
         )
     }
