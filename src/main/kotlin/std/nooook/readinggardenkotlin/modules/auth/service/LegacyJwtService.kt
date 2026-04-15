@@ -50,8 +50,8 @@ class LegacyJwtService(
         val expiresAt = issuedAt.plus(duration)
 
         return Jwts.builder()
-            .claim("user_no", user.userNo ?: 0)
-            .claim("user_nick", user.userNick)
+            .claim("user_no", user.id)
+            .claim("user_nick", user.nick)
             .claim("type", tokenType)
             .claim("timestamp", issuedAt.toString())
             .issuedAt(Date.from(issuedAt))

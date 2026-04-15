@@ -73,14 +73,14 @@ class LegacyJwtAuthenticationFilter(
                 throw BadCredentialsException("Invalid access token type")
             }
 
-            val userNo = (claims["user_no"] as? Number)?.toInt()
+            val userId = (claims["user_no"] as? Number)?.toLong()
                 ?: throw BadCredentialsException("Missing user number")
-            val user = userRepository.findByUserNo(userNo)
+            val user = userRepository.findById(userId).orElse(null)
                 ?: throw UsernameNotFoundException("User not found")
 
             val principal = LegacyAuthenticationPrincipal(
-                userNo = user.userNo?.toLong() ?: userNo.toLong(),
-                userNick = user.userNick,
+                userId = user.id,
+                userNick = user.nick,
             )
 
             val authentication = UsernamePasswordAuthenticationToken(

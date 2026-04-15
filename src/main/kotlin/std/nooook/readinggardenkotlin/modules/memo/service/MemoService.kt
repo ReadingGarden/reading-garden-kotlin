@@ -15,19 +15,19 @@ class MemoService(
     private val bookRepository: BookRepository,
 ) {
     fun getMemoList(
-        userNo: Int,
+        userId: Long,
         page: Int = 1,
         pageSize: Int = 10,
     ): MemoListResponse {
-        val memoPage = memoRepository.findAllByUserNoJoinBookOrderByMemoLikeDescMemoCreatedAtDesc(
-            userNo = userNo,
+        val memoPage = memoRepository.findAllByUserIdJoinBookOrderByIsLikedDescCreatedAtDesc(
+            userId = userId,
             pageable = PageRequest.of(page - 1, pageSize),
         )
 
-        val memoIds = memoPage.content.mapNotNull { it.id }
-        val bookNos = memoPage.content.map { it.bookNo }.distinct()
-        val booksByNo = bookRepository.findAllById(bookNos).associateBy { it.bookNo ?: -1 }
-        val imagesByMemoNo = memoImageRepository.findAllByMemoNoIn(memoIds).associateBy { it.memoNo }
+        val memoIds = memoPage.content.map { it.id }
+        val bookIds = memoPage.content.map { it.book.id }.distinct()
+        val booksById = bookRepository.findAllById(bookIds).associateBy { it.id }
+        val imagesByMemoId = memoImageRepository.findAllByMemoIdIn(memoIds).associateBy { it.memo.id }
 
         return MemoListResponse(
             current_page = page,
@@ -35,20 +35,19 @@ class MemoService(
             total = memoPage.totalElements,
             page_size = pageSize,
             list = memoPage.content.map { memo ->
-                val memoId = checkNotNull(memo.id) { "Memo id is required" }
-                val book = checkNotNull(booksByNo[memo.bookNo]) { "Book ${memo.bookNo} is missing for memo $memoId" }
-                val imageUrl = imagesByMemoNo[memoId]?.imageUrl
+                val book = checkNotNull(booksById[memo.book.id]) { "Book ${memo.book.id} is missing for memo ${memo.id}" }
+                val imageUrl = imagesByMemoId[memo.id]?.url
 
                 MemoListItemResponse(
-                    id = memoId,
-                    book_no = memo.bookNo,
-                    book_title = book.bookTitle,
-                    book_author = book.bookAuthor,
-                    book_image_url = book.bookImageUrl,
-                    memo_content = memo.memoContent,
-                    memo_like = memo.memoLike,
+                    id = memo.id,
+                    book_no = memo.book.id,
+                    book_title = book.title,
+                    book_author = book.author,
+                    book_image_url = book.imageUrl,
+                    memo_content = memo.content,
+                    memo_like = memo.isLiked,
                     image_url = imageUrl,
-                    memo_created_at = memo.memoCreatedAt.toString(),
+                    memo_created_at = memo.createdAt.toString(),
                 )
             },
         )

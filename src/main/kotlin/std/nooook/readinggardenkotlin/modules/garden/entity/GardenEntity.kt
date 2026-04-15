@@ -9,18 +9,19 @@ import jakarta.persistence.Table
 import java.time.LocalDateTime
 
 @Entity
-@Table(name = "GARDEN")
+@Table(name = "gardens")
 class GardenEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "garden_no")
-    var gardenNo: Int? = null,
-    @Column(name = "garden_title", nullable = false, length = 30)
-    var gardenTitle: String = "",
-    @Column(name = "garden_info", nullable = false, length = 200)
-    var gardenInfo: String = "",
-    @Column(name = "garden_color", nullable = false, length = 20)
-    var gardenColor: String = "",
-    @Column(name = "garden_created_at", nullable = false)
-    var gardenCreatedAt: LocalDateTime = LocalDateTime.now(),
+    val id: Long = 0,
+    @Column(nullable = false, length = 30)
+    var title: String = "",
+    @Column(nullable = false, length = 200)
+    var info: String = "",
+    @Column(nullable = false, length = 20)
+    var color: String = "",
+    @Column(nullable = false)
+    val createdAt: LocalDateTime = LocalDateTime.now(),
+    @Column(nullable = false)
+    var updatedAt: LocalDateTime = LocalDateTime.now(),
 )

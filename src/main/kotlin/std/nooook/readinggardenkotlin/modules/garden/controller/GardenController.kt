@@ -56,7 +56,7 @@ class GardenController(
         LegacyDataResponse(
             resp_code = 200,
             resp_msg = "가든 리스트 조회 성공",
-            data = gardenQueryService.getGardenList(principal.userNo.toInt()),
+            data = gardenQueryService.getGardenList(principal.userId),
         )
 
     @GetMapping("/detail")
@@ -65,12 +65,12 @@ class GardenController(
     fun getGardenDetail(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "조회할 가든 번호", example = "10")
-        @RequestParam(name = "garden_no") gardenNo: Int,
+        @RequestParam(name = "garden_no") gardenNo: Long,
     ): LegacyDataResponse<GardenDetailResponse> =
         LegacyDataResponse(
             resp_code = 200,
             resp_msg = "가든 상세 조회 성공",
-            data = gardenQueryService.getGardenDetail(principal.userNo.toInt(), gardenNo),
+            data = gardenQueryService.getGardenDetail(principal.userId, gardenNo),
         )
 
     @PostMapping("")
@@ -91,7 +91,7 @@ class GardenController(
             LegacyDataResponse(
                 resp_code = 201,
                 resp_msg = "가든 추가 성공",
-                data = gardenCommandService.createGarden(principal.userNo.toInt(), request),
+                data = gardenCommandService.createGarden(principal.userId, request),
             ),
         )
 
@@ -108,12 +108,12 @@ class GardenController(
     fun updateGarden(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "수정할 가든 번호", example = "10")
-        @RequestParam(name = "garden_no") gardenNo: Int,
+        @RequestParam(name = "garden_no") gardenNo: Long,
         @RequestBody request: UpdateGardenRequest,
     ): LegacyDataResponse<Map<String, Any?>> =
         LegacyDataResponse(
             resp_code = 200,
-            resp_msg = gardenCommandService.updateGarden(principal.userNo.toInt(), gardenNo, request),
+            resp_msg = gardenCommandService.updateGarden(principal.userId, gardenNo, request),
             data = HashMap<String, Any?>(),
         )
 
@@ -123,10 +123,10 @@ class GardenController(
     fun deleteGarden(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "삭제할 가든 번호", example = "10")
-        @RequestParam(name = "garden_no") gardenNo: Int,
+        @RequestParam(name = "garden_no") gardenNo: Long,
     ): LegacyHttpResponse =
         LegacyResponses.ok(
-            gardenCommandService.deleteGarden(principal.userNo.toInt(), gardenNo),
+            gardenCommandService.deleteGarden(principal.userId, gardenNo),
         )
 
     @PutMapping("/to")
@@ -135,12 +135,12 @@ class GardenController(
     fun moveGardenBook(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "현재 가든 번호", example = "10")
-        @RequestParam(name = "garden_no") gardenNo: Int,
+        @RequestParam(name = "garden_no") gardenNo: Long,
         @Parameter(description = "이동할 대상 가든 번호", example = "11")
-        @RequestParam(name = "to_garden_no") toGardenNo: Int,
+        @RequestParam(name = "to_garden_no") toGardenNo: Long,
     ): LegacyHttpResponse =
         LegacyResponses.ok(
-            gardenCommandService.moveGardenBook(principal.userNo.toInt(), gardenNo, toGardenNo),
+            gardenCommandService.moveGardenBook(principal.userId, gardenNo, toGardenNo),
         )
 
     @DeleteMapping("/member")
@@ -149,10 +149,10 @@ class GardenController(
     fun leaveGardenMember(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "탈퇴할 가든 번호", example = "10")
-        @RequestParam(name = "garden_no") gardenNo: Int,
+        @RequestParam(name = "garden_no") gardenNo: Long,
     ): LegacyHttpResponse =
         LegacyResponses.ok(
-            gardenMembershipService.leaveGardenMember(principal.userNo.toInt(), gardenNo),
+            gardenMembershipService.leaveGardenMember(principal.userId, gardenNo),
         )
 
     @PutMapping("/member")
@@ -161,12 +161,12 @@ class GardenController(
     fun updateGardenMember(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "대상 가든 번호", example = "10")
-        @RequestParam(name = "garden_no") gardenNo: Int,
+        @RequestParam(name = "garden_no") gardenNo: Long,
         @Parameter(description = "새 리더 사용자 번호", example = "2")
-        @RequestParam(name = "user_no") userNo: Int,
+        @RequestParam(name = "user_no") userNo: Long,
     ): LegacyHttpResponse =
         LegacyResponses.ok(
-            gardenMembershipService.updateGardenMember(principal.userNo.toInt(), gardenNo, userNo),
+            gardenMembershipService.updateGardenMember(principal.userId, gardenNo, userNo),
         )
 
     @PutMapping("/main")
@@ -175,10 +175,10 @@ class GardenController(
     fun updateGardenMain(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "대표로 설정할 가든 번호", example = "10")
-        @RequestParam(name = "garden_no") gardenNo: Int,
+        @RequestParam(name = "garden_no") gardenNo: Long,
     ): LegacyHttpResponse =
         LegacyResponses.ok(
-            gardenCommandService.updateGardenMain(principal.userNo.toInt(), gardenNo),
+            gardenCommandService.updateGardenMain(principal.userId, gardenNo),
         )
 
     @PostMapping("/invite")
@@ -187,12 +187,12 @@ class GardenController(
     fun inviteGardenMember(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "초대할 가든 번호", example = "10")
-        @RequestParam(name = "garden_no") gardenNo: Int,
+        @RequestParam(name = "garden_no") gardenNo: Long,
     ): ResponseEntity<LegacyHttpResponse> =
         ResponseEntity.status(HttpStatus.CREATED).body(
             LegacyResponses.error(
                 status = 201,
-                message = gardenMembershipService.inviteGardenMember(principal.userNo.toInt(), gardenNo),
+                message = gardenMembershipService.inviteGardenMember(principal.userId, gardenNo),
             ),
         )
 }

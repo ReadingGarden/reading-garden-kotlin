@@ -1,0 +1,79 @@
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: reading-garden-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      app-blue:
+        condition: service_healthy
+
+  app-blue:
+    image: ${IMAGE_REF:?IMAGE_REF is required}
+    container_name: reading-garden-blue
+    restart: unless-stopped
+    pull_policy: always
+    expose:
+      - "8080"
+    env_file:
+      - /opt/reading-garden/.env
+    volumes:
+      - /opt/reading-garden/secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
+      - /opt/reading-garden/data:/opt/reading-garden/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app-green:
+    image: ${IMAGE_REF:?IMAGE_REF is required}
+    container_name: reading-garden-green
+    restart: unless-stopped
+    pull_policy: always
+    expose:
+      - "8080"
+    env_file:
+      - /opt/reading-garden/.env
+    volumes:
+      - /opt/reading-garden/secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
+      - /opt/reading-garden/data:/opt/reading-garden/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - green
+
+  postgres:
+    image: postgres:17
+    container_name: reading-garden-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-reading_garden}
+      POSTGRES_USER: ${DB_USER:-book}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-book} -d ${DB_NAME:-reading_garden}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  pgdata:

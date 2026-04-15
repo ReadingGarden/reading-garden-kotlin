@@ -53,7 +53,7 @@ class BookController(
         @RequestParam isbn: String,
     ): LegacyHttpResponse =
         LegacyResponses.ok(
-            bookQueryService.checkDuplication(principal.userNo.toInt(), isbn),
+            bookQueryService.checkDuplication(principal.userId, isbn),
         )
 
     @GetMapping("/search")
@@ -142,7 +142,7 @@ class BookController(
             LegacyDataResponse(
                 resp_code = 201,
                 resp_msg = "책 등록 성공",
-                data = bookCommandService.createBook(principal.userNo.toInt(), request),
+                data = bookCommandService.createBook(principal.userId, request),
             ),
         )
 
@@ -152,10 +152,10 @@ class BookController(
     fun deleteBook(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "삭제할 책 번호", example = "1")
-        @RequestParam(name = "book_no") bookNo: Int,
+        @RequestParam(name = "book_no") bookNo: Long,
     ): LegacyHttpResponse =
         LegacyResponses.ok(
-            bookCommandService.deleteBook(principal.userNo.toInt(), bookNo),
+            bookCommandService.deleteBook(principal.userId, bookNo),
         )
 
     @GetMapping("/status")
@@ -164,7 +164,7 @@ class BookController(
     fun getBookStatus(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "가든 번호 필터", example = "10")
-        @RequestParam(name = "garden_no", required = false) gardenNo: Int?,
+        @RequestParam(name = "garden_no", required = false) gardenNo: Long?,
         @Parameter(description = "상태 코드 필터", example = "1")
         @RequestParam(required = false) status: Int?,
         @Parameter(description = "페이지 번호", example = "1")
@@ -176,7 +176,7 @@ class BookController(
             resp_code = 200,
             resp_msg = "책 상태 조회 성공",
             data = bookQueryService.getBookStatus(
-                userNo = principal.userNo.toInt(),
+                userId = principal.userId,
                 gardenNo = gardenNo,
                 status = status,
                 page = page,
@@ -190,7 +190,7 @@ class BookController(
     fun getBookRead(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "조회할 책 번호", example = "1")
-        @RequestParam(name = "book_no") bookNo: Int,
+        @RequestParam(name = "book_no") bookNo: Long,
     ): LegacyDataResponse<BookReadDetailResponse> =
         LegacyDataResponse(
             resp_code = 200,
@@ -216,7 +216,7 @@ class BookController(
             LegacyDataResponse(
                 resp_code = 201,
                 resp_msg = "책 기록 성공",
-                data = bookReadService.createRead(principal.userNo.toInt(), request),
+                data = bookReadService.createRead(principal.userId, request),
             ),
         )
 
@@ -233,7 +233,7 @@ class BookController(
     fun updateBookRead(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "수정할 독서 기록 id", example = "1")
-        @RequestParam id: Int,
+        @RequestParam id: Long,
         @RequestBody request: UpdateReadRequest,
     ): LegacyHttpResponse =
         LegacyResponses.ok(
@@ -246,7 +246,7 @@ class BookController(
     fun deleteBookRead(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "삭제할 독서 기록 id", example = "1")
-        @RequestParam id: Int,
+        @RequestParam id: Long,
     ): LegacyHttpResponse =
         LegacyResponses.ok(
             bookReadService.deleteRead(id),
@@ -284,7 +284,7 @@ class BookController(
     fun uploadBookImage(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "이미지를 연결할 책 번호", example = "1")
-        @RequestParam(name = "book_no") bookNo: Int,
+        @RequestParam(name = "book_no") bookNo: Long,
         @Parameter(description = "업로드할 이미지 파일", required = true)
         @RequestParam(name = "file") file: MultipartFile,
     ): ResponseEntity<LegacyHttpResponse> =
@@ -301,7 +301,7 @@ class BookController(
     fun deleteBookImage(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "이미지를 삭제할 책 번호", example = "1")
-        @RequestParam(name = "book_no") bookNo: Int,
+        @RequestParam(name = "book_no") bookNo: Long,
     ): ResponseEntity<LegacyHttpResponse> =
         ResponseEntity.status(HttpStatus.CREATED).body(
             LegacyResponses.error(
@@ -323,12 +323,12 @@ class BookController(
     fun updateBook(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "수정할 책 번호", example = "1")
-        @RequestParam(name = "book_no") bookNo: Int,
+        @RequestParam(name = "book_no") bookNo: Long,
         @RequestBody request: UpdateBookRequest,
     ): LegacyHttpResponse =
         LegacyResponses.ok(
             bookCommandService.updateBook(
-                userNo = principal.userNo.toInt(),
+                userId = principal.userId,
                 bookNo = bookNo,
                 request = request,
             ),

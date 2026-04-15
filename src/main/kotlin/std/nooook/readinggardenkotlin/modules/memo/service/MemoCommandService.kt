@@ -8,6 +8,7 @@ import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.server.ResponseStatusException
 import std.nooook.readinggardenkotlin.common.storage.ImageStorage
+import std.nooook.readinggardenkotlin.modules.auth.repository.UserRepository
 import std.nooook.readinggardenkotlin.modules.book.repository.BookRepository
 import std.nooook.readinggardenkotlin.modules.memo.controller.CreateMemoRequest
 import std.nooook.readinggardenkotlin.modules.memo.controller.CreateMemoResponse
@@ -22,59 +23,62 @@ class MemoCommandService(
     private val bookRepository: BookRepository,
     private val memoImageRepository: MemoImageRepository,
     private val imageStorage: ImageStorage,
+    private val userRepository: UserRepository,
 ) {
     @Transactional
     fun createMemo(
-        userNo: Int,
+        userId: Long,
         request: CreateMemoRequest,
     ): CreateMemoResponse {
-        bookRepository.findByBookNoAndUserNo(request.book_no, userNo)
+        val book = bookRepository.findByIdAndUserId(request.book_no, userId)
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 책 정보가 없습니다.")
+        val user = userRepository.findById(userId)
+            .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 사용자 정보가 없습니다.") }
 
         val saved = memoRepository.save(
             MemoEntity(
-                bookNo = request.book_no,
-                memoContent = request.memo_content,
-                userNo = userNo,
-                memoLike = false,
+                book = book,
+                content = request.memo_content,
+                user = user,
+                isLiked = false,
             ),
         )
 
         return CreateMemoResponse(
-            id = checkNotNull(saved.id) { "Memo id was not generated" },
+            id = saved.id,
         )
     }
 
     @Transactional
     fun updateMemo(
-        userNo: Int,
-        id: Int,
+        userId: Long,
+        id: Long,
         request: UpdateMemoRequest,
     ): String {
         val memo = memoRepository.findById(id).orElse(null)
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 메모가 없습니다.")
 
-        bookRepository.findByBookNoAndUserNo(request.book_no, userNo)
+        val book = bookRepository.findByIdAndUserId(request.book_no, userId)
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 책 정보가 없습니다.")
 
-        memo.bookNo = request.book_no
-        memo.memoContent = request.memo_content
+        memo.book = book
+        memo.content = request.memo_content
         memoRepository.save(memo)
         return "메모 수정 성공"
     }
 
     @Transactional
     fun deleteMemo(
-        userNo: Int,
-        id: Int,
+        userId: Long,
+        id: Long,
     ): String {
         val memo = memoRepository.findById(id).orElse(null)
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 메모가 없습니다.")
 
         val stagedDeletes = mutableListOf<ImageStorage.StagedDelete>()
         try {
-            memoImageRepository.findAllByMemoNoIn(listOf(id)).forEach { memoImage ->
-                stagedDeletes += imageStorage.stageDelete(memoImage.imageUrl)
+            memoImageRepository.findAllByMemoIdIn(listOf(id)).forEach { memoImage ->
+                stagedDeletes += imageStorage.stageDelete(memoImage.url)
                 memoImageRepository.delete(memoImage)
             }
 
@@ -92,13 +96,13 @@ class MemoCommandService(
 
     @Transactional
     fun toggleMemoLike(
-        userNo: Int,
-        id: Int,
+        userId: Long,
+        id: Long,
     ): String {
         val memo = memoRepository.findById(id).orElse(null)
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 메모가 없습니다.")
 
-        memo.memoLike = !memo.memoLike
+        memo.isLiked = !memo.isLiked
         memoRepository.save(memo)
         return "메모 즐겨찾기 추가/해제"
     }

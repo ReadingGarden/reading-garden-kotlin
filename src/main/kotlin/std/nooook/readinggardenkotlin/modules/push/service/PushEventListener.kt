@@ -10,8 +10,8 @@ class PushEventListener(
 ) {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun handleGardenMemberJoined(event: GardenMemberJoinedPushEvent) {
-        event.recipientUserNos.forEach { userNo ->
-            pushService.sendNewMemberPush(userNo, event.gardenNo)
+        event.recipientUserIds.forEach { userId ->
+            pushService.sendNewMemberPush(userId, event.gardenNo)
         }
     }
 }

@@ -14,85 +14,84 @@ import std.nooook.readinggardenkotlin.modules.garden.controller.GardenDetailBook
 import std.nooook.readinggardenkotlin.modules.garden.controller.GardenListItemResponse
 import std.nooook.readinggardenkotlin.modules.garden.controller.GardenListMemberResponse
 import std.nooook.readinggardenkotlin.modules.garden.repository.GardenRepository
-import std.nooook.readinggardenkotlin.modules.garden.repository.GardenUserRepository
+import std.nooook.readinggardenkotlin.modules.garden.repository.GardenMemberRepository
 
 interface GardenQueryService {
-    fun getGardenList(userNo: Int): List<GardenListItemResponse>
+    fun getGardenList(userId: Long): List<GardenListItemResponse>
 
-    fun getGardenDetail(userNo: Int, gardenNo: Int): GardenDetailResponse
+    fun getGardenDetail(userId: Long, gardenNo: Long): GardenDetailResponse
 }
 
 @Service
 class DefaultGardenQueryService(
     private val gardenRepository: GardenRepository,
-    private val gardenUserRepository: GardenUserRepository,
+    private val gardenMemberRepository: GardenMemberRepository,
     private val bookRepository: BookRepository,
     private val bookReadRepository: BookReadRepository,
     private val userRepository: UserRepository,
 ) : GardenQueryService {
     @Transactional
-    override fun getGardenList(userNo: Int): List<GardenListItemResponse> =
-        gardenUserRepository.findAllByUserNoOrderByGardenMainDescGardenSignDateAsc(userNo)
+    override fun getGardenList(userId: Long): List<GardenListItemResponse> =
+        gardenMemberRepository.findAllByUserIdOrderByIsMainDescJoinDateAsc(userId)
             .map { membership ->
-                val garden = gardenRepository.findById(membership.gardenNo)
+                val garden = gardenRepository.findById(membership.garden.id)
                     .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 가든이 없습니다.") }
                 GardenListItemResponse(
-                    garden_no = checkNotNull(garden.gardenNo),
-                    garden_title = garden.gardenTitle,
-                    garden_info = garden.gardenInfo,
-                    garden_color = garden.gardenColor,
-                    garden_members = gardenUserRepository.countByGardenNo(membership.gardenNo).toInt(),
-                    book_count = bookRepository.countByGardenNo(membership.gardenNo).toInt(),
-                    garden_created_at = formatDateTime(garden.gardenCreatedAt),
+                    garden_no = garden.id,
+                    garden_title = garden.title,
+                    garden_info = garden.info,
+                    garden_color = garden.color,
+                    garden_members = gardenMemberRepository.countByGardenId(membership.garden.id).toInt(),
+                    book_count = bookRepository.countByGardenId(membership.garden.id).toInt(),
+                    garden_created_at = formatDateTime(garden.createdAt),
                 )
             }
 
     @Transactional
-    override fun getGardenDetail(userNo: Int, gardenNo: Int): GardenDetailResponse {
-        if (!gardenUserRepository.existsByGardenNoAndUserNo(gardenNo, userNo)) {
+    override fun getGardenDetail(userId: Long, gardenNo: Long): GardenDetailResponse {
+        if (!gardenMemberRepository.existsByGardenIdAndUserId(gardenNo, userId)) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 가든이 없습니다.")
         }
 
         val garden = gardenRepository.findById(gardenNo)
             .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 가든이 없습니다.") }
-        val members = gardenUserRepository.findAllByGardenNoOrderByGardenLeaderDescGardenSignDateAsc(gardenNo)
-        val usersByNo = userRepository.findAllByUserNoIn(members.map { it.userNo })
-            .associateBy { checkNotNull(it.userNo) }
+        val members = gardenMemberRepository.findAllByGardenIdOrderByIsLeaderDescJoinDateAsc(gardenNo)
+        val usersByNo = userRepository.findAllByIdIn(members.map { it.user.id })
+            .associateBy { it.id }
 
         return GardenDetailResponse(
-            garden_no = checkNotNull(garden.gardenNo),
-            garden_title = garden.gardenTitle,
-            garden_info = garden.gardenInfo,
-            garden_color = garden.gardenColor,
-            garden_created_at = formatDateTime(garden.gardenCreatedAt),
-            book_list = bookRepository.findAllByGardenNoOrderByBookNoAsc(gardenNo)
+            garden_no = garden.id,
+            garden_title = garden.title,
+            garden_info = garden.info,
+            garden_color = garden.color,
+            garden_created_at = formatDateTime(garden.createdAt),
+            book_list = bookRepository.findAllByGardenIdOrderByIdAsc(gardenNo)
                 .map { book ->
-                    val bookNo = checkNotNull(book.bookNo)
-                    val latestRead = bookReadRepository.findTopByBookNoOrderByCreatedAtDesc(bookNo)
+                    val latestRead = bookReadRepository.findTopByBookIdOrderByCreatedAtDesc(book.id)
                     GardenDetailBookResponse(
-                        book_no = bookNo,
-                        book_isbn = book.bookIsbn,
-                        book_title = book.bookTitle,
-                        book_author = book.bookAuthor,
-                        book_publisher = book.bookPublisher,
-                        book_info = book.bookInfo,
-                        book_image_url = book.bookImageUrl,
-                        book_tree = book.bookTree,
-                        book_status = book.bookStatus,
-                        percent = latestRead?.let { calculatePercent(it.bookCurrentPage, book.bookPage) } ?: 0.0,
-                        user_no = book.userNo,
-                        book_page = book.bookPage,
+                        book_no = book.id,
+                        book_isbn = book.isbn,
+                        book_title = book.title,
+                        book_author = book.author,
+                        book_publisher = book.publisher,
+                        book_info = book.info,
+                        book_image_url = book.imageUrl,
+                        book_tree = book.tree,
+                        book_status = book.status,
+                        percent = latestRead?.let { calculatePercent(it.currentPage, book.page) } ?: 0.0,
+                        user_no = book.user.id,
+                        book_page = book.page,
                     )
                 },
             garden_members = members.map { member ->
-                val user = usersByNo[member.userNo]
+                val user = usersByNo[member.user.id]
                     ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 사용자 정보가 없습니다.")
                 GardenListMemberResponse(
-                    user_no = checkNotNull(user.userNo),
-                    user_nick = user.userNick,
-                    user_image = user.userImage,
-                    garden_leader = member.gardenLeader,
-                    garden_sign_date = formatDateTime(member.gardenSignDate),
+                    user_no = user.id,
+                    user_nick = user.nick,
+                    user_image = user.image,
+                    garden_leader = member.isLeader,
+                    garden_sign_date = formatDateTime(member.joinDate),
                 )
             },
         )

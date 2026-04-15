@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema
 @Schema(description = "가든 생성 성공 응답")
 data class CreateGardenResponse(
     @field:Schema(description = "가든 번호", example = "10")
-    val garden_no: Int,
+    val garden_no: Long,
     @field:Schema(description = "가든 제목", example = "새 가든")
     val garden_title: String,
     @field:Schema(description = "가든 소개", example = "소개")
@@ -17,7 +17,7 @@ data class CreateGardenResponse(
 @Schema(description = "가든 멤버 항목")
 data class GardenListMemberResponse(
     @field:Schema(description = "사용자 번호", example = "1")
-    val user_no: Int,
+    val user_no: Long,
     @field:Schema(description = "닉네임", example = "임의닉네임")
     val user_nick: String,
     @field:Schema(description = "프로필 이미지", example = "데이지")
@@ -31,7 +31,7 @@ data class GardenListMemberResponse(
 @Schema(description = "가든 목록 항목")
 data class GardenListItemResponse(
     @field:Schema(description = "가든 번호", example = "10")
-    val garden_no: Int,
+    val garden_no: Long,
     @field:Schema(description = "가든 제목", example = "메인 가든")
     val garden_title: String,
     @field:Schema(description = "가든 소개", example = "첫 번째")
@@ -49,7 +49,7 @@ data class GardenListItemResponse(
 @Schema(description = "가든 상세의 책 항목")
 data class GardenDetailBookResponse(
     @field:Schema(description = "책 번호", example = "1")
-    val book_no: Int,
+    val book_no: Long,
     @field:Schema(description = "ISBN13", example = "9788937462788", nullable = true)
     val book_isbn: String?,
     @field:Schema(description = "책 제목", example = "메인 책")
@@ -69,7 +69,7 @@ data class GardenDetailBookResponse(
     @field:Schema(description = "진행률", example = "25.0")
     val percent: Double,
     @field:Schema(description = "등록한 사용자 번호", example = "1")
-    val user_no: Int,
+    val user_no: Long,
     @field:Schema(description = "전체 페이지 수", example = "100")
     val book_page: Int,
 )
@@ -77,7 +77,7 @@ data class GardenDetailBookResponse(
 @Schema(description = "가든 상세 응답")
 data class GardenDetailResponse(
     @field:Schema(description = "가든 번호", example = "10")
-    val garden_no: Int,
+    val garden_no: Long,
     @field:Schema(description = "가든 제목", example = "메인 가든")
     val garden_title: String,
     @field:Schema(description = "가든 소개", example = "첫 번째")

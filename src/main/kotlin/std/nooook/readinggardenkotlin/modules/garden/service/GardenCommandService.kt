@@ -15,8 +15,10 @@ import std.nooook.readinggardenkotlin.modules.book.repository.BookRepository
 import std.nooook.readinggardenkotlin.modules.garden.controller.CreateGardenRequest
 import std.nooook.readinggardenkotlin.modules.garden.controller.CreateGardenResponse
 import std.nooook.readinggardenkotlin.modules.garden.controller.UpdateGardenRequest
+import std.nooook.readinggardenkotlin.modules.garden.entity.GardenEntity
+import std.nooook.readinggardenkotlin.modules.garden.entity.GardenMemberEntity
 import std.nooook.readinggardenkotlin.modules.garden.repository.GardenRepository
-import std.nooook.readinggardenkotlin.modules.garden.repository.GardenUserRepository
+import std.nooook.readinggardenkotlin.modules.garden.repository.GardenMemberRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoImageRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
 
@@ -24,7 +26,7 @@ import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
 class GardenCommandService(
     private val userRepository: UserRepository,
     private val gardenRepository: GardenRepository,
-    private val gardenUserRepository: GardenUserRepository,
+    private val gardenMemberRepository: GardenMemberRepository,
     private val bookRepository: BookRepository,
     private val bookReadRepository: BookReadRepository,
     private val bookImageRepository: BookImageRepository,
@@ -34,35 +36,35 @@ class GardenCommandService(
 ) {
     @Transactional
     fun createGarden(
-        userNo: Int,
+        userId: Long,
         request: CreateGardenRequest,
     ): CreateGardenResponse {
-        userRepository.findByUserNoForUpdate(userNo)
+        val user = userRepository.findByIdForUpdate(userId)
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 사용자 정보가 없습니다.")
 
-        if (gardenUserRepository.countByUserNo(userNo) >= MAX_GARDEN_COUNT) {
+        if (gardenMemberRepository.countByUserId(userId) >= MAX_GARDEN_COUNT) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "가든 생성 개수 초과")
         }
 
         val garden = gardenRepository.save(
-            std.nooook.readinggardenkotlin.modules.garden.entity.GardenEntity(
-                gardenTitle = request.garden_title,
-                gardenInfo = request.garden_info,
-                gardenColor = request.garden_color,
+            GardenEntity(
+                title = request.garden_title,
+                info = request.garden_info,
+                color = request.garden_color,
             ),
         )
 
-        gardenUserRepository.save(
-            std.nooook.readinggardenkotlin.modules.garden.entity.GardenUserEntity(
-                gardenNo = garden.gardenNo ?: throw IllegalStateException("Garden id was not generated"),
-                userNo = userNo,
-                gardenLeader = true,
-                gardenMain = true,
+        gardenMemberRepository.save(
+            GardenMemberEntity(
+                garden = garden,
+                user = user,
+                isLeader = true,
+                isMain = true,
             ),
         )
 
         return CreateGardenResponse(
-            garden_no = garden.gardenNo ?: throw IllegalStateException("Garden id was not generated"),
+            garden_no = garden.id,
             garden_title = request.garden_title,
             garden_info = request.garden_info,
             garden_color = request.garden_color,
@@ -71,54 +73,54 @@ class GardenCommandService(
 
     @Transactional
     fun updateGarden(
-        userNo: Int,
-        gardenNo: Int,
+        userId: Long,
+        gardenNo: Long,
         request: UpdateGardenRequest,
     ): String {
-        logger.debug("updateGarden: userNo={}, gardenNo={}, request={}", userNo, gardenNo, request)
+        logger.debug("updateGarden: userId={}, gardenNo={}, request={}", userId, gardenNo, request)
         val garden = gardenRepository.findById(gardenNo)
             .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 가든이 없습니다.") }
-        val membership = gardenUserRepository.findByGardenNoAndUserNo(gardenNo, userNo)
+        val membership = gardenMemberRepository.findByGardenIdAndUserId(gardenNo, userId)
             ?: throw ResponseStatusException(HttpStatus.FORBIDDEN, "가든 수정 불가")
 
-        if (!membership.gardenLeader) {
+        if (!membership.isLeader) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "가든 수정 불가")
         }
 
-        garden.gardenTitle = request.garden_title
-        garden.gardenInfo = request.garden_info
-        garden.gardenColor = request.garden_color
+        garden.title = request.garden_title
+        garden.info = request.garden_info
+        garden.color = request.garden_color
         gardenRepository.save(garden)
         return "가든 수정 성공"
     }
 
     @Transactional
     fun deleteGarden(
-        userNo: Int,
-        gardenNo: Int,
+        userId: Long,
+        gardenNo: Long,
     ): String {
-        userRepository.findByUserNoForUpdate(userNo)
+        userRepository.findByIdForUpdate(userId)
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 사용자 정보가 없습니다.")
-        val garden = gardenRepository.findByGardenNoForUpdate(gardenNo)
+        val garden = gardenRepository.findByIdForUpdate(gardenNo)
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 가든이 없습니다.")
 
-        val membership = gardenUserRepository.findByGardenNoAndUserNo(gardenNo, userNo)
+        val membership = gardenMemberRepository.findByGardenIdAndUserId(gardenNo, userId)
             ?: throw ResponseStatusException(HttpStatus.FORBIDDEN, "가든 삭제 불가")
-        if (!membership.gardenLeader) {
+        if (!membership.isLeader) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "가든 삭제 불가")
         }
-        if (gardenUserRepository.countByGardenNo(gardenNo) > 1) {
+        if (gardenMemberRepository.countByGardenId(gardenNo) > 1) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "가든 삭제 불가")
         }
-        if (gardenUserRepository.countByUserNo(userNo) <= 1) {
+        if (gardenMemberRepository.countByUserId(userId) <= 1) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "가든 삭제 불가")
         }
 
         val stagedDeletes = mutableListOf<ImageStorage.StagedDelete>()
         try {
-            deleteOwnedGardenResources(userNo, gardenNo, stagedDeletes)
-            gardenUserRepository.delete(membership)
-            gardenUserRepository.flush()
+            deleteOwnedGardenResources(userId, gardenNo, stagedDeletes)
+            gardenMemberRepository.delete(membership)
+            gardenMemberRepository.flush()
             gardenRepository.delete(garden)
             finalizeStagedDeletes(stagedDeletes)
             return "가든 삭제 성공"
@@ -133,9 +135,9 @@ class GardenCommandService(
 
     @Transactional
     fun moveGardenBook(
-        userNo: Int,
-        gardenNo: Int,
-        toGardenNo: Int,
+        userId: Long,
+        gardenNo: Long,
+        toGardenNo: Long,
     ): String {
         lockGardensInDeterministicOrder(gardenNo, toGardenNo)
 
@@ -143,20 +145,20 @@ class GardenCommandService(
             .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 가든이 없습니다.") }
         val destinationGarden = gardenRepository.findById(toGardenNo)
             .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 도착지 가든이 없습니다.") }
-        if (gardenUserRepository.findByGardenNoAndUserNo(gardenNo, userNo) == null ||
-            gardenUserRepository.findByGardenNoAndUserNo(toGardenNo, userNo) == null
+        if (gardenMemberRepository.findByGardenIdAndUserId(gardenNo, userId) == null ||
+            gardenMemberRepository.findByGardenIdAndUserId(toGardenNo, userId) == null
         ) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "가든 옮기기 불가")
         }
 
-        val movableBookCount = bookRepository.countByUserNoAndGardenNo(userNo, gardenNo)
-        val destinationBookCount = bookRepository.countByGardenNo(toGardenNo)
+        val movableBookCount = bookRepository.countByUserIdAndGardenId(userId, gardenNo)
+        val destinationBookCount = bookRepository.countByGardenId(toGardenNo)
         if (destinationBookCount + movableBookCount > MAX_GARDEN_BOOK_COUNT) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "가든 옮기기 불가")
         }
 
-        bookRepository.findAllByUserNoAndGardenNo(userNo, gardenNo).forEach { book ->
-            book.gardenNo = checkNotNull(destinationGarden.gardenNo)
+        bookRepository.findAllByUserIdAndGardenId(userId, gardenNo).forEach { book ->
+            book.garden = destinationGarden
             bookRepository.save(book)
         }
         return "가든 책 이동 성공"
@@ -164,71 +166,69 @@ class GardenCommandService(
 
     @Transactional
     fun updateGardenMain(
-        userNo: Int,
-        gardenNo: Int,
+        userId: Long,
+        gardenNo: Long,
     ): String {
-        userRepository.findByUserNoForUpdate(userNo)
+        userRepository.findByIdForUpdate(userId)
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 사용자 정보가 없습니다.")
 
         if (!gardenRepository.existsById(gardenNo)) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 가든이 없습니다.")
         }
 
-        val targetMembership = gardenUserRepository.findByGardenNoAndUserNo(gardenNo, userNo)
+        val targetMembership = gardenMemberRepository.findByGardenIdAndUserId(gardenNo, userId)
             ?: throw ResponseStatusException(HttpStatus.FORBIDDEN, "가든 메인 변경 불가")
 
-        gardenUserRepository.findAllByUserNo(userNo)
-            .filter { it.gardenMain && it.id != targetMembership.id }
+        gardenMemberRepository.findAllByUserId(userId)
+            .filter { it.isMain && it.id != targetMembership.id }
             .forEach { membership ->
-                membership.gardenMain = false
-                gardenUserRepository.save(membership)
+                membership.isMain = false
+                gardenMemberRepository.save(membership)
             }
 
-        if (!targetMembership.gardenMain) {
-            targetMembership.gardenMain = true
-            gardenUserRepository.save(targetMembership)
+        if (!targetMembership.isMain) {
+            targetMembership.isMain = true
+            gardenMemberRepository.save(targetMembership)
         }
 
         return "가든 메인 변경 성공"
     }
 
     private fun lockGardensInDeterministicOrder(
-        firstGardenNo: Int,
-        secondGardenNo: Int,
+        firstGardenNo: Long,
+        secondGardenNo: Long,
     ) {
         listOf(firstGardenNo, secondGardenNo)
             .distinct()
             .sorted()
             .forEach { gardenNo ->
-                val lockedGarden = gardenRepository.findByGardenNoForUpdate(gardenNo)
+                val lockedGarden = gardenRepository.findByIdForUpdate(gardenNo)
                     ?: throw if (gardenNo == secondGardenNo) {
                         ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 도착지 가든이 없습니다.")
                     } else {
                         ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 가든이 없습니다.")
                     }
-                checkNotNull(lockedGarden.gardenNo)
             }
     }
 
     private fun deleteOwnedGardenResources(
-        userNo: Int,
-        gardenNo: Int,
+        userId: Long,
+        gardenNo: Long,
         stagedDeletes: MutableList<ImageStorage.StagedDelete>,
     ) {
-        bookRepository.findAllByUserNoAndGardenNo(userNo, gardenNo).forEach { book ->
-            val bookNo = checkNotNull(book.bookNo)
-            bookReadRepository.deleteAllByBookNo(bookNo)
+        bookRepository.findAllByUserIdAndGardenId(userId, gardenNo).forEach { book ->
+            bookReadRepository.deleteAllByBookId(book.id)
 
-            bookImageRepository.findAllByBookNo(bookNo).forEach { image ->
-                stagedDeletes += imageStorage.stageDelete(image.imageUrl)
+            bookImageRepository.findAllByBookId(book.id).forEach { image ->
+                stagedDeletes += imageStorage.stageDelete(image.url)
                 bookImageRepository.delete(image)
             }
 
-            val memos = memoRepository.findAllByBookNo(bookNo)
-            val memoIds = memos.mapNotNull { it.id }
+            val memos = memoRepository.findAllByBookId(book.id)
+            val memoIds = memos.map { it.id }
             if (memoIds.isNotEmpty()) {
-                memoImageRepository.findAllByMemoNoIn(memoIds).forEach { memoImage ->
-                    stagedDeletes += imageStorage.stageDelete(memoImage.imageUrl)
+                memoImageRepository.findAllByMemoIdIn(memoIds).forEach { memoImage ->
+                    stagedDeletes += imageStorage.stageDelete(memoImage.url)
                     memoImageRepository.delete(memoImage)
                 }
             }

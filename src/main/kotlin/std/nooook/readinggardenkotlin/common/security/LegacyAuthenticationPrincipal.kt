@@ -1,6 +1,6 @@
 package std.nooook.readinggardenkotlin.common.security
 
 data class LegacyAuthenticationPrincipal(
-    val userNo: Long,
+    val userId: Long,
     val userNick: String,
 )

@@ -7,10 +7,10 @@ spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:default}
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://${DB_HOST:localhost}:3306/${DB_NAME:reading_garden}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
-    username: ${SPRING_DATASOURCE_USERNAME:${DB_USER:root}}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:reading_garden}}
+    username: ${SPRING_DATASOURCE_USERNAME:${DB_USER:book}}
     password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD:}}
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:4}
       minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:1}
@@ -18,8 +18,9 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
-      naming:
-        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
   mvc:
     problemdetails:
       enabled: true
@@ -48,6 +49,6 @@ app:
     account: ${APP_EMAIL_ACCOUNT:${EMAIL_ACCOUNT:}}
     password: ${APP_EMAIL_PASSWORD:${EMAIL_PASSWORD:}}
   storage:
-    images-root: ${APP_STORAGE_IMAGES_ROOT:/srv/Back/images}
+    images-root: ${APP_STORAGE_IMAGES_ROOT:/opt/reading-garden/data/images}
   integrations:
     aladin-ttbkey: ${APP_ALADIN_TTBKEY:${ALADIN_TTBKEY:}}
