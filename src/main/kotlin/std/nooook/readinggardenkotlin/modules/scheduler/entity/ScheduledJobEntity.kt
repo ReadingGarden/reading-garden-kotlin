@@ -8,6 +8,8 @@ import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 import java.time.OffsetDateTime
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import std.nooook.readinggardenkotlin.modules.auth.entity.UserEntity
 
 @Entity
@@ -23,6 +25,7 @@ class ScheduledJobEntity(
     var targetUser: UserEntity? = null,
     @Column(nullable = false)
     var scheduledAt: OffsetDateTime = OffsetDateTime.now(),
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "JSONB")
     var payload: String? = null,
     @Column(nullable = false)

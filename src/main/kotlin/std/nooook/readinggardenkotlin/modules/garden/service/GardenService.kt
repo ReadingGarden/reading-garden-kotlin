@@ -11,7 +11,7 @@ class GardenService(
 ) {
     @Transactional
     fun createGarden(
-        userNo: Int,
+        userId: Long,
         request: CreateGardenRequest,
-    ): CreateGardenResponse = gardenCommandService.createGarden(userNo, request)
+    ): CreateGardenResponse = gardenCommandService.createGarden(userId, request)
 }

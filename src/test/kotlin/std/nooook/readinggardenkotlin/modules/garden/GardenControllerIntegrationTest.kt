@@ -15,6 +15,8 @@ import org.mockito.Mockito.verifyNoMoreInteractions
 import org.mockito.ArgumentMatchers.anyString
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.context.annotation.Import
+import std.nooook.readinggardenkotlin.TestcontainersConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
@@ -65,6 +67,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.springframework.web.server.ResponseStatusException
 
+@Import(TestcontainersConfiguration::class)
 @SpringBootTest
 @AutoConfigureMockMvc
 class GardenControllerIntegrationTest(
@@ -963,17 +966,18 @@ class GardenControllerIntegrationTest(
         val user = checkNotNull(userRepository.findByEmail("gardendeletelast@example.com"))
         val userNo = user.id
         val targetMembership = gardenMemberRepository.findAllByUserId(userNo).single()
+        val gardenId = targetMembership.garden.id
 
         mockMvc.perform(
             delete("/api/v1/garden/")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                .queryParam("garden_no", targetMembership.id.toString()),
+                .queryParam("garden_no", gardenId.toString()),
         )
             .andExpect(status().isForbidden)
             .andExpect(jsonPath("$.resp_code").value(403))
             .andExpect(jsonPath("$.resp_msg").value("가든 삭제 불가"))
 
-        assertTrue(gardenRepository.existsById(targetMembership.id))
+        assertTrue(gardenRepository.existsById(gardenId))
         assertEquals(1L, gardenMemberRepository.countByUserId(userNo))
     }
 
@@ -1261,18 +1265,19 @@ class GardenControllerIntegrationTest(
         val user = checkNotNull(userRepository.findByEmail("gardenleavealone@example.com"))
         val userNo = user.id
         val targetMembership = gardenMemberRepository.findAllByUserId(userNo).single()
+        val gardenId = targetMembership.garden.id
 
         mockMvc.perform(
             delete("/api/v1/garden/member")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                .queryParam("garden_no", targetMembership.id.toString()),
+                .queryParam("garden_no", gardenId.toString()),
         )
             .andExpect(status().isForbidden)
             .andExpect(jsonPath("$.resp_code").value(403))
             .andExpect(jsonPath("$.resp_msg").value("가든 탈퇴 불가"))
 
-        assertTrue(gardenRepository.existsById(targetMembership.id))
-        assertEquals(1L, gardenMemberRepository.countByGardenId(targetMembership.id))
+        assertTrue(gardenRepository.existsById(gardenId))
+        assertEquals(1L, gardenMemberRepository.countByGardenId(gardenId))
     }
 
     @Test
@@ -1504,8 +1509,8 @@ class GardenControllerIntegrationTest(
             .andExpect(jsonPath("$.resp_code").value(200))
             .andExpect(jsonPath("$.resp_msg").value("가든 책 이동 성공"))
 
-        assertEquals(destinationGardenNo, bookRepository.findById(checkNotNull(callerBook.id)).orElseThrow().id)
-        assertEquals(sourceGardenNo, bookRepository.findById(checkNotNull(teammateBook.id)).orElseThrow().id)
+        assertEquals(destinationGardenNo, bookRepository.findById(checkNotNull(callerBook.id)).orElseThrow().garden?.id)
+        assertEquals(sourceGardenNo, bookRepository.findById(checkNotNull(teammateBook.id)).orElseThrow().garden?.id)
     }
 
     @Test
@@ -1695,7 +1700,7 @@ class GardenControllerIntegrationTest(
         assertFalse(refreshedCurrentMain.isMain)
         assertTrue(refreshedTargetMembership.isMain)
         assertEquals(1, mainMemberships.size)
-        assertEquals(targetGardenNo, mainMemberships.single().id)
+        assertEquals(targetGardenNo, mainMemberships.single().garden.id)
     }
 
     @Test
@@ -1777,7 +1782,7 @@ class GardenControllerIntegrationTest(
 
             val mainMemberships = gardenMemberRepository.findAllByUserId(userNo).filter { it.isMain }
             assertEquals(1, mainMemberships.size)
-            assertTrue(mainMemberships.single().id == candidateGardenANo || mainMemberships.single().id == candidateGardenBNo)
+            assertTrue(mainMemberships.single().garden.id == candidateGardenANo || mainMemberships.single().garden.id == candidateGardenBNo)
             assertFalse(gardenMemberRepository.findByGardenIdAndUserId(originalMainGardenNo, userNo)?.isMain ?: true)
         } finally {
             executor.shutdownNow()

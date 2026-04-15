@@ -56,7 +56,7 @@ class MemoController(
             resp_code = 200,
             resp_msg = "메모 리스트 조회 성공",
             data = memoService.getMemoList(
-                userNo = principal.userNo.toInt(),
+                userId = principal.userId,
                 page = page,
                 pageSize = pageSize,
             ),
@@ -77,13 +77,13 @@ class MemoController(
     fun getMemoDetail(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "조회할 메모 id", example = "1")
-        @RequestParam id: Int,
+        @RequestParam id: Long,
     ): LegacyDataResponse<MemoDetailResponse> =
         LegacyDataResponse(
             resp_code = 200,
             resp_msg = "메모 상세 조회 성공",
             data = memoQueryService.getMemoDetail(
-                userNo = principal.userNo.toInt(),
+                userId = principal.userId,
                 id = id,
             ),
         )
@@ -107,7 +107,7 @@ class MemoController(
                 resp_code = 201,
                 resp_msg = "메모 추가 성공",
                 data = memoCommandService.createMemo(
-                    userNo = principal.userNo.toInt(),
+                    userId = principal.userId,
                     request = request,
                 ),
             ),
@@ -126,12 +126,12 @@ class MemoController(
     fun updateMemo(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "수정할 메모 id", example = "1")
-        @RequestParam id: Int,
+        @RequestParam id: Long,
         @RequestBody request: UpdateMemoRequest,
     ): LegacyHttpResponse =
         LegacyResponses.ok(
             memoCommandService.updateMemo(
-                userNo = principal.userNo.toInt(),
+                userId = principal.userId,
                 id = id,
                 request = request,
             ),
@@ -143,11 +143,11 @@ class MemoController(
     fun deleteMemo(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "삭제할 메모 id", example = "1")
-        @RequestParam id: Int,
+        @RequestParam id: Long,
     ): LegacyHttpResponse =
         LegacyResponses.ok(
             memoCommandService.deleteMemo(
-                userNo = principal.userNo.toInt(),
+                userId = principal.userId,
                 id = id,
             ),
         )
@@ -184,7 +184,7 @@ class MemoController(
     fun uploadMemoImage(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "이미지를 연결할 메모 id", example = "1")
-        @RequestParam id: Int,
+        @RequestParam id: Long,
         @Parameter(description = "업로드할 이미지 파일", required = true)
         @RequestParam(name = "file") file: MultipartFile,
     ): ResponseEntity<LegacyHttpResponse> =
@@ -201,7 +201,7 @@ class MemoController(
     fun deleteMemoImage(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "이미지를 삭제할 메모 id", example = "1")
-        @RequestParam id: Int,
+        @RequestParam id: Long,
     ): ResponseEntity<LegacyHttpResponse> =
         ResponseEntity.status(HttpStatus.CREATED).body(
             LegacyResponses.error(
@@ -216,11 +216,11 @@ class MemoController(
     fun toggleMemoLike(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "좋아요를 토글할 메모 id", example = "1")
-        @RequestParam id: Int,
+        @RequestParam id: Long,
     ): LegacyHttpResponse =
         LegacyResponses.ok(
             memoCommandService.toggleMemoLike(
-                userNo = principal.userNo.toInt(),
+                userId = principal.userId,
                 id = id,
             ),
         )

@@ -8,6 +8,8 @@ import org.mockito.BDDMockito.given
 import org.mockito.Mockito.verify
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.context.annotation.Import
+import std.nooook.readinggardenkotlin.TestcontainersConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
@@ -24,17 +26,18 @@ import std.nooook.readinggardenkotlin.modules.book.repository.BookImageRepositor
 import std.nooook.readinggardenkotlin.modules.book.repository.BookReadRepository
 import std.nooook.readinggardenkotlin.modules.book.repository.BookRepository
 import std.nooook.readinggardenkotlin.modules.garden.repository.GardenRepository
-import std.nooook.readinggardenkotlin.modules.garden.repository.GardenUserRepository
+import std.nooook.readinggardenkotlin.modules.garden.repository.GardenMemberRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoImageRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
 import std.nooook.readinggardenkotlin.modules.push.integration.FcmClient
-import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
+import std.nooook.readinggardenkotlin.modules.push.repository.PushSettingsRepository
 import java.time.Clock
 import java.time.LocalDateTime
 import java.time.ZoneId
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
+@Import(TestcontainersConfiguration::class)
 @SpringBootTest
 @AutoConfigureMockMvc
 class PushControllerIntegrationTest(
@@ -45,10 +48,10 @@ class PushControllerIntegrationTest(
     @Autowired private val bookReadRepository: BookReadRepository,
     @Autowired private val bookImageRepository: BookImageRepository,
     @Autowired private val gardenRepository: GardenRepository,
-    @Autowired private val gardenUserRepository: GardenUserRepository,
+    @Autowired private val gardenMemberRepository: GardenMemberRepository,
     @Autowired private val memoRepository: MemoRepository,
     @Autowired private val memoImageRepository: MemoImageRepository,
-    @Autowired private val pushRepository: PushRepository,
+    @Autowired private val pushSettingsRepository: PushSettingsRepository,
 ) {
     @MockitoBean
     private lateinit var fcmClient: FcmClient
@@ -64,8 +67,8 @@ class PushControllerIntegrationTest(
         bookReadRepository.deleteAll()
         bookImageRepository.deleteAll()
         bookRepository.deleteAll()
-        pushRepository.deleteAll()
-        gardenUserRepository.deleteAll()
+        pushSettingsRepository.deleteAll()
+        gardenMemberRepository.deleteAll()
         gardenRepository.deleteAll()
         memoImageRepository.deleteAll()
         memoRepository.deleteAll()
@@ -86,12 +89,12 @@ class PushControllerIntegrationTest(
 
         val signupBody = objectMapper.readTree(signupResponse.response.contentAsString)
         val accessToken = signupBody.path("data").path("access_token").asText()
-        val user = assertNotNull(userRepository.findByUserEmail("push_it@example.com"))
-        val userNo = assertNotNull(user.userNo)
-        val push = assertNotNull(pushRepository.findByUserNo(userNo))
+        val user = assertNotNull(userRepository.findByEmail("push_it@example.com"))
+        val userNo = assertNotNull(user.id)
+        val push = assertNotNull(pushSettingsRepository.findByUserId(userNo))
 
-        assertEquals(true, push.pushAppOk)
-        assertEquals(false, push.pushBookOk)
+        assertEquals(true, push.appOk)
+        assertEquals(false, push.bookOk)
         assertEquals(null, push.pushTime)
 
         mockMvc.perform(
@@ -121,8 +124,8 @@ class PushControllerIntegrationTest(
             .path("access_token")
             .asText()
 
-        val user = assertNotNull(userRepository.findByUserEmail("push_book@example.com"))
-        val userNo = assertNotNull(user.userNo)
+        val user = assertNotNull(userRepository.findByEmail("push_book@example.com"))
+        val userNo = assertNotNull(user.id)
 
         mockMvc.perform(
             put("/api/v1/push/")
@@ -134,9 +137,9 @@ class PushControllerIntegrationTest(
             .andExpect(jsonPath("$.resp_code").value(200))
             .andExpect(jsonPath("$.resp_msg").value("푸시 알림 수정 성공"))
 
-        val push = assertNotNull(pushRepository.findByUserNo(userNo))
-        assertEquals(true, push.pushAppOk)
-        assertEquals(true, push.pushBookOk)
+        val push = assertNotNull(pushSettingsRepository.findByUserId(userNo))
+        assertEquals(true, push.appOk)
+        assertEquals(true, push.bookOk)
         assertEquals(null, push.pushTime)
     }
 
@@ -155,8 +158,8 @@ class PushControllerIntegrationTest(
             .path("access_token")
             .asText()
 
-        val user = assertNotNull(userRepository.findByUserEmail("push_time@example.com"))
-        val userNo = assertNotNull(user.userNo)
+        val user = assertNotNull(userRepository.findByEmail("push_time@example.com"))
+        val userNo = assertNotNull(user.id)
         val expectedPushTime = LocalDateTime.of(2026, 4, 6, 12, 30, 0)
 
         mockMvc.perform(
@@ -169,9 +172,9 @@ class PushControllerIntegrationTest(
             .andExpect(jsonPath("$.resp_code").value(200))
             .andExpect(jsonPath("$.resp_msg").value("푸시 알림 수정 성공"))
 
-        val push = assertNotNull(pushRepository.findByUserNo(userNo))
-        assertEquals(true, push.pushAppOk)
-        assertEquals(false, push.pushBookOk)
+        val push = assertNotNull(pushSettingsRepository.findByUserId(userNo))
+        assertEquals(true, push.appOk)
+        assertEquals(false, push.bookOk)
         assertEquals(expectedPushTime, push.pushTime)
     }
 
@@ -186,7 +189,7 @@ class PushControllerIntegrationTest(
         given(
             fcmClient.sendToMany(
                 listOf("book-valid-token"),
-                "💧물 주는 시간이에요!",
+                "\uD83D\uDCA7물 주는 시간이에요!",
                 "책 어디까지 읽으셨나요? 독서가든에서 기록해보세요!",
                 emptyMap(),
             ),
@@ -199,11 +202,11 @@ class PushControllerIntegrationTest(
         val wrongTimeUserNo = signupAndGetUserNo("book_wrongtime@example.com", "book-wrong-time-token")
         val blankTokenUserNo = signupAndGetUserNo("book_blank@example.com", "   ")
 
-        updatePushSettings(validUserNo, pushAppOk = false, pushBookOk = true, pushTime = fixedNow)
-        updatePushSettings(pushDisabledUserNo, pushAppOk = true, pushBookOk = false, pushTime = fixedNow)
-        updatePushSettings(timeMissingUserNo, pushAppOk = true, pushBookOk = true, pushTime = null)
-        updatePushSettings(wrongTimeUserNo, pushAppOk = true, pushBookOk = true, pushTime = fixedNow.plusMinutes(1))
-        updatePushSettings(blankTokenUserNo, pushAppOk = true, pushBookOk = true, pushTime = fixedNow)
+        updatePushSettings(validUserNo, appOk = false, bookOk = true, pushTime = fixedNow)
+        updatePushSettings(pushDisabledUserNo, appOk = true, bookOk = false, pushTime = fixedNow)
+        updatePushSettings(timeMissingUserNo, appOk = true, bookOk = true, pushTime = null)
+        updatePushSettings(wrongTimeUserNo, appOk = true, bookOk = true, pushTime = fixedNow.plusMinutes(1))
+        updatePushSettings(blankTokenUserNo, appOk = true, bookOk = true, pushTime = fixedNow)
 
         mockMvc.perform(
             post("/api/v1/push/book")
@@ -217,7 +220,7 @@ class PushControllerIntegrationTest(
 
         verify(fcmClient).sendToMany(
             listOf("book-valid-token"),
-            "💧물 주는 시간이에요!",
+            "\uD83D\uDCA7물 주는 시간이에요!",
             "책 어디까지 읽으셨나요? 독서가든에서 기록해보세요!",
             emptyMap(),
         )
@@ -237,15 +240,15 @@ class PushControllerIntegrationTest(
 
         val senderEmail = "notice_sender@example.com"
         val accessToken = signupAndGetAccessToken(senderEmail, "sender-token")
-        val senderUserNo = assertNotNull(userRepository.findByUserEmail(senderEmail)?.userNo)
+        val senderUserNo = assertNotNull(userRepository.findByEmail(senderEmail)?.id)
         val validUserNo = signupAndGetUserNo("notice_valid@example.com", " notice-valid-token ")
         val appDisabledUserNo = signupAndGetUserNo("notice_disabled@example.com", "notice-disabled-token")
         val blankTokenUserNo = signupAndGetUserNo("notice_blank@example.com", "   ")
 
-        updatePushSettings(senderUserNo, pushAppOk = false, pushBookOk = false, pushTime = null)
-        updatePushSettings(validUserNo, pushAppOk = true, pushBookOk = false, pushTime = null)
-        updatePushSettings(appDisabledUserNo, pushAppOk = false, pushBookOk = true, pushTime = LocalDateTime.now())
-        updatePushSettings(blankTokenUserNo, pushAppOk = true, pushBookOk = true, pushTime = LocalDateTime.now())
+        updatePushSettings(senderUserNo, appOk = false, bookOk = false, pushTime = null)
+        updatePushSettings(validUserNo, appOk = true, bookOk = false, pushTime = null)
+        updatePushSettings(appDisabledUserNo, appOk = false, bookOk = true, pushTime = LocalDateTime.now())
+        updatePushSettings(blankTokenUserNo, appOk = true, bookOk = true, pushTime = LocalDateTime.now())
 
         mockMvc.perform(
             post("/api/v1/push/notice")
@@ -289,21 +292,21 @@ class PushControllerIntegrationTest(
     private fun signupAndGetUserNo(
         email: String,
         fcmToken: String,
-    ): Int {
+    ): Long {
         signupAndGetAccessToken(email, fcmToken)
-        return assertNotNull(userRepository.findByUserEmail(email)?.userNo)
+        return assertNotNull(userRepository.findByEmail(email)?.id)
     }
 
     private fun updatePushSettings(
-        userNo: Int,
-        pushAppOk: Boolean,
-        pushBookOk: Boolean,
+        userNo: Long,
+        appOk: Boolean,
+        bookOk: Boolean,
         pushTime: LocalDateTime?,
     ) {
-        val push = assertNotNull(pushRepository.findByUserNo(userNo))
-        push.pushAppOk = pushAppOk
-        push.pushBookOk = pushBookOk
+        val push = assertNotNull(pushSettingsRepository.findByUserId(userNo))
+        push.appOk = appOk
+        push.bookOk = bookOk
         push.pushTime = pushTime
-        pushRepository.save(push)
+        pushSettingsRepository.save(push)
     }
 }

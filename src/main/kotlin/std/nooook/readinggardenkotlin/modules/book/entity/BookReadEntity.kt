@@ -27,5 +27,5 @@ class BookReadEntity(
     @Column(nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),
 ) {
-    protected constructor() : this(book = BookEntity())
+    protected constructor() : this(book = BookEntity(user = std.nooook.readinggardenkotlin.modules.auth.entity.UserEntity()))
 }

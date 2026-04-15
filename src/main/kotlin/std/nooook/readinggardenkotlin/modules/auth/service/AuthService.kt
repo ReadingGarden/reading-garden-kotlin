@@ -19,13 +19,13 @@ import std.nooook.readinggardenkotlin.modules.book.repository.BookImageRepositor
 import std.nooook.readinggardenkotlin.modules.book.repository.BookRepository
 import std.nooook.readinggardenkotlin.modules.book.repository.BookReadRepository
 import std.nooook.readinggardenkotlin.modules.garden.entity.GardenEntity
-import std.nooook.readinggardenkotlin.modules.garden.entity.GardenUserEntity
+import std.nooook.readinggardenkotlin.modules.garden.entity.GardenMemberEntity
 import std.nooook.readinggardenkotlin.modules.garden.repository.GardenRepository
-import std.nooook.readinggardenkotlin.modules.garden.repository.GardenUserRepository
+import std.nooook.readinggardenkotlin.modules.garden.repository.GardenMemberRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoImageRepository
 import std.nooook.readinggardenkotlin.modules.memo.repository.MemoRepository
-import std.nooook.readinggardenkotlin.modules.push.entity.PushEntity
-import std.nooook.readinggardenkotlin.modules.push.repository.PushRepository
+import std.nooook.readinggardenkotlin.modules.push.entity.PushSettingsEntity
+import std.nooook.readinggardenkotlin.modules.push.repository.PushSettingsRepository
 import std.nooook.readinggardenkotlin.modules.scheduler.service.AuthPasswordResetExpiryJobService
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -35,8 +35,8 @@ class AuthService(
     private val userRepository: UserRepository,
     private val refreshTokenRepository: RefreshTokenRepository,
     private val gardenRepository: GardenRepository,
-    private val gardenUserRepository: GardenUserRepository,
-    private val pushRepository: PushRepository,
+    private val gardenMemberRepository: GardenMemberRepository,
+    private val pushSettingsRepository: PushSettingsRepository,
     private val bookRepository: BookRepository,
     private val bookReadRepository: BookReadRepository,
     private val bookImageRepository: BookImageRepository,
@@ -53,38 +53,37 @@ class AuthService(
 
         val user = userRepository.save(
             UserEntity(
-                userEmail = request.user_email,
-                userPassword = request.user_password.takeIf { it.isNotBlank() }?.let(::encodePassword).orEmpty(),
-                userNick = generateRandomNick(),
-                userImage = DEFAULT_USER_IMAGE,
-                userFcm = request.user_fcm,
-                userSocialId = request.user_social_id,
-                userSocialType = request.user_social_type,
+                email = request.user_email,
+                password = request.user_password.takeIf { it.isNotBlank() }?.let(::encodePassword).orEmpty(),
+                nick = generateRandomNick(),
+                image = DEFAULT_USER_IMAGE,
+                fcm = request.user_fcm,
+                socialId = request.user_social_id,
+                socialType = request.user_social_type,
             ),
         )
 
-        val userNo = user.userNo ?: throw IllegalStateException("User id was not generated")
         val garden = gardenRepository.save(
             GardenEntity(
-                gardenTitle = "${user.userNick}의 가든",
-                gardenInfo = "독서가든에 오신걸 환영합니다☺️",
-                gardenColor = "green",
+                title = "${user.nick}의 가든",
+                info = "독서가든에 오신걸 환영합니다☺️",
+                color = "green",
             ),
         )
 
-        gardenUserRepository.save(
-            GardenUserEntity(
-                gardenNo = garden.gardenNo ?: throw IllegalStateException("Garden id was not generated"),
-                userNo = userNo,
-                gardenLeader = true,
-                gardenMain = true,
+        gardenMemberRepository.save(
+            GardenMemberEntity(
+                garden = garden,
+                user = user,
+                isLeader = true,
+                isMain = true,
             ),
         )
 
-        pushRepository.save(
-            PushEntity(
-                userNo = userNo,
-                pushAppOk = true,
+        pushSettingsRepository.save(
+            PushSettingsEntity(
+                user = user,
+                appOk = true,
             ),
         )
 
@@ -92,7 +91,7 @@ class AuthService(
         return SignupResponse(
             access_token = tokenPair["access_token"].orEmpty(),
             refresh_token = tokenPair["refresh_token"].orEmpty(),
-            user_nick = user.userNick,
+            user_nick = user.nick,
         )
     }
 
@@ -112,27 +111,27 @@ class AuthService(
         socialType: String,
     ): Map<String, String> {
         val user = if (socialId.isNotBlank()) {
-            userRepository.findByUserSocialIdAndUserSocialType(socialId, socialType)
+            userRepository.findBySocialIdAndSocialType(socialId, socialType)
                 ?: throw badRequest("등록되지 않은 소셜입니다")
         } else {
-            val foundUser = userRepository.findByUserEmail(email)
+            val foundUser = userRepository.findByEmail(email)
                 ?: throw badRequest("등록되지 않은 이메일 주소입니다.")
-            if (!passwordEncoder.matches(password, foundUser.userPassword)) {
+            if (!passwordEncoder.matches(password, foundUser.password)) {
                 throw badRequest("비밀번호가 일치하지 않습니다.")
             }
             foundUser
         }
 
-        user.userFcm = fcmToken
+        user.fcm = fcmToken
         userRepository.save(user)
         return persistRefreshToken(user)
     }
 
     @Transactional
-    fun logout(userNo: Int) {
-        val user = requireUser(userNo)
-        refreshTokenRepository.deleteAllByUserNo(userNo)
-        user.userFcm = ""
+    fun logout(userId: Long) {
+        val user = requireUser(userId)
+        refreshTokenRepository.deleteAllByUserId(userId)
+        user.fcm = ""
         userRepository.save(user)
     }
 
@@ -140,9 +139,9 @@ class AuthService(
     fun refresh(refreshToken: String): String =
         try {
             val claims = jwtService.parseRefreshToken(refreshToken)
-            val userNo = (claims["user_no"] as? Number)?.toInt()
+            val userId = (claims["user_no"] as? Number)?.toLong()
                 ?: throw unauthorized("Unauthorized")
-            val storedToken = refreshTokenRepository.findByUserNoAndToken(userNo, refreshToken)
+            val storedToken = refreshTokenRepository.findByUserIdAndToken(userId, refreshToken)
                 ?: throw unauthorized("Unauthorized")
 
             if (storedToken.exp?.isBefore(LocalDateTime.now(UTC_ZONE_OFFSET)) == true) {
@@ -150,7 +149,7 @@ class AuthService(
                 throw unauthorized("Unauthorized")
             }
 
-            val user = requireUser(userNo)
+            val user = requireUser(userId)
             jwtService.generateAccessToken(user)
         } catch (ex: JwtException) {
             throw unauthorized("Unauthorized")
@@ -159,46 +158,44 @@ class AuthService(
         }
 
     @Transactional
-    fun deleteUser(userNo: Int) {
-        val user = requireUser(userNo)
-        val memberships = gardenUserRepository.findAllByUserNo(userNo)
-        val books = bookRepository.findAllByUserNo(userNo)
-        val memos = memoRepository.findAllByUserNo(userNo)
+    fun deleteUser(userId: Long) {
+        val user = requireUser(userId)
+        val memberships = gardenMemberRepository.findAllByUserId(userId)
+        val books = bookRepository.findAllByUserId(userId)
+        val memos = memoRepository.findAllByUserId(userId)
 
         memberships.forEach { membership ->
-            if (membership.gardenLeader) {
-                val members = gardenUserRepository.findAllByGardenNoOrderByGardenSignDateAsc(membership.gardenNo)
+            if (membership.isLeader) {
+                val members = gardenMemberRepository.findAllByGardenIdOrderByJoinDateAsc(membership.garden.id)
                 if (members.size > 1) {
-                    members.firstOrNull { it.userNo != userNo }?.let { nextLeader ->
-                        nextLeader.gardenLeader = true
-                        gardenUserRepository.save(nextLeader)
+                    members.firstOrNull { it.user.id != userId }?.let { nextLeader ->
+                        nextLeader.isLeader = true
+                        gardenMemberRepository.save(nextLeader)
                     }
                 }
             }
-            gardenUserRepository.delete(membership)
-        }
-
-        books.forEach { book ->
-            val bookNo = book.bookNo ?: return@forEach
-            bookReadRepository.deleteAllByBookNo(bookNo)
-            bookImageRepository.deleteByBookNo(bookNo)
-            bookRepository.delete(book)
+            gardenMemberRepository.delete(membership)
         }
 
         memos.forEach { memo ->
-            val memoNo = memo.id ?: return@forEach
-            memoImageRepository.deleteByMemoNo(memoNo)
+            memoImageRepository.deleteByMemoId(memo.id)
             memoRepository.delete(memo)
         }
 
-        refreshTokenRepository.deleteAllByUserNo(userNo)
-        pushRepository.findByUserNo(userNo)?.let(pushRepository::delete)
+        books.forEach { book ->
+            bookReadRepository.deleteAllByBookId(book.id)
+            bookImageRepository.deleteByBookId(book.id)
+            bookRepository.delete(book)
+        }
+
+        refreshTokenRepository.deleteAllByUserId(userId)
+        pushSettingsRepository.findByUserId(userId)?.let(pushSettingsRepository::delete)
         userRepository.delete(user)
     }
 
     @Transactional
     fun sendPasswordResetMail(email: String) {
-        val user = userRepository.findByUserEmail(email)
+        val user = userRepository.findByEmail(email)
             ?: throw badRequest("등록되지 않은 이메일 주소입니다.")
         val authNumber = generateRandomString(5)
 
@@ -212,10 +209,10 @@ class AuthService(
             throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "메일 전송 실패", ex)
         }
 
-        user.userAuthNumber = authNumber
+        user.authNumber = authNumber
         userRepository.save(user)
         passwordResetExpiryJobService.schedulePasswordResetExpiry(
-            user.userNo ?: throw IllegalStateException("User id was not generated"),
+            user.id,
             authNumber,
         )
     }
@@ -224,10 +221,9 @@ class AuthService(
         email: String,
         authNumber: String,
     ) {
-        val user = userRepository.findByUserEmail(email)
+        val user = userRepository.findByEmail(email)
             ?: throw badRequest("등록되지 않은 이메일 주소입니다.")
-        val userNo = user.userNo ?: throw IllegalStateException("User id was not generated")
-        if (user.userAuthNumber != authNumber || !passwordResetExpiryJobService.isPasswordResetAuthValid(userNo, authNumber)) {
+        if (user.authNumber != authNumber || !passwordResetExpiryJobService.isPasswordResetAuthValid(user.id, authNumber)) {
             throw badRequest("인증번호 불일치")
         }
     }
@@ -237,82 +233,81 @@ class AuthService(
         email: String,
         password: String,
     ) {
-        val user = userRepository.findByUserEmail(email)
+        val user = userRepository.findByEmail(email)
             ?: throw badRequest("등록되지 않은 이메일 주소입니다.")
-        user.userPassword = encodePassword(password)
+        user.password = encodePassword(password)
         userRepository.save(user)
     }
 
     @Transactional
     fun updatePassword(
-        userNo: Int,
+        userId: Long,
         password: String,
     ) {
-        val user = requireUser(userNo)
-        user.userPassword = encodePassword(password)
+        val user = requireUser(userId)
+        user.password = encodePassword(password)
         userRepository.save(user)
     }
 
-    fun getProfile(userNo: Int): UserProfileResponse {
-        val user = requireUser(userNo)
+    fun getProfile(userId: Long): UserProfileResponse {
+        val user = requireUser(userId)
         return UserProfileResponse(
-            user_no = user.userNo ?: userNo,
-            user_nick = user.userNick,
-            user_email = user.userEmail,
-            user_social_type = user.userSocialType,
-            user_image = user.userImage,
-            user_created_at = user.userCreatedAt,
-            garden_count = gardenUserRepository.countByUserNo(userNo),
-            read_book_count = bookRepository.countByUserNoAndBookStatus(userNo, READ_BOOK_STATUS),
-            like_book_count = bookRepository.countByUserNoAndBookStatus(userNo, LIKE_BOOK_STATUS),
+            user_no = user.id,
+            user_nick = user.nick,
+            user_email = user.email,
+            user_social_type = user.socialType,
+            user_image = user.image,
+            user_created_at = user.createdAt,
+            garden_count = gardenMemberRepository.countByUserId(userId),
+            read_book_count = bookRepository.countByUserIdAndStatus(userId, READ_BOOK_STATUS),
+            like_book_count = bookRepository.countByUserIdAndStatus(userId, LIKE_BOOK_STATUS),
         )
     }
 
     @Transactional
     fun updateProfile(
-        userNo: Int,
+        userId: Long,
         userNick: String?,
         userImage: String?,
     ): UserSummaryResponse {
-        val user = requireUser(userNo)
+        val user = requireUser(userId)
         if (!userNick.isNullOrBlank()) {
-            user.userNick = userNick
+            user.nick = userNick
         } else if (!userImage.isNullOrBlank()) {
-            user.userImage = userImage
+            user.image = userImage
         }
 
         val savedUser = userRepository.save(user)
         return UserSummaryResponse(
-            user_no = savedUser.userNo ?: userNo,
-            user_nick = savedUser.userNick,
-            user_email = savedUser.userEmail,
-            user_image = savedUser.userImage,
-            user_fcm = savedUser.userFcm,
-            user_social_id = savedUser.userSocialId,
-            user_social_type = savedUser.userSocialType,
-            user_created_at = savedUser.userCreatedAt,
+            user_no = savedUser.id,
+            user_nick = savedUser.nick,
+            user_email = savedUser.email,
+            user_image = savedUser.image,
+            user_fcm = savedUser.fcm,
+            user_social_id = savedUser.socialId,
+            user_social_type = savedUser.socialType,
+            user_created_at = savedUser.createdAt,
         )
     }
 
     private fun validateSignupDuplicate(request: CreateUserRequest) {
         if (request.user_social_id.isNotBlank()) {
-            if (userRepository.existsByUserSocialIdAndUserSocialType(request.user_social_id, request.user_social_type)) {
+            if (userRepository.existsBySocialIdAndSocialType(request.user_social_id, request.user_social_type)) {
                 throw conflict("소셜 아이디 중복")
             }
-        } else if (userRepository.existsByUserEmail(request.user_email)) {
+        } else if (userRepository.existsByEmail(request.user_email)) {
             throw conflict("이메일 중복")
         }
     }
 
     private fun persistRefreshToken(user: UserEntity): Map<String, String> {
-        val userNo = user.userNo ?: throw IllegalStateException("User id is required")
         val accessToken = jwtService.generateAccessToken(user)
         val refreshToken = jwtService.generateRefreshToken(user)
 
-        refreshTokenRepository.deleteAllByUserNo(userNo)
+        refreshTokenRepository.deleteAllByUserId(user.id)
         refreshTokenRepository.save(
             RefreshTokenEntity(
-                userNo = userNo,
+                user = user,
                 token = refreshToken,
                 exp = LocalDateTime.ofInstant(jwtService.refreshTokenExpiry(), UTC_ZONE_OFFSET),
             ),
@@ -324,8 +319,8 @@ class AuthService(
         )
     }
 
-    private fun requireUser(userNo: Int): UserEntity =
-        userRepository.findByUserNo(userNo)
+    private fun requireUser(userId: Long): UserEntity =
+        userRepository.findById(userId).orElse(null)
             ?: throw badRequest("일치하는 사용자 정보가 없습니다.")
 
     private fun badRequest(message: String) =

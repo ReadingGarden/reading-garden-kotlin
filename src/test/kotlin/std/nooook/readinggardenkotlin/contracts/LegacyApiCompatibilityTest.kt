@@ -9,10 +9,11 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.context.annotation.Import
+import std.nooook.readinggardenkotlin.TestcontainersConfiguration
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
 import org.springframework.core.io.ClassPathResource
 import org.springframework.http.HttpHeaders
@@ -42,7 +43,7 @@ import kotlin.test.assertNotNull
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(LegacyApiCompatibilityTest.TestConfig::class)
+@Import(TestcontainersConfiguration::class, LegacyApiCompatibilityTest.TestConfig::class)
 class LegacyApiCompatibilityTest(
     @Autowired private val mockMvc: MockMvc,
     @Autowired private val userRepository: UserRepository,

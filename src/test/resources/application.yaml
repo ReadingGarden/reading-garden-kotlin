@@ -1,13 +1,10 @@
 spring:
-  datasource:
-    url: jdbc:tc:postgresql:17:///reading_garden
-    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
   jpa:
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: validate
   flyway:
     enabled: true
+    locations: classpath:db/migration
   servlet:
     multipart:
       max-file-size: 10MB

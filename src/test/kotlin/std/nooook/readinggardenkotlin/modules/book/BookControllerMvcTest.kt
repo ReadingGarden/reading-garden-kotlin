@@ -5,6 +5,8 @@ import org.mockito.BDDMockito.given
 import org.mockito.Mockito.doReturn
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.context.annotation.Import
+import std.nooook.readinggardenkotlin.TestcontainersConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -38,6 +40,7 @@ import std.nooook.readinggardenkotlin.modules.book.service.BookReadService
 import std.nooook.readinggardenkotlin.modules.book.service.BookService
 import org.springframework.web.server.ResponseStatusException
 
+@Import(TestcontainersConfiguration::class)
 @SpringBootTest
 @AutoConfigureMockMvc
 class BookControllerMvcTest(
@@ -399,7 +402,7 @@ class BookControllerMvcTest(
     private fun bookAuth() =
         authentication(
             UsernamePasswordAuthenticationToken(
-                LegacyAuthenticationPrincipal(1, "테스터"),
+                LegacyAuthenticationPrincipal(1L, "테스터"),
                 null,
                 listOf(SimpleGrantedAuthority("ROLE_USER")),
             ),
