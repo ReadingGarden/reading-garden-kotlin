@@ -2,38 +2,51 @@ package std.nooook.readinggardenkotlin.modules.book.entity
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.FetchType
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
+import jakarta.persistence.JoinColumn
+import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
+import java.time.LocalDateTime
+import std.nooook.readinggardenkotlin.modules.auth.entity.UserEntity
+import std.nooook.readinggardenkotlin.modules.garden.entity.GardenEntity
 
 @Entity
-@Table(name = "BOOK")
+@Table(name = "books")
 class BookEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "book_no")
-    var bookNo: Int? = null,
-    @Column(name = "garden_no")
-    var gardenNo: Int? = null,
-    @Column(name = "book_title", nullable = false, length = 300)
-    var bookTitle: String = "",
-    @Column(name = "book_author", nullable = false, length = 100)
-    var bookAuthor: String = "",
-    @Column(name = "book_publisher", nullable = false, length = 100)
-    var bookPublisher: String = "",
-    @Column(name = "book_status", nullable = false)
-    var bookStatus: Int = 0,
-    @Column(name = "user_no", nullable = false)
-    var userNo: Int = 0,
-    @Column(name = "book_page", nullable = false)
-    var bookPage: Int = 0,
-    @Column(name = "book_isbn", length = 30)
-    var bookIsbn: String? = null,
-    @Column(name = "book_tree", length = 30)
-    var bookTree: String? = null,
-    @Column(name = "book_image_url", columnDefinition = "text")
-    var bookImageUrl: String? = null,
-    @Column(name = "book_info", nullable = false, columnDefinition = "text")
-    var bookInfo: String = "",
-)
+    val id: Long = 0,
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "garden_id")
+    var garden: GardenEntity? = null,
+    @Column(nullable = false, length = 300)
+    var title: String = "",
+    @Column(nullable = false, length = 100)
+    var author: String = "",
+    @Column(nullable = false, length = 100)
+    var publisher: String = "",
+    @Column(nullable = false)
+    var status: Int = 0,
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    val user: UserEntity,
+    @Column(nullable = false)
+    var page: Int = 0,
+    @Column(length = 30)
+    var isbn: String? = null,
+    @Column(length = 30)
+    var tree: String? = null,
+    @Column(columnDefinition = "TEXT")
+    var imageUrl: String? = null,
+    @Column(nullable = false, columnDefinition = "TEXT")
+    var info: String = "",
+    @Column(nullable = false)
+    val createdAt: LocalDateTime = LocalDateTime.now(),
+    @Column(nullable = false)
+    var updatedAt: LocalDateTime = LocalDateTime.now(),
+) {
+    protected constructor() : this(user = UserEntity())
+}
