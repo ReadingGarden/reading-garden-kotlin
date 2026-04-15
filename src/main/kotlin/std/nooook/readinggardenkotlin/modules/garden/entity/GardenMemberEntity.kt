@@ -1,4 +1,4 @@
-package std.nooook.readinggardenkotlin.modules.memo.entity
+package std.nooook.readinggardenkotlin.modules.garden.entity
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
@@ -11,30 +11,25 @@ import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 import java.time.LocalDateTime
 import std.nooook.readinggardenkotlin.modules.auth.entity.UserEntity
-import std.nooook.readinggardenkotlin.modules.book.entity.BookEntity
 
 @Entity
-@Table(name = "memos")
-class MemoEntity(
+@Table(name = "garden_members")
+class GardenMemberEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long = 0,
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "book_id", nullable = false)
-    var book: BookEntity,
-    @Column(nullable = false, columnDefinition = "TEXT")
-    var content: String = "",
-    @Column(nullable = false)
-    val createdAt: LocalDateTime = LocalDateTime.now(),
+    @JoinColumn(name = "garden_id", nullable = false)
+    val garden: GardenEntity,
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     val user: UserEntity,
     @Column(nullable = false)
-    var isLiked: Boolean = false,
-    @Column(columnDefinition = "TEXT")
-    var quote: String? = null,
+    var isLeader: Boolean = false,
     @Column(nullable = false)
-    var updatedAt: LocalDateTime = LocalDateTime.now(),
+    var joinDate: LocalDateTime = LocalDateTime.now(),
+    @Column(nullable = false)
+    var isMain: Boolean = false,
 ) {
-    protected constructor() : this(book = BookEntity(), user = UserEntity())
+    protected constructor() : this(garden = GardenEntity(), user = UserEntity())
 }
