@@ -74,14 +74,14 @@ echo "=== app-${STANDBY} is healthy ==="
 
 # Switch nginx upstream to standby
 sed -i "s/reading-garden-${ACTIVE}:8080/reading-garden-${STANDBY}:8080/" "$NGINX_CONF"
-docker exec reading-garden-proxy nginx -s reload
+docker restart reading-garden-proxy
 echo "=== Nginx switched to app-${STANDBY} ==="
 
 # Run smoke check against nginx
 if ! TIMEOUT_SECONDS=30 "${APP_DIR}/cutover-smoke-check.sh" "http://127.0.0.1:80"; then
     echo "ERROR: Smoke check failed, rolling back to app-${ACTIVE}" >&2
     sed -i "s/reading-garden-${STANDBY}:8080/reading-garden-${ACTIVE}:8080/" "$NGINX_CONF"
-    docker exec reading-garden-proxy nginx -s reload
+    docker restart reading-garden-proxy
     docker compose -f "$COMPOSE_FILE" stop "app-${STANDBY}"
     exit 1
 fi
