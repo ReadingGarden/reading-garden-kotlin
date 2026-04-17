@@ -269,12 +269,16 @@ class AuthService(
         userId: Long,
         userNick: String?,
         userImage: String?,
+        userFcm: String? = null,
     ): UserSummaryResponse {
         val user = requireUser(userId)
         if (!userNick.isNullOrBlank()) {
             user.nick = userNick
         } else if (!userImage.isNullOrBlank()) {
             user.image = userImage
+        }
+        if (userFcm != null) {
+            user.fcm = userFcm
         }
 
         val savedUser = userRepository.save(user)
