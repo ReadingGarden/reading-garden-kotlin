@@ -3,6 +3,7 @@ services:
     image: ${IMAGE_REF:?IMAGE_REF is required}
     container_name: ${APP_CONTAINER_PREFIX:-reading-garden}-blue
     restart: unless-stopped
+    stop_grace_period: ${APP_STOP_GRACE_PERIOD:-35s}
     pull_policy: always
     expose:
       - "8080"
@@ -28,6 +29,7 @@ services:
     image: ${IMAGE_REF:?IMAGE_REF is required}
     container_name: ${APP_CONTAINER_PREFIX:-reading-garden}-green
     restart: unless-stopped
+    stop_grace_period: ${APP_STOP_GRACE_PERIOD:-35s}
     pull_policy: always
     expose:
       - "8080"

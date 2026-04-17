@@ -64,6 +64,7 @@ IMAGE_REF="ghcr.io/example/reading-garden:test" \
 APP_HOST_DIR="${APP_HOST_DIR}" \
 APP_CONTAINER_PREFIX="reading-garden-dev" \
 APP_VOLUME_PREFIX="reading-garden-dev" \
+APP_STOP_GRACE_PERIOD="35s" \
 DB_PASSWORD="test-password" \
 docker compose --profile green -f "$APP_COMPOSE" config > "${TMP_DIR}/app-compose.yaml"
 
@@ -75,6 +76,7 @@ fi
 assert_contains "${TMP_DIR}/app-compose.yaml" "container_name: reading-garden-dev-blue"
 assert_contains "${TMP_DIR}/app-compose.yaml" "container_name: reading-garden-dev-green"
 assert_contains "${TMP_DIR}/app-compose.yaml" "container_name: reading-garden-dev-db"
+assert_contains "${TMP_DIR}/app-compose.yaml" "stop_grace_period: 35s"
 assert_contains "${TMP_DIR}/app-compose.yaml" "source: ${APP_HOST_DIR}/data"
 assert_contains "${TMP_DIR}/app-compose.yaml" "source: ${APP_HOST_DIR}/secrets/firebase-service-account.json"
 assert_contains "${TMP_DIR}/app-compose.yaml" "name: reading-garden-dev_pgdata"
