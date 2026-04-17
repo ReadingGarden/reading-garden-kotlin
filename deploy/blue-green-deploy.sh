@@ -10,6 +10,8 @@ SMOKE_BASE_URL="${SMOKE_BASE_URL:-https://readinggarden.duckdns.org}"
 APP_CONTAINER_PREFIX="${APP_CONTAINER_PREFIX:-reading-garden}"
 APP_VOLUME_PREFIX="${APP_VOLUME_PREFIX:-$APP_CONTAINER_PREFIX}"
 APP_HOST_DIR="${APP_HOST_DIR:-$APP_DIR}"
+CUTOVER_DRAIN_SECONDS="${CUTOVER_DRAIN_SECONDS:-30}"
+APP_STOP_TIMEOUT_SECONDS="${APP_STOP_TIMEOUT_SECONDS:-35}"
 EDGE_APP_DIR="${EDGE_APP_DIR:-/opt/reading-garden/edge}"
 EDGE_COMPOSE_FILE="${EDGE_APP_DIR}/docker-compose.yml"
 EDGE_ROUTE_FILE_NAME="${EDGE_ROUTE_FILE_NAME:-prod-upstream.caddy}"
@@ -220,7 +222,10 @@ if ! TIMEOUT_SECONDS=30 "${APP_DIR}/cutover-smoke-check.sh" "${SMOKE_BASE_URL}";
     exit 1
 fi
 
-docker compose -f "$COMPOSE_FILE" stop "app-${ACTIVE}"
+echo "=== Draining app-${ACTIVE} for ${CUTOVER_DRAIN_SECONDS}s ==="
+sleep "$CUTOVER_DRAIN_SECONDS"
+
+docker compose -f "$COMPOSE_FILE" stop -t "$APP_STOP_TIMEOUT_SECONDS" "app-${ACTIVE}"
 echo "=== Deployment complete: app-${STANDBY} is now active ==="
 
 docker system prune -f || true
