@@ -67,6 +67,8 @@ EOF
 #!/usr/bin/env bash
 printf 'caddy\n' >> "$TMPDIR/event-log"
 touch "$TMPDIR/caddy-invoked"
+printf '%s\n' "$$" > "$TMPDIR/caddy-pid"
+printf '%s\n' "$PPID" > "$TMPDIR/caddy-ppid"
 printf '%s\n' "$@" > "$TMPDIR/caddy-argv"
 EOF
 
@@ -77,7 +79,9 @@ EOF
         CADDY_ROUTE_FILE="$tmp/routes/prod-upstream.caddy" \
         UPSTREAM_WAIT_TIMEOUT_SECONDS=1 \
         UPSTREAM_WAIT_INTERVAL_SECONDS=1 \
-        "$TARGET" >"$tmp/stdout" 2>"$tmp/stderr"
+        "$TARGET" >"$tmp/stdout" 2>"$tmp/stderr" &
+        local target_pid=$!
+        wait "$target_pid" || true
 
         assert_line_equals "$tmp/getent-log" "hosts reading-garden-blue"
         assert_line_equals "$tmp/curl-log" "http://reading-garden-blue:8080/api/health"
@@ -86,6 +90,8 @@ EOF
         assert_line_equals "$tmp/caddy-argv" "/etc/caddy/Caddyfile"
         assert_line_equals "$tmp/caddy-argv" "--adapter"
         assert_line_equals "$tmp/caddy-argv" "caddyfile"
+        assert_line_equals "$tmp/caddy-pid" "$target_pid"
+        [[ -f "$tmp/event-log" ]] || fail "expected event log"
         mapfile -t event_lines < "$tmp/event-log"
         [[ "${event_lines[0]:-}" == "getent" && "${event_lines[1]:-}" == "curl" && "${event_lines[2]:-}" == "caddy" ]] || fail "expected event order getent -> curl -> caddy"
         [[ -e "$tmp/caddy-invoked" ]] || fail "expected caddy to be invoked"
@@ -146,6 +152,63 @@ EOF
         assert_contains "$tmp/stderr" "Failed to extract upstream"
         [[ ! -e "$tmp/event-log" ]] || fail "expected no events before parse failure"
         [[ ! -e "$tmp/getent-log" ]] || fail "expected getent not to be invoked"
+        [[ ! -e "$tmp/curl-log" ]] || fail "expected curl not to be invoked"
+        [[ ! -e "$tmp/caddy-invoked" ]] || fail "expected caddy not to be invoked"
+    )
+}
+
+test_dns_failure() {
+    (
+        set -euo pipefail
+        local tmp
+        tmp="$(mktemp -d)"
+        trap 'rm -rf "$tmp"' EXIT
+        mkdir -p "$tmp/bin" "$tmp/routes"
+
+        cat > "$tmp/routes/prod-upstream.caddy" <<'EOF'
+handle_path /api/* {
+    rewrite * /api{path}
+
+    reverse_proxy reading-garden-blue:8080 {
+        header_up Host {host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    encode gzip zstd
+}
+EOF
+
+        cat > "$tmp/bin/getent" <<'EOF'
+#!/usr/bin/env bash
+printf '%s %s\n' "${1:-}" "${2:-}" >> "$TMPDIR/getent-log"
+exit 1
+EOF
+
+        cat > "$tmp/bin/curl" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" >> "$TMPDIR/curl-log"
+exit 0
+EOF
+
+        cat > "$tmp/bin/caddy" <<'EOF'
+#!/usr/bin/env bash
+touch "$TMPDIR/caddy-invoked"
+printf '%s\n' "$@" > "$TMPDIR/caddy-argv"
+EOF
+
+        chmod +x "$tmp/bin/getent" "$tmp/bin/curl" "$tmp/bin/caddy"
+
+        if PATH="$tmp/bin:$PATH" \
+            TMPDIR="$tmp" \
+            CADDY_ROUTE_FILE="$tmp/routes/prod-upstream.caddy" \
+            UPSTREAM_WAIT_TIMEOUT_SECONDS=1 \
+            UPSTREAM_WAIT_INTERVAL_SECONDS=1 \
+            "$TARGET" >"$tmp/stdout" 2>"$tmp/stderr"; then
+            fail "expected DNS failure"
+        fi
+
+        assert_line_equals "$tmp/getent-log" "hosts reading-garden-blue"
+        assert_contains "$tmp/stderr" "upstream DNS"
         [[ ! -e "$tmp/curl-log" ]] || fail "expected curl not to be invoked"
         [[ ! -e "$tmp/caddy-invoked" ]] || fail "expected caddy not to be invoked"
     )
@@ -219,6 +282,7 @@ EOF
 
 test_success_execs_caddy_run
 test_route_parse_failure
+test_dns_failure
 test_health_timeout_failure
 
 echo "PASS: caddy startup guard"
