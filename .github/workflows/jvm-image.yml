@@ -107,6 +107,8 @@ jobs:
             "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$EDGE_APP_DIR/docker-compose.yml"
           scp -P "$OCI_PORT" deploy/Caddyfile.edge \
             "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$EDGE_APP_DIR/Caddyfile"
+          scp -P "$OCI_PORT" deploy/caddy-start.sh \
+            "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$EDGE_APP_DIR/caddy-start.sh"
           scp -P "$OCI_PORT" deploy/routes/prod-upstream.caddy \
             "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$EDGE_APP_DIR/defaults/prod-upstream.caddy"
           scp -P "$OCI_PORT" deploy/routes/dev-upstream.caddy \
@@ -119,7 +121,8 @@ jobs:
               '$REMOTE_APP_DIR/render-edge-route.sh' \
               '$REMOTE_APP_DIR/cutover-smoke-check.sh' \
               '$REMOTE_APP_DIR/bootstrap-instance.sh' \
-              '$EDGE_APP_DIR/bootstrap-edge.sh'"
+              '$EDGE_APP_DIR/bootstrap-edge.sh' \
+              '$EDGE_APP_DIR/caddy-start.sh'"
 
       - name: Deploy with blue-green
         run: |
@@ -138,6 +141,7 @@ jobs:
           export APP_VOLUME_PREFIX="reading-garden"
           export EDGE_APP_DIR="$EDGE_APP_DIR"
           export EDGE_ROUTE_FILE_NAME="prod-upstream.caddy"
+          export EDGE_CADDY_ROUTE_FILE="/etc/caddy/routes/prod-upstream.caddy"
           export SMOKE_BASE_URL="https://readinggarden.duckdns.org"
 
           ./bootstrap-instance.sh

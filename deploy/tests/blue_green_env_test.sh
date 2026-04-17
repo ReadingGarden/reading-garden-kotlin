@@ -32,7 +32,8 @@ assert_contains "$BLUE_GREEN_SCRIPT" 'APP_CONTAINER_PREFIX="${APP_CONTAINER_PREF
 assert_contains "$BLUE_GREEN_SCRIPT" 'EDGE_APP_DIR="${EDGE_APP_DIR:-/opt/reading-garden/edge}"'
 assert_contains "$BLUE_GREEN_SCRIPT" 'EDGE_ROUTE_FILE_NAME="${EDGE_ROUTE_FILE_NAME:-prod-upstream.caddy}"'
 assert_contains "$BOOTSTRAP_SCRIPT" 'REMOTE_APP_DIR:-${APP_DIR:-}'
-assert_contains "${ROOT_DIR}/deploy/bootstrap-edge.sh" 'head -n 1 || true'
+assert_contains "${ROOT_DIR}/deploy/bootstrap-edge.sh" 'EDGE_CADDY_START_SCRIPT="${EDGE_APP_DIR}/caddy-start.sh"'
+assert_contains "${ROOT_DIR}/deploy/bootstrap-edge.sh" 'EDGE_CADDY_ROUTE_FILE="${EDGE_CADDY_ROUTE_FILE:-/etc/caddy/routes/prod-upstream.caddy}"'
 
 "$ROUTE_RENDERER" "reading-garden" "green" > "${TMP_DIR}/prod-route.caddy"
 "$ROUTE_RENDERER" "reading-garden-dev" "blue" > "${TMP_DIR}/dev-route.caddy"

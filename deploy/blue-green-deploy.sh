@@ -117,10 +117,16 @@ switch_proxy_target() {
     return 1
 }
 
-container_exists() {
+running_container_exists() {
     local name="$1"
 
     docker ps --format '{{.Names}}' | grep -qx "$name"
+}
+
+ensure_public_network() {
+    if ! docker network inspect "$PUBLIC_NETWORK_NAME" >/dev/null 2>&1; then
+        docker network create "$PUBLIC_NETWORK_NAME" >/dev/null
+    fi
 }
 
 ensure_container_connected_to_public_network() {
@@ -140,7 +146,9 @@ export APP_HOST_DIR
 export APP_CONTAINER_PREFIX
 export APP_VOLUME_PREFIX
 
-if ! container_exists "${APP_CONTAINER_PREFIX}-blue" && ! container_exists "${APP_CONTAINER_PREFIX}-green"; then
+ensure_public_network
+
+if ! running_container_exists "${APP_CONTAINER_PREFIX}-blue" && ! running_container_exists "${APP_CONTAINER_PREFIX}-green"; then
     echo "=== First deployment: starting blue + postgres ==="
 
     docker compose -f "$COMPOSE_FILE" pull

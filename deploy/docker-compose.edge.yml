@@ -3,13 +3,19 @@ services:
     image: caddy:2
     container_name: reading-garden-caddy
     restart: unless-stopped
+    entrypoint: ["/bin/sh", "/usr/local/bin/caddy-start.sh"]
+    environment:
+      CADDY_ROUTE_FILE: ${EDGE_CADDY_ROUTE_FILE:?EDGE_CADDY_ROUTE_FILE is required}
+      UPSTREAM_WAIT_TIMEOUT_SECONDS: "120"
+      UPSTREAM_WAIT_INTERVAL_SECONDS: "2"
     ports:
       - "80:80"
       - "443:443"
       - "443:443/udp"
     volumes:
-      - /opt/reading-garden/edge/Caddyfile:/etc/caddy/Caddyfile
+      - /opt/reading-garden/edge/Caddyfile:/etc/caddy/Caddyfile:ro
       - /opt/reading-garden/edge/routes:/etc/caddy/routes:ro
+      - /opt/reading-garden/edge/caddy-start.sh:/usr/local/bin/caddy-start.sh:ro
       - caddy_data:/data
       - caddy_config:/config
     networks:

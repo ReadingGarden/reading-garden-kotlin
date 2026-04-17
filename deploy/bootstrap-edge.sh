@@ -4,9 +4,11 @@ set -euo pipefail
 EDGE_APP_DIR="${EDGE_APP_DIR:-/opt/reading-garden/edge}"
 EDGE_COMPOSE_FILE="${EDGE_APP_DIR}/docker-compose.yml"
 EDGE_CADDY_FILE="${EDGE_APP_DIR}/Caddyfile"
+EDGE_CADDY_START_SCRIPT="${EDGE_APP_DIR}/caddy-start.sh"
 EDGE_DEFAULTS_DIR="${EDGE_APP_DIR}/defaults"
 EDGE_PROD_ROUTE_FILE="${EDGE_APP_DIR}/routes/prod-upstream.caddy"
 EDGE_DEV_ROUTE_FILE="${EDGE_APP_DIR}/routes/dev-upstream.caddy"
+EDGE_CADDY_ROUTE_FILE="${EDGE_CADDY_ROUTE_FILE:-/etc/caddy/routes/prod-upstream.caddy}"
 LEGACY_APP_DIR="${LEGACY_APP_DIR:-/opt/reading-garden}"
 LEGACY_CADDY_FILE="${LEGACY_APP_DIR}/Caddyfile"
 PUBLIC_NETWORK_NAME="${PUBLIC_NETWORK_NAME:-reading-garden-public}"
@@ -60,7 +62,37 @@ current_caddy_mount="$(
         2>/dev/null | head -n 1 || true
 )"
 
-if [[ -n "$current_caddy_mount" && "$current_caddy_mount" != "$EDGE_CADDY_FILE" ]]; then
+current_routes_mount="$(
+    docker inspect reading-garden-caddy \
+        --format '{{range .Mounts}}{{if eq .Destination "/etc/caddy/routes"}}{{println .Source}}{{end}}{{end}}' \
+        2>/dev/null | head -n 1 || true
+)"
+
+current_start_script_mount="$(
+    docker inspect reading-garden-caddy \
+        --format '{{range .Mounts}}{{if eq .Destination "/usr/local/bin/caddy-start.sh"}}{{println .Source}}{{end}}{{end}}' \
+        2>/dev/null | head -n 1 || true
+)"
+
+current_caddy_route_file="$(
+    docker inspect reading-garden-caddy \
+        --format '{{range .Config.Env}}{{println .}}{{end}}' \
+        2>/dev/null | grep '^CADDY_ROUTE_FILE=' | cut -d= -f2- | head -n 1 || true
+)"
+
+current_caddy_public_network="$(
+    docker inspect reading-garden-caddy \
+        --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' \
+        2>/dev/null | grep -x "$PUBLIC_NETWORK_NAME" || true
+)"
+
+if [[ -n "$current_caddy_mount" && (
+    "$current_caddy_mount" != "$EDGE_CADDY_FILE" ||
+    "$current_routes_mount" != "${EDGE_APP_DIR}/routes" ||
+    "$current_start_script_mount" != "$EDGE_CADDY_START_SCRIPT" ||
+    "$current_caddy_route_file" != "$EDGE_CADDY_ROUTE_FILE" ||
+    -z "$current_caddy_public_network"
+) ]]; then
     docker rm -f reading-garden-caddy >/dev/null
 fi
 
