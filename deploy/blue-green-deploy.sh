@@ -5,62 +5,65 @@ set -euo pipefail
 
 APP_DIR="${REMOTE_APP_DIR:-/opt/reading-garden}"
 COMPOSE_FILE="${APP_DIR}/docker-compose.yml"
-CADDY_FILE="${APP_DIR}/Caddyfile"
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-120}"
 SMOKE_BASE_URL="${SMOKE_BASE_URL:-https://readinggarden.duckdns.org}"
+APP_CONTAINER_PREFIX="${APP_CONTAINER_PREFIX:-reading-garden}"
+APP_VOLUME_PREFIX="${APP_VOLUME_PREFIX:-$APP_CONTAINER_PREFIX}"
+APP_HOST_DIR="${APP_HOST_DIR:-$APP_DIR}"
+EDGE_APP_DIR="${EDGE_APP_DIR:-/opt/reading-garden/edge}"
+EDGE_COMPOSE_FILE="${EDGE_APP_DIR}/docker-compose.yml"
+EDGE_ROUTE_FILE_NAME="${EDGE_ROUTE_FILE_NAME:-prod-upstream.caddy}"
+EDGE_ROUTE_FILE="${EDGE_APP_DIR}/routes/${EDGE_ROUTE_FILE_NAME}"
+EDGE_ROUTE_FILE_IN_CONTAINER="/etc/caddy/routes/${EDGE_ROUTE_FILE_NAME}"
+PUBLIC_NETWORK_NAME="${PUBLIC_NETWORK_NAME:-reading-garden-public}"
+ROUTE_RENDERER="${APP_DIR}/render-edge-route.sh"
 
 reload_caddy() {
-    docker compose -f "$COMPOSE_FILE" exec -T caddy \
+    docker compose -f "$EDGE_COMPOSE_FILE" exec -T caddy \
         caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
-    docker compose -f "$COMPOSE_FILE" exec -T caddy \
+    docker compose -f "$EDGE_COMPOSE_FILE" exec -T caddy \
         caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
 }
 
-caddy_file_has_upstream() {
+route_file_has_upstream() {
     local file_path="$1"
     local target="$2"
 
     grep -q "reverse_proxy ${target}:8080" "$file_path"
 }
 
-caddy_container_has_upstream() {
+edge_route_has_upstream() {
     local target="$1"
 
-    docker compose -f "$COMPOSE_FILE" exec -T caddy \
-        cat /etc/caddy/Caddyfile | grep -q "reverse_proxy ${target}:8080"
+    docker compose -f "$EDGE_COMPOSE_FILE" exec -T caddy \
+        sh -lc "grep -q 'reverse_proxy ${target}:8080' '${EDGE_ROUTE_FILE_IN_CONTAINER}'"
 }
 
-caddy_upstream_from_file() {
+route_file_current_upstream() {
     local file_path="$1"
 
     sed -nE \
-        's/.*reverse_proxy (reading-garden-(blue|green)):8080.*/\1/p' \
+        "s/.*reverse_proxy (${APP_CONTAINER_PREFIX}-(blue|green)):8080.*/\\1/p" \
         "$file_path" | head -n 1
 }
 
-render_caddyfile_for_target() {
+render_route_file_for_target() {
     local target="$1"
     local output_path="$2"
+    local color="${target##*-}"
 
-    if ! grep -Eq 'reverse_proxy reading-garden-(blue|green):8080' "$CADDY_FILE"; then
-        echo "ERROR: Could not find reverse_proxy upstream in ${CADDY_FILE}" >&2
-        return 1
-    fi
+    "$ROUTE_RENDERER" "$APP_CONTAINER_PREFIX" "$color" > "$output_path"
 
-    sed -E \
-        "s/reverse_proxy reading-garden-(blue|green):8080/reverse_proxy ${target}:8080/" \
-        "$CADDY_FILE" > "$output_path"
-
-    if ! caddy_file_has_upstream "$output_path" "$target"; then
-        echo "ERROR: Failed to render Caddyfile for upstream ${target}" >&2
+    if ! route_file_has_upstream "$output_path" "$target"; then
+        echo "ERROR: Failed to render edge route for ${target}" >&2
         return 1
     fi
 }
 
-write_caddyfile_in_place() {
+write_route_file_in_place() {
     local source_path="$1"
 
-    cat "$source_path" > "$CADDY_FILE"
+    cat "$source_path" > "$EDGE_ROUTE_FILE"
 }
 
 switch_proxy_target() {
@@ -69,36 +72,34 @@ switch_proxy_target() {
     local candidate
     local previous_target
 
-    backup="$(mktemp "${CADDY_FILE}.backup.XXXXXX")"
-    candidate="$(mktemp "${CADDY_FILE}.candidate.XXXXXX")"
+    backup="$(mktemp "${EDGE_ROUTE_FILE}.backup.XXXXXX")"
+    candidate="$(mktemp "${EDGE_ROUTE_FILE}.candidate.XXXXXX")"
 
-    if ! cp "$CADDY_FILE" "$backup"; then
+    if ! cp "$EDGE_ROUTE_FILE" "$backup"; then
         rm -f "$backup" "$candidate"
         return 1
     fi
 
-    previous_target="$(caddy_upstream_from_file "$backup")"
-    if [ -z "$previous_target" ]; then
-        echo "ERROR: Failed to detect current Caddy upstream from backup" >&2
+    previous_target="$(route_file_current_upstream "$backup")"
+    if [[ -z "$previous_target" ]]; then
+        echo "ERROR: Failed to detect current upstream from ${EDGE_ROUTE_FILE}" >&2
         rm -f "$backup" "$candidate"
         return 1
     fi
 
-    if ! render_caddyfile_for_target "$target" "$candidate"; then
+    if ! render_route_file_for_target "$target" "$candidate"; then
         rm -f "$backup" "$candidate"
         return 1
     fi
 
-    if ! write_caddyfile_in_place "$candidate"; then
+    if ! write_route_file_in_place "$candidate"; then
         rm -f "$backup" "$candidate"
         return 1
     fi
 
-    if ! caddy_container_has_upstream "$target"; then
-        echo "ERROR: Caddy container did not observe upstream ${target}" >&2
-        if ! write_caddyfile_in_place "$backup"; then
-            echo "ERROR: Failed to restore previous Caddyfile after container drift" >&2
-        fi
+    if ! edge_route_has_upstream "$target"; then
+        echo "ERROR: Edge Caddy did not observe upstream ${target}" >&2
+        write_route_file_in_place "$backup" || true
         rm -f "$backup" "$candidate"
         return 1
     fi
@@ -108,46 +109,54 @@ switch_proxy_target() {
         return 0
     fi
 
-    if ! write_caddyfile_in_place "$backup"; then
-        echo "ERROR: Failed to restore previous Caddy config after reload failure" >&2
-        rm -f "$backup" "$candidate"
-        return 1
-    fi
-
-    if ! caddy_container_has_upstream "$previous_target"; then
-        echo "ERROR: Failed to confirm restored Caddy upstream after reload failure" >&2
-    elif ! reload_caddy; then
-        echo "ERROR: Failed to restore previous Caddy config after reload failure" >&2
+    write_route_file_in_place "$backup" || true
+    if edge_route_has_upstream "$previous_target"; then
+        reload_caddy || true
     fi
     rm -f "$backup" "$candidate"
     return 1
 }
 
+running_container_exists() {
+    local name="$1"
+
+    docker ps --format '{{.Names}}' | grep -qx "$name"
+}
+
+ensure_public_network() {
+    if ! docker network inspect "$PUBLIC_NETWORK_NAME" >/dev/null 2>&1; then
+        docker network create "$PUBLIC_NETWORK_NAME" >/dev/null
+    fi
+}
+
+ensure_container_connected_to_public_network() {
+    local container="$1"
+
+    if ! docker inspect "$container" \
+        --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' \
+        | grep -qx "$PUBLIC_NETWORK_NAME"; then
+        docker network connect "$PUBLIC_NETWORK_NAME" "$container"
+    fi
+}
+
 cd "$APP_DIR"
 
 export IMAGE_REF="${IMAGE_REF:?IMAGE_REF is required}"
+export APP_HOST_DIR
+export APP_CONTAINER_PREFIX
+export APP_VOLUME_PREFIX
 
-# First deployment — no containers running yet
-if ! docker ps --format '{{.Names}}' | grep -q 'reading-garden-blue\|reading-garden-green'; then
-    echo "=== First deployment: starting blue + caddy + postgres ==="
-    first_target="$(mktemp "${CADDY_FILE}.first.XXXXXX")"
-    if ! render_caddyfile_for_target "reading-garden-blue" "$first_target"; then
-        rm -f "$first_target"
-        exit 1
-    fi
-    if ! write_caddyfile_in_place "$first_target"; then
-        rm -f "$first_target"
-        exit 1
-    fi
-    rm -f "$first_target"
+ensure_public_network
+
+if ! running_container_exists "${APP_CONTAINER_PREFIX}-blue" && ! running_container_exists "${APP_CONTAINER_PREFIX}-green"; then
+    echo "=== First deployment: starting blue + postgres ==="
 
     docker compose -f "$COMPOSE_FILE" pull
-    docker compose -f "$COMPOSE_FILE" up -d
-    reload_caddy
+    docker compose -f "$COMPOSE_FILE" up -d app-blue postgres
 
     echo "=== Waiting for app-blue to become healthy ==="
     deadline=$((SECONDS + TIMEOUT_SECONDS))
-    until docker inspect --format='{{.State.Health.Status}}' reading-garden-blue 2>/dev/null | grep -q "healthy"; do
+    until docker inspect --format='{{.State.Health.Status}}' "${APP_CONTAINER_PREFIX}-blue" 2>/dev/null | grep -q "healthy"; do
         if (( SECONDS >= deadline )); then
             echo "ERROR: app-blue did not become healthy within ${TIMEOUT_SECONDS}s" >&2
             docker compose -f "$COMPOSE_FILE" logs app-blue --tail 50
@@ -156,37 +165,40 @@ if ! docker ps --format '{{.Names}}' | grep -q 'reading-garden-blue\|reading-gar
         sleep 2
     done
 
+    ensure_container_connected_to_public_network "${APP_CONTAINER_PREFIX}-blue"
+    switch_proxy_target "${APP_CONTAINER_PREFIX}-blue"
+
     TIMEOUT_SECONDS=30 "${APP_DIR}/cutover-smoke-check.sh" "${SMOKE_BASE_URL}"
     echo "=== First deployment complete: app-blue is active ==="
     docker system prune -f || true
     exit 0
 fi
 
-# Subsequent deployments — blue-green swap
-if docker ps --format '{{.Names}}' | grep -qx 'reading-garden-blue'; then
-    ACTIVE="blue"
-    STANDBY="green"
-else
-    ACTIVE="green"
-    STANDBY="blue"
-fi
+current_target="$(route_file_current_upstream "$EDGE_ROUTE_FILE" || true)"
+case "$current_target" in
+    "${APP_CONTAINER_PREFIX}-green")
+        ACTIVE="green"
+        STANDBY="blue"
+        ;;
+    *)
+        ACTIVE="blue"
+        STANDBY="green"
+        ;;
+esac
 
 echo "=== Current active: $ACTIVE, deploying to: $STANDBY ==="
 
-# Pull new image
 docker compose -f "$COMPOSE_FILE" pull "app-${STANDBY}"
 
-# Start standby container
-if [ "$STANDBY" = "green" ]; then
+if [[ "$STANDBY" = "green" ]]; then
     docker compose -f "$COMPOSE_FILE" --profile green up -d "app-${STANDBY}"
 else
     docker compose -f "$COMPOSE_FILE" up -d "app-${STANDBY}"
 fi
 
-# Wait for standby to become healthy
 echo "=== Waiting for app-${STANDBY} to become healthy ==="
 deadline=$((SECONDS + TIMEOUT_SECONDS))
-until docker inspect --format='{{.State.Health.Status}}' "reading-garden-${STANDBY}" 2>/dev/null | grep -q "healthy"; do
+until docker inspect --format='{{.State.Health.Status}}' "${APP_CONTAINER_PREFIX}-${STANDBY}" 2>/dev/null | grep -q "healthy"; do
     if (( SECONDS >= deadline )); then
         echo "ERROR: app-${STANDBY} did not become healthy within ${TIMEOUT_SECONDS}s" >&2
         docker compose -f "$COMPOSE_FILE" logs "app-${STANDBY}" --tail 50
@@ -197,19 +209,18 @@ until docker inspect --format='{{.State.Health.Status}}' "reading-garden-${STAND
 done
 echo "=== app-${STANDBY} is healthy ==="
 
-switch_proxy_target "reading-garden-${STANDBY}"
-echo "=== Caddy switched to app-${STANDBY} ==="
+ensure_container_connected_to_public_network "${APP_CONTAINER_PREFIX}-${STANDBY}"
+switch_proxy_target "${APP_CONTAINER_PREFIX}-${STANDBY}"
+echo "=== Edge Caddy switched to app-${STANDBY} ==="
 
 if ! TIMEOUT_SECONDS=30 "${APP_DIR}/cutover-smoke-check.sh" "${SMOKE_BASE_URL}"; then
     echo "ERROR: Smoke check failed, rolling back to app-${ACTIVE}" >&2
-    switch_proxy_target "reading-garden-${ACTIVE}"
+    switch_proxy_target "${APP_CONTAINER_PREFIX}-${ACTIVE}"
     docker compose -f "$COMPOSE_FILE" stop "app-${STANDBY}"
     exit 1
 fi
 
-# Stop old active container
 docker compose -f "$COMPOSE_FILE" stop "app-${ACTIVE}"
 echo "=== Deployment complete: app-${STANDBY} is now active ==="
 
-# Cleanup
 docker system prune -f || true
