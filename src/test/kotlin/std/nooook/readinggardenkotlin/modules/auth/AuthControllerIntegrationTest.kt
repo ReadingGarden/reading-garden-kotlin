@@ -629,6 +629,58 @@ class AuthControllerIntegrationTest(
     }
 
     @Test
+    fun `update profile should refresh fcm token for auto login client`() {
+        val signupBody = signup("profilefcm@example.com", "pw1234", "fcm-initial")
+        val accessToken = signupBody.path("data").path("access_token").asText()
+
+        mockMvc.perform(
+            put("/api/v1/auth/")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"user_fcm":"fcm-rotated"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.data.user_fcm").value("fcm-rotated"))
+
+        val savedUser = checkNotNull(userRepository.findByEmail("profilefcm@example.com"))
+        kotlin.test.assertEquals("fcm-rotated", savedUser.fcm)
+    }
+
+    @Test
+    fun `signup should accept apple social signup with empty email`() {
+        mockMvc.perform(
+            post("/api/v1/auth")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """{"user_email":"","user_password":"","user_fcm":"fcm-apple","user_social_id":"apple-uid-1","user_social_type":"apple"}""",
+                ),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.resp_code").value(201))
+
+        val user = checkNotNull(userRepository.findBySocialIdAndSocialType("apple-uid-1", "apple"))
+        kotlin.test.assertEquals("", user.email)
+        kotlin.test.assertEquals("fcm-apple", user.fcm)
+    }
+
+    @Test
+    fun `signup should accept apple private relay email`() {
+        mockMvc.perform(
+            post("/api/v1/auth")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """{"user_email":"abc123@privaterelay.appleid.com","user_password":"","user_fcm":"fcm-apple-2","user_social_id":"apple-uid-2","user_social_type":"apple"}""",
+                ),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.resp_code").value(201))
+
+        val user = checkNotNull(userRepository.findBySocialIdAndSocialType("apple-uid-2", "apple"))
+        kotlin.test.assertEquals("abc123@privaterelay.appleid.com", user.email)
+    }
+
+    @Test
     fun `delete user should remove auth garden book and memo data`() {
         val signupBody = signup("delete@example.com", "pw1234", "fcm-delete")
         val accessToken = signupBody.path("data").path("access_token").asText()
