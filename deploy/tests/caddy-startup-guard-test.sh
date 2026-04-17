@@ -21,6 +21,17 @@ assert_line_equals() {
     grep -Fx "$expected" "$file" >/dev/null || fail "expected exact line '$expected' in $file"
 }
 
+assert_array_equals() {
+    local -n actual="$1"
+    shift
+    local expected=("$@")
+    [[ "${#actual[@]}" -eq "${#expected[@]}" ]] || fail "expected ${#expected[@]} args, got ${#actual[@]}"
+    local i
+    for i in "${!expected[@]}"; do
+        [[ "${actual[$i]}" == "${expected[$i]}" ]] || fail "expected arg[$i] '${expected[$i]}', got '${actual[$i]}'"
+    done
+}
+
 test_success_execs_caddy_run() {
     (
         set -euo pipefail
@@ -68,7 +79,6 @@ EOF
 printf 'caddy\n' >> "$TMPDIR/event-log"
 touch "$TMPDIR/caddy-invoked"
 printf '%s\n' "$$" > "$TMPDIR/caddy-pid"
-printf '%s\n' "$PPID" > "$TMPDIR/caddy-ppid"
 printf '%s\n' "$@" > "$TMPDIR/caddy-argv"
 EOF
 
@@ -81,15 +91,19 @@ EOF
         UPSTREAM_WAIT_INTERVAL_SECONDS=1 \
         "$TARGET" >"$tmp/stdout" 2>"$tmp/stderr" &
         local target_pid=$!
-        wait "$target_pid" || true
+        if ! wait "$target_pid"; then
+            fail "expected success path to exit 0"
+        fi
 
         assert_line_equals "$tmp/getent-log" "hosts reading-garden-blue"
         assert_line_equals "$tmp/curl-log" "http://reading-garden-blue:8080/api/health"
-        assert_line_equals "$tmp/caddy-argv" "run"
-        assert_line_equals "$tmp/caddy-argv" "--config"
-        assert_line_equals "$tmp/caddy-argv" "/etc/caddy/Caddyfile"
-        assert_line_equals "$tmp/caddy-argv" "--adapter"
-        assert_line_equals "$tmp/caddy-argv" "caddyfile"
+        mapfile -t caddy_args < "$tmp/caddy-argv"
+        assert_array_equals caddy_args \
+            run \
+            --config \
+            /etc/caddy/Caddyfile \
+            --adapter \
+            caddyfile
         assert_line_equals "$tmp/caddy-pid" "$target_pid"
         [[ -f "$tmp/event-log" ]] || fail "expected event log"
         mapfile -t event_lines < "$tmp/event-log"
