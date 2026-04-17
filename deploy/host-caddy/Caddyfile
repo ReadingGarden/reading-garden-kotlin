@@ -1,0 +1,6 @@
+{
+    admin unix//run/caddy-admin.sock
+}
+
+import /etc/caddy/common/*.caddy
+import /etc/caddy/sites/*.caddy
