@@ -35,8 +35,8 @@ class OpenApiConfig {
         .servers(
             listOf(
                 Server()
-                    .url("http://localhost:8080")
-                    .description("Local development server"),
+                    .url("/")
+                    .description("Current server origin"),
             ),
         )
         .tags(
