@@ -32,6 +32,7 @@ validate_positive_integer() {
 }
 
 preflight_checks() {
+    require_command awk
     require_command getent
     require_command curl
     require_command caddy
@@ -87,6 +88,31 @@ calculate_probe_timeout_seconds() {
     printf '%s\n' "$probe_timeout"
 }
 
+sleep_with_remaining_budget() {
+    local start_ts="$1"
+    local now_ts
+    local elapsed
+    local remaining
+    local sleep_seconds
+
+    now_ts="$(date +%s)"
+    elapsed=$((now_ts - start_ts))
+    remaining=$((UPSTREAM_WAIT_TIMEOUT_SECONDS - elapsed))
+
+    if [ "$remaining" -le 0 ]; then
+        return 0
+    fi
+
+    sleep_seconds="$UPSTREAM_WAIT_INTERVAL_SECONDS"
+    if [ "$remaining" -lt "$sleep_seconds" ]; then
+        sleep_seconds="$remaining"
+    fi
+
+    if [ "$sleep_seconds" -gt 0 ]; then
+        sleep "$sleep_seconds"
+    fi
+}
+
 wait_for_upstream_dns() {
     local host="$1"
     local start_ts
@@ -104,7 +130,7 @@ wait_for_upstream_dns() {
             return 1
         fi
 
-        sleep "$UPSTREAM_WAIT_INTERVAL_SECONDS"
+        sleep_with_remaining_budget "$start_ts"
     done
 }
 
@@ -131,7 +157,7 @@ wait_for_upstream_health() {
             return 1
         fi
 
-        sleep "$UPSTREAM_WAIT_INTERVAL_SECONDS"
+        sleep_with_remaining_budget "$start_ts"
     done
 }
 
