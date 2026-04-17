@@ -38,6 +38,7 @@ EOF
 
         cat > "$tmp/bin/getent" <<'EOF'
 #!/usr/bin/env bash
+printf '%s %s\n' "${1:-}" "${2:-}" >> "$TMPDIR/getent-log"
 if [[ "${1:-}" == "hosts" && "${2:-}" == "reading-garden-blue" ]]; then
     echo "172.19.0.2 reading-garden-blue"
     exit 0
@@ -47,7 +48,7 @@ EOF
 
         cat > "$tmp/bin/curl" <<'EOF'
 #!/usr/bin/env bash
-if [[ "${1:-}" == "-fsS" && "${2:-}" == "http://reading-garden-blue:8080/api/health" ]]; then
+if [[ "$*" == *"http://reading-garden-blue:8080/api/health"* ]]; then
     exit 0
 fi
 exit 1
@@ -55,6 +56,7 @@ EOF
 
         cat > "$tmp/bin/caddy" <<'EOF'
 #!/usr/bin/env bash
+touch "$TMPDIR/caddy-invoked"
 printf '%s\n' "$@" > "$TMPDIR/caddy-argv"
 EOF
 
@@ -67,11 +69,13 @@ EOF
         UPSTREAM_WAIT_INTERVAL_SECONDS=1 \
         "$TARGET" >"$tmp/stdout" 2>"$tmp/stderr"
 
+        assert_contains "$tmp/getent-log" "hosts reading-garden-blue"
         assert_contains "$tmp/caddy-argv" "run"
         assert_contains "$tmp/caddy-argv" "--config"
         assert_contains "$tmp/caddy-argv" "/etc/caddy/Caddyfile"
         assert_contains "$tmp/caddy-argv" "--adapter"
         assert_contains "$tmp/caddy-argv" "caddyfile"
+        [[ -e "$tmp/caddy-invoked" ]] || fail "expected caddy to be invoked"
     )
 }
 
@@ -96,6 +100,7 @@ EOF
 
         cat > "$tmp/bin/getent" <<'EOF'
 #!/usr/bin/env bash
+printf '%s %s\n' "${1:-}" "${2:-}" >> "$TMPDIR/getent-log"
 exit 0
 EOF
 
@@ -106,6 +111,7 @@ EOF
 
         cat > "$tmp/bin/caddy" <<'EOF'
 #!/usr/bin/env bash
+touch "$TMPDIR/caddy-invoked"
 printf '%s\n' "$@" > "$TMPDIR/caddy-argv"
 EOF
 
@@ -121,6 +127,7 @@ EOF
         fi
 
         assert_contains "$tmp/stderr" "Failed to extract upstream"
+        [[ ! -e "$tmp/caddy-invoked" ]] || fail "expected caddy not to be invoked"
     )
 }
 
@@ -147,6 +154,7 @@ EOF
 
         cat > "$tmp/bin/getent" <<'EOF'
 #!/usr/bin/env bash
+printf '%s %s\n' "${1:-}" "${2:-}" >> "$TMPDIR/getent-log"
 if [[ "${1:-}" == "hosts" && "${2:-}" == "reading-garden-blue" ]]; then
     echo "172.19.0.2 reading-garden-blue"
     exit 0
@@ -161,6 +169,7 @@ EOF
 
         cat > "$tmp/bin/caddy" <<'EOF'
 #!/usr/bin/env bash
+touch "$TMPDIR/caddy-invoked"
 printf '%s\n' "$@" > "$TMPDIR/caddy-argv"
 EOF
 
@@ -175,7 +184,9 @@ EOF
             fail "expected health timeout failure"
         fi
 
+        assert_contains "$tmp/getent-log" "hosts reading-garden-blue"
         assert_contains "$tmp/stderr" "Timed out waiting for upstream health"
+        [[ ! -e "$tmp/caddy-invoked" ]] || fail "expected caddy not to be invoked"
     )
 }
 
