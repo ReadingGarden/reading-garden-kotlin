@@ -45,12 +45,14 @@ if [[ ! -x "$BOOTSTRAP_SCRIPT" ]]; then
 fi
 
 assert_contains "$BLUE_GREEN_SCRIPT" 'APP_CONTAINER_PREFIX="${APP_CONTAINER_PREFIX:-reading-garden}"'
-assert_contains "$BLUE_GREEN_SCRIPT" 'EDGE_APP_DIR="${EDGE_APP_DIR:-/opt/reading-garden/edge}"'
-assert_contains "$BLUE_GREEN_SCRIPT" 'EDGE_ROUTE_FILE_NAME="${EDGE_ROUTE_FILE_NAME:-prod-upstream.caddy}"'
+assert_contains "$BLUE_GREEN_SCRIPT" 'HOST_CADDY_UPSTREAM_FILE="${HOST_CADDY_UPSTREAM_FILE:?HOST_CADDY_UPSTREAM_FILE is required}"'
+assert_contains "$BLUE_GREEN_SCRIPT" 'APP_BLUE_HOST_PORT="${APP_BLUE_HOST_PORT:?APP_BLUE_HOST_PORT is required}"'
+assert_contains "$BLUE_GREEN_SCRIPT" 'APP_GREEN_HOST_PORT="${APP_GREEN_HOST_PORT:?APP_GREEN_HOST_PORT is required}"'
 assert_contains "$BLUE_GREEN_SCRIPT" 'CUTOVER_DRAIN_SECONDS="${CUTOVER_DRAIN_SECONDS:-30}"'
 assert_contains "$BLUE_GREEN_SCRIPT" 'APP_STOP_TIMEOUT_SECONDS="${APP_STOP_TIMEOUT_SECONDS:-35}"'
 assert_contains "$BLUE_GREEN_SCRIPT" 'sleep "$CUTOVER_DRAIN_SECONDS"'
 assert_contains "$BLUE_GREEN_SCRIPT" 'docker compose -f "$COMPOSE_FILE" stop -t "$APP_STOP_TIMEOUT_SECONDS" "app-${ACTIVE}"'
+assert_contains "$BLUE_GREEN_SCRIPT" 'ROUTE_RENDERER="${ROUTE_RENDERER:-${APP_DIR}/render-host-caddy-upstream.sh}"'
 assert_contains "$BOOTSTRAP_SCRIPT" 'REMOTE_APP_DIR:-${APP_DIR:-}'
 assert_contains "$BOOTSTRAP_EDGE_SCRIPT" 'EDGE_CADDY_START_SCRIPT="${EDGE_APP_DIR}/caddy-start.sh"'
 
