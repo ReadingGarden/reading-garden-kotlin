@@ -19,8 +19,27 @@ reload_caddy() {
 switch_proxy_target() {
     local from="$1"
     local to="$2"
+    local backup
+
+    backup="$(mktemp "${CADDY_FILE}.XXXXXX")"
+    if ! cp "$CADDY_FILE" "$backup"; then
+        rm -f "$backup"
+        return 1
+    fi
+
     sed -i "s/${from}:8080/${to}:8080/" "$CADDY_FILE"
-    reload_caddy
+
+    if reload_caddy; then
+        rm -f "$backup"
+        return 0
+    fi
+
+    cp "$backup" "$CADDY_FILE"
+    if ! reload_caddy; then
+        echo "ERROR: Failed to restore previous Caddy config after reload failure" >&2
+    fi
+    rm -f "$backup"
+    return 1
 }
 
 cd "$APP_DIR"
