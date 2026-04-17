@@ -7,7 +7,7 @@ APP_DIR="${REMOTE_APP_DIR:-/opt/reading-garden}"
 COMPOSE_FILE="${APP_DIR}/docker-compose.yml"
 CADDY_FILE="${APP_DIR}/Caddyfile"
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-120}"
-SMOKE_BASE_URL="${SMOKE_BASE_URL:-https://nooook.duckdns.org}"
+SMOKE_BASE_URL="${SMOKE_BASE_URL:-https://readinggarden.duckdns.org}"
 
 reload_caddy() {
     docker compose -f "$COMPOSE_FILE" exec -T caddy \

@@ -1,4 +1,4 @@
-nooook.duckdns.org {
+readinggarden.duckdns.org {
     encode zstd gzip
 
     request_body {
