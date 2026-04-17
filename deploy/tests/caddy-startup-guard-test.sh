@@ -21,14 +21,19 @@ assert_line_equals() {
     grep -Fx "$expected" "$file" >/dev/null || fail "expected exact line '$expected' in $file"
 }
 
-assert_array_equals() {
-    local -n actual="$1"
+assert_file_lines_exact() {
+    local file="$1"
     shift
     local expected=("$@")
-    [[ "${#actual[@]}" -eq "${#expected[@]}" ]] || fail "expected ${#expected[@]} args, got ${#actual[@]}"
+    local actual=()
+    local line
+    while IFS= read -r line; do
+        actual+=("$line")
+    done < "$file"
+    [[ "${#actual[@]}" -eq "${#expected[@]}" ]] || fail "expected ${#expected[@]} lines, got ${#actual[@]} in $file"
     local i
     for i in "${!expected[@]}"; do
-        [[ "${actual[$i]}" == "${expected[$i]}" ]] || fail "expected arg[$i] '${expected[$i]}', got '${actual[$i]}'"
+        [[ "${actual[$i]}" == "${expected[$i]}" ]] || fail "expected line[$i] '${expected[$i]}', got '${actual[$i]}' in $file"
     done
 }
 
@@ -97,8 +102,7 @@ EOF
 
         assert_line_equals "$tmp/getent-log" "hosts reading-garden-blue"
         assert_line_equals "$tmp/curl-log" "http://reading-garden-blue:8080/api/health"
-        mapfile -t caddy_args < "$tmp/caddy-argv"
-        assert_array_equals caddy_args \
+        assert_file_lines_exact "$tmp/caddy-argv" \
             run \
             --config \
             /etc/caddy/Caddyfile \
@@ -106,7 +110,10 @@ EOF
             caddyfile
         assert_line_equals "$tmp/caddy-pid" "$target_pid"
         [[ -f "$tmp/event-log" ]] || fail "expected event log"
-        mapfile -t event_lines < "$tmp/event-log"
+        event_lines=()
+        while IFS= read -r line; do
+            event_lines+=("$line")
+        done < "$tmp/event-log"
         [[ "${event_lines[0]:-}" == "getent" && "${event_lines[1]:-}" == "curl" && "${event_lines[2]:-}" == "caddy" ]] || fail "expected event order getent -> curl -> caddy"
         [[ -e "$tmp/caddy-invoked" ]] || fail "expected caddy to be invoked"
     )
@@ -288,7 +295,10 @@ EOF
         assert_line_equals "$tmp/getent-log" "hosts reading-garden-blue"
         assert_line_equals "$tmp/curl-log" "http://reading-garden-blue:8080/api/health"
         assert_contains "$tmp/stderr" "Timed out waiting for upstream health"
-        mapfile -t event_lines < "$tmp/event-log"
+        event_lines=()
+        while IFS= read -r line; do
+            event_lines+=("$line")
+        done < "$tmp/event-log"
         [[ "${event_lines[0]:-}" == "getent" && "${event_lines[1]:-}" == "curl" ]] || fail "expected event order getent -> curl before timeout"
         [[ ! -e "$tmp/caddy-invoked" ]] || fail "expected caddy not to be invoked"
     )
