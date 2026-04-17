@@ -9,6 +9,15 @@ fail() {
     exit 1
 }
 
+test_container_sh_syntax_is_valid() {
+    command -v docker >/dev/null 2>&1 || fail "docker is required for caddy shell compatibility test"
+    docker run --rm \
+        -v "$TARGET:/tmp/caddy-start.sh:ro" \
+        caddy:2 \
+        /bin/sh -n /tmp/caddy-start.sh >/dev/null 2>&1 || \
+        fail "expected $TARGET to be compatible with caddy:2 /bin/sh"
+}
+
 write_timeout_stub() {
     local path="$1"
     cat > "$path" <<'EOF'
@@ -446,6 +455,7 @@ EOF
     )
 }
 
+test_container_sh_syntax_is_valid
 test_success_execs_caddy_run
 test_route_parse_failure
 test_dns_failure
