@@ -46,7 +46,13 @@ class GardenController(
             ApiResponse(
                 responseCode = "200",
                 description = "가든 리스트 조회 성공",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.GARDEN_LIST_SUCCESS)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = GardenListLegacyDataResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.GARDEN_LIST_SUCCESS)],
+                    ),
+                ],
             ),
         ],
     )
@@ -62,6 +68,15 @@ class GardenController(
     @GetMapping("/detail")
     @Operation(summary = "가든 상세 조회", description = "`garden_no`에 해당하는 가든과 책/멤버 정보를 조회합니다.")
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "가든 상세 조회 성공",
+                content = [Content(mediaType = "application/json", schema = Schema(implementation = GardenDetailLegacyDataResponse::class))],
+            ),
+        ],
+    )
     fun getGardenDetail(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "조회할 가든 번호", example = "10")
@@ -83,6 +98,15 @@ class GardenController(
         ),
     )
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "201",
+                description = "가든 생성 성공",
+                content = [Content(mediaType = "application/json", schema = Schema(implementation = CreateGardenLegacyDataResponse::class))],
+            ),
+        ],
+    )
     fun createGarden(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @RequestBody request: CreateGardenRequest,
@@ -105,6 +129,21 @@ class GardenController(
         ),
     )
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "가든 수정 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = GardenEmptyLegacyDataResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.GARDEN_UPDATE_SUCCESS)],
+                    ),
+                ],
+            ),
+        ],
+    )
     fun updateGarden(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "수정할 가든 번호", example = "10")
@@ -120,6 +159,21 @@ class GardenController(
     @DeleteMapping("")
     @Operation(summary = "가든 삭제", description = "`garden_no`에 해당하는 가든을 삭제합니다.")
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "가든 삭제 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.GARDEN_DELETE_SUCCESS)],
+                    ),
+                ],
+            ),
+        ],
+    )
     fun deleteGarden(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "삭제할 가든 번호", example = "10")
@@ -132,6 +186,21 @@ class GardenController(
     @PutMapping("/to")
     @Operation(summary = "가든 간 책 이동", description = "한 가든의 책을 다른 가든으로 이동합니다.")
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "가든 책 이동 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.GARDEN_MOVE_SUCCESS)],
+                    ),
+                ],
+            ),
+        ],
+    )
     fun moveGardenBook(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "현재 가든 번호", example = "10")
@@ -146,6 +215,21 @@ class GardenController(
     @DeleteMapping("/member")
     @Operation(summary = "가든 나가기", description = "현재 사용자가 `garden_no` 가든에서 탈퇴합니다.")
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "가든 탈퇴 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.GARDEN_LEAVE_SUCCESS)],
+                    ),
+                ],
+            ),
+        ],
+    )
     fun leaveGardenMember(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "탈퇴할 가든 번호", example = "10")
@@ -158,6 +242,21 @@ class GardenController(
     @PutMapping("/member")
     @Operation(summary = "가든 리더 변경", description = "`user_no`에게 가든 리더 권한을 넘깁니다.")
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "가든 멤버 변경 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.GARDEN_LEADER_SUCCESS)],
+                    ),
+                ],
+            ),
+        ],
+    )
     fun updateGardenMember(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "대상 가든 번호", example = "10")
@@ -172,6 +271,21 @@ class GardenController(
     @PutMapping("/main")
     @Operation(summary = "대표 가든 변경", description = "`garden_no`를 대표 가든으로 설정합니다.")
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "가든 메인 변경 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.GARDEN_MAIN_SUCCESS)],
+                    ),
+                ],
+            ),
+        ],
+    )
     fun updateGardenMain(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "대표로 설정할 가든 번호", example = "10")
@@ -184,6 +298,21 @@ class GardenController(
     @PostMapping("/invite")
     @Operation(summary = "가든 초대 링크 생성", description = "`garden_no`에 대한 초대 정보를 생성합니다.")
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "201",
+                description = "가든 초대 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.GARDEN_INVITE_SUCCESS)],
+                    ),
+                ],
+            ),
+        ],
+    )
     fun inviteGardenMember(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "초대할 가든 번호", example = "10")

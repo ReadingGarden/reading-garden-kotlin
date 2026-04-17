@@ -13,6 +13,17 @@ data class SignupResponse(
     val user_nick: String,
 )
 
+@Schema(description = "로그인 성공 응답 데이터")
+data class LoginResponseData(
+    @field:Schema(description = "로그인에 사용할 access token", example = "fixture-access-token")
+    val access_token: String,
+    @field:Schema(description = "토큰 재발급용 refresh token", example = "fixture-refresh-token")
+    val refresh_token: String,
+)
+
+@Schema(description = "빈 객체 응답 데이터")
+class EmptyResponseData
+
 @Schema(description = "내 프로필 응답 데이터")
 data class UserProfileResponse(
     @field:Schema(description = "사용자 번호", example = "1")
@@ -53,4 +64,64 @@ data class UserSummaryResponse(
     val user_social_type: String,
     @field:Schema(description = "가입 시각", example = "2026-04-09T16:00:00")
     val user_created_at: LocalDateTime,
+)
+
+@Schema(name = "SignupLegacyDataResponse", description = "회원가입 성공 레거시 envelope")
+data class SignupLegacyDataResponse(
+    @field:Schema(description = "HTTP 상태 코드와 동일한 레거시 응답 코드", example = "201")
+    val resp_code: Int,
+    @field:Schema(description = "레거시 응답 메시지", example = "회원가입 성공")
+    val resp_msg: String,
+    @field:Schema(description = "회원가입 결과 데이터")
+    val data: SignupResponse,
+)
+
+@Schema(name = "LoginLegacyDataResponse", description = "로그인 성공 레거시 envelope")
+data class LoginLegacyDataResponse(
+    @field:Schema(description = "HTTP 상태 코드와 동일한 레거시 응답 코드", example = "200")
+    val resp_code: Int,
+    @field:Schema(description = "레거시 응답 메시지", example = "로그인 성공")
+    val resp_msg: String,
+    @field:Schema(description = "로그인 토큰 데이터")
+    val data: LoginResponseData,
+)
+
+@Schema(name = "EmptyLegacyDataResponse", description = "빈 객체 데이터를 담는 레거시 envelope")
+data class EmptyLegacyDataResponse(
+    @field:Schema(description = "HTTP 상태 코드와 동일한 레거시 응답 코드", example = "200")
+    val resp_code: Int,
+    @field:Schema(description = "레거시 응답 메시지", example = "처리 성공")
+    val resp_msg: String,
+    @field:Schema(description = "빈 객체 데이터")
+    val data: EmptyResponseData,
+)
+
+@Schema(name = "TokenRefreshLegacyDataResponse", description = "토큰 재발급 성공 레거시 envelope")
+data class TokenRefreshLegacyDataResponse(
+    @field:Schema(description = "HTTP 상태 코드와 동일한 레거시 응답 코드", example = "200")
+    val resp_code: Int,
+    @field:Schema(description = "레거시 응답 메시지", example = "토큰 발급 성공")
+    val resp_msg: String,
+    @field:Schema(description = "새 access token", example = "fixture-access-token")
+    val data: String,
+)
+
+@Schema(name = "UserProfileLegacyDataResponse", description = "내 프로필 조회 성공 레거시 envelope")
+data class UserProfileLegacyDataResponse(
+    @field:Schema(description = "HTTP 상태 코드와 동일한 레거시 응답 코드", example = "200")
+    val resp_code: Int,
+    @field:Schema(description = "레거시 응답 메시지", example = "조회 성공")
+    val resp_msg: String,
+    @field:Schema(description = "프로필 조회 데이터")
+    val data: UserProfileResponse,
+)
+
+@Schema(name = "UserSummaryLegacyDataResponse", description = "프로필 수정 성공 레거시 envelope")
+data class UserSummaryLegacyDataResponse(
+    @field:Schema(description = "HTTP 상태 코드와 동일한 레거시 응답 코드", example = "200")
+    val resp_code: Int,
+    @field:Schema(description = "레거시 응답 메시지", example = "프로필 변경 성공")
+    val resp_msg: String,
+    @field:Schema(description = "프로필 수정 결과 데이터")
+    val data: UserSummaryResponse,
 )

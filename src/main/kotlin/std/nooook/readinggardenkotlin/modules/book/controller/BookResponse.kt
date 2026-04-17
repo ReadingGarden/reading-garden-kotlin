@@ -177,3 +177,87 @@ data class BookSearchPayloadDocument(
     @field:Schema(description = "검색 결과 목록")
     val item: List<BookSearchItemDocument>,
 )
+
+@Schema(description = "ISBN 검색 응답 payload")
+data class BookLookupPayloadDocument(
+    @field:Schema(description = "책 제목", example = "클린 코드")
+    val title: String,
+    @field:Schema(description = "저자", example = "로버트 C. 마틴")
+    val author: String,
+    @field:Schema(description = "ISBN13", example = "9780132350884")
+    val isbn13: String,
+    @field:Schema(description = "표지 이미지 URL", example = "https://example.com/cover.jpg")
+    val cover: String,
+    @field:Schema(description = "출판사", example = "프래그마틱")
+    val publisher: String,
+)
+
+@Schema(name = "BookSearchLegacyDataResponse", description = "책 검색 성공 레거시 envelope")
+data class BookSearchLegacyDataResponse(
+    @field:Schema(description = "HTTP 상태 코드와 동일한 레거시 응답 코드", example = "200")
+    val resp_code: Int,
+    @field:Schema(description = "레거시 응답 메시지", example = "책 검색 성공")
+    val resp_msg: String,
+    @field:Schema(description = "책 검색 데이터")
+    val data: BookSearchPayloadDocument,
+)
+
+@Schema(name = "BookLookupLegacyDataResponse", description = "ISBN 검색 성공 레거시 envelope")
+data class BookLookupLegacyDataResponse(
+    @field:Schema(description = "HTTP 상태 코드와 동일한 레거시 응답 코드", example = "200")
+    val resp_code: Int,
+    @field:Schema(description = "레거시 응답 메시지", example = "책 검색(ISBN) 성공")
+    val resp_msg: String,
+    @field:Schema(description = "ISBN 검색 데이터")
+    val data: BookLookupPayloadDocument,
+)
+
+@Schema(name = "BookDetailLegacyDataResponse", description = "책 상세 조회 성공 레거시 envelope")
+data class BookDetailLegacyDataResponse(
+    @field:Schema(description = "HTTP 상태 코드와 동일한 레거시 응답 코드", example = "200")
+    val resp_code: Int,
+    @field:Schema(description = "레거시 응답 메시지", example = "책 상세 조회 성공")
+    val resp_msg: String,
+    @field:Schema(description = "책 상세 데이터")
+    val data: BookDetailResponse,
+)
+
+@Schema(name = "CreateBookLegacyDataResponse", description = "책 등록 성공 레거시 envelope")
+data class CreateBookLegacyDataResponse(
+    @field:Schema(description = "HTTP 상태 코드와 동일한 레거시 응답 코드", example = "201")
+    val resp_code: Int,
+    @field:Schema(description = "레거시 응답 메시지", example = "책 등록 성공")
+    val resp_msg: String,
+    @field:Schema(description = "생성된 책 데이터")
+    val data: CreateBookResponse,
+)
+
+@Schema(name = "BookStatusLegacyDataResponse", description = "책 상태 목록 조회 성공 레거시 envelope")
+data class BookStatusLegacyDataResponse(
+    @field:Schema(description = "HTTP 상태 코드와 동일한 레거시 응답 코드", example = "200")
+    val resp_code: Int,
+    @field:Schema(description = "레거시 응답 메시지", example = "책 상태 조회 성공")
+    val resp_msg: String,
+    @field:Schema(description = "책 상태 목록 데이터")
+    val data: BookStatusResponse,
+)
+
+@Schema(name = "BookReadDetailLegacyDataResponse", description = "독서 기록 상세 조회 성공 레거시 envelope")
+data class BookReadDetailLegacyDataResponse(
+    @field:Schema(description = "HTTP 상태 코드와 동일한 레거시 응답 코드", example = "200")
+    val resp_code: Int,
+    @field:Schema(description = "레거시 응답 메시지", example = "독서 기록 조회 성공")
+    val resp_msg: String,
+    @field:Schema(description = "독서 기록 상세 데이터")
+    val data: BookReadDetailResponse,
+)
+
+@Schema(name = "CreateReadLegacyDataResponse", description = "독서 기록 생성 성공 레거시 envelope")
+data class CreateReadLegacyDataResponse(
+    @field:Schema(description = "HTTP 상태 코드와 동일한 레거시 응답 코드", example = "201")
+    val resp_code: Int,
+    @field:Schema(description = "레거시 응답 메시지", example = "책 기록 성공")
+    val resp_msg: String,
+    @field:Schema(description = "생성된 독서 기록 데이터")
+    val data: CreateReadResponse,
+)
