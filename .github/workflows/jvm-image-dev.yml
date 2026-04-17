@@ -1,9 +1,9 @@
-name: jvm-image
+name: jvm-image-dev
 
 on:
   push:
     branches:
-      - main
+      - dev
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -65,17 +65,17 @@ jobs:
           platforms: linux/arm64
           push: true
           tags: |
-            ${{ env.REGISTRY_IMAGE }}:jvm-${{ github.sha }}
-            ${{ env.REGISTRY_IMAGE }}:jvm-latest
+            ${{ env.REGISTRY_IMAGE }}:jvm-dev-${{ github.sha }}
+            ${{ env.REGISTRY_IMAGE }}:jvm-dev-latest
 
-  deploy-oci:
+  deploy-oci-dev:
     needs: build-arm64
     runs-on: ubuntu-latest
     permissions:
       contents: read
     env:
-      IMAGE_REF: ghcr.io/readinggarden/reading-garden-kotlin:jvm-${{ github.sha }}
-      REMOTE_APP_DIR: /opt/reading-garden
+      IMAGE_REF: ghcr.io/readinggarden/reading-garden-kotlin:jvm-dev-${{ github.sha }}
+      REMOTE_APP_DIR: /opt/reading-garden/dev
       EDGE_APP_DIR: /opt/reading-garden/edge
       OCI_PORT: ${{ vars.OCI_PORT || '22' }}
     steps:
@@ -133,12 +133,13 @@ jobs:
 
           echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 
+          export SOURCE_APP_DIR="/opt/reading-garden"
           export APP_HOST_DIR="$REMOTE_APP_DIR"
-          export APP_CONTAINER_PREFIX="reading-garden"
-          export APP_VOLUME_PREFIX="reading-garden"
+          export APP_CONTAINER_PREFIX="reading-garden-dev"
+          export APP_VOLUME_PREFIX="reading-garden-dev"
           export EDGE_APP_DIR="$EDGE_APP_DIR"
-          export EDGE_ROUTE_FILE_NAME="prod-upstream.caddy"
-          export SMOKE_BASE_URL="https://readinggarden.duckdns.org"
+          export EDGE_ROUTE_FILE_NAME="dev-upstream.caddy"
+          export SMOKE_BASE_URL="https://readinggarden-dev.duckdns.org"
 
           ./bootstrap-instance.sh
           test -f .env
