@@ -1,12 +1,16 @@
 services:
-  nginx:
-    image: nginx:alpine
-    container_name: reading-garden-proxy
+  caddy:
+    image: caddy:2
+    container_name: reading-garden-caddy
     restart: unless-stopped
     ports:
       - "80:80"
+      - "443:443"
+      - "443:443/udp"
     volumes:
-      - /opt/reading-garden/nginx.conf:/etc/nginx/conf.d/default.conf
+      - /opt/reading-garden/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
     depends_on:
       app-blue:
         condition: service_healthy
@@ -77,3 +81,5 @@ services:
 
 volumes:
   pgdata:
+  caddy_data:
+  caddy_config:
