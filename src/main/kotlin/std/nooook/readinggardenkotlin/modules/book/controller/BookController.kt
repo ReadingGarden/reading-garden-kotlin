@@ -47,6 +47,32 @@ class BookController(
     @GetMapping("")
     @Operation(summary = "책 중복 확인", description = "현재 사용자 기준으로 같은 ISBN의 책이 이미 등록되었는지 확인합니다.")
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "책 등록 가능",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.BOOK_DUPLICATION_AVAILABLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "403",
+                description = "이미 동일한 ISBN의 책이 존재함",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.BOOK_DUPLICATION_CONFLICT)],
+                    ),
+                ],
+            ),
+        ],
+    )
     fun checkBookDuplication(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "확인할 ISBN13", example = "9788937462788")
@@ -66,7 +92,7 @@ class BookController(
                 content = [
                     Content(
                         mediaType = "application/json",
-                        schema = Schema(implementation = BookSearchPayloadDocument::class),
+                        schema = Schema(implementation = BookSearchLegacyDataResponse::class),
                         examples = [ExampleObject(value = OpenApiExamples.BOOK_SEARCH_SUCCESS)],
                     ),
                 ],
@@ -93,6 +119,21 @@ class BookController(
 
     @GetMapping("/search-isbn")
     @Operation(summary = "ISBN 검색", description = "ISBN13으로 책을 검색합니다. 알라딘 응답 payload를 그대로 노출합니다.")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "ISBN 검색 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = BookLookupLegacyDataResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.BOOK_LOOKUP_SUCCESS)],
+                    ),
+                ],
+            ),
+        ],
+    )
     fun searchBookByIsbn(
         @Parameter(description = "ISBN13", example = "9788937462788")
         @RequestParam query: String,
@@ -110,7 +151,13 @@ class BookController(
             ApiResponse(
                 responseCode = "200",
                 description = "책 상세 조회 성공",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.BOOK_DETAIL_SUCCESS)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = BookDetailLegacyDataResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.BOOK_DETAIL_SUCCESS)],
+                    ),
+                ],
             ),
         ],
     )
@@ -134,6 +181,15 @@ class BookController(
         ),
     )
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "201",
+                description = "책 등록 성공",
+                content = [Content(mediaType = "application/json", schema = Schema(implementation = CreateBookLegacyDataResponse::class))],
+            ),
+        ],
+    )
     fun createBook(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @RequestBody request: CreateBookRequest,
@@ -149,6 +205,21 @@ class BookController(
     @DeleteMapping("")
     @Operation(summary = "책 삭제", description = "`book_no`에 해당하는 책을 삭제합니다.")
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "책 삭제 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.BOOK_DELETE_SUCCESS)],
+                    ),
+                ],
+            ),
+        ],
+    )
     fun deleteBook(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "삭제할 책 번호", example = "1")
@@ -161,6 +232,15 @@ class BookController(
     @GetMapping("/status")
     @Operation(summary = "책 상태 목록 조회", description = "가든 번호, 상태 코드, 페이지네이션 조건으로 책 목록을 조회합니다.")
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "책 상태 조회 성공",
+                content = [Content(mediaType = "application/json", schema = Schema(implementation = BookStatusLegacyDataResponse::class))],
+            ),
+        ],
+    )
     fun getBookStatus(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "가든 번호 필터", example = "10")
@@ -187,6 +267,15 @@ class BookController(
     @GetMapping("/read")
     @Operation(summary = "독서 기록 상세 조회", description = "`book_no` 기준으로 독서 이력과 연결 메모를 조회합니다.")
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "독서 기록 조회 성공",
+                content = [Content(mediaType = "application/json", schema = Schema(implementation = BookReadDetailLegacyDataResponse::class))],
+            ),
+        ],
+    )
     fun getBookRead(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "조회할 책 번호", example = "1")
@@ -208,6 +297,15 @@ class BookController(
         ),
     )
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "201",
+                description = "독서 기록 생성 성공",
+                content = [Content(mediaType = "application/json", schema = Schema(implementation = CreateReadLegacyDataResponse::class))],
+            ),
+        ],
+    )
     fun createBookRead(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @RequestBody request: CreateReadRequest,
@@ -230,6 +328,21 @@ class BookController(
         ),
     )
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "독서 기록 수정 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.BOOK_READ_UPDATE_SUCCESS)],
+                    ),
+                ],
+            ),
+        ],
+    )
     fun updateBookRead(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "수정할 독서 기록 id", example = "1")
@@ -243,6 +356,21 @@ class BookController(
     @DeleteMapping("/read")
     @Operation(summary = "독서 기록 삭제", description = "`id`에 해당하는 독서 기록을 삭제합니다.")
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "독서 기록 삭제 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.BOOK_READ_DELETE_SUCCESS)],
+                    ),
+                ],
+            ),
+        ],
+    )
     fun deleteBookRead(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "삭제할 독서 기록 id", example = "1")
@@ -267,17 +395,35 @@ class BookController(
             ApiResponse(
                 responseCode = "201",
                 description = "업로드 성공",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.CREATED_EMPTY_SUCCESS)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.BOOK_IMAGE_UPLOAD_SUCCESS)],
+                    ),
+                ],
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "multipart 요청 형식 오류",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.BAD_REQUEST)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.BAD_REQUEST)],
+                    ),
+                ],
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "인증 실패",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.UNAUTHORIZED)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.UNAUTHORIZED)],
+                    ),
+                ],
             ),
         ],
     )
@@ -298,6 +444,21 @@ class BookController(
     @DeleteMapping("/image")
     @Operation(summary = "책 이미지 삭제", description = "`book_no`에 연결된 사용자 업로드 이미지를 삭제합니다.")
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "201",
+                description = "책 이미지 삭제 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.BOOK_IMAGE_DELETE_SUCCESS)],
+                    ),
+                ],
+            ),
+        ],
+    )
     fun deleteBookImage(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "이미지를 삭제할 책 번호", example = "1")
@@ -320,6 +481,21 @@ class BookController(
         ),
     )
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "책 수정 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.BOOK_UPDATE_SUCCESS)],
+                    ),
+                ],
+            ),
+        ],
+    )
     fun updateBook(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "수정할 책 번호", example = "1")
