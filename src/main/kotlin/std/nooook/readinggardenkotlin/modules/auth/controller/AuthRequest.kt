@@ -5,9 +5,9 @@ import jakarta.validation.constraints.Pattern
 
 @Schema(description = "회원가입 요청")
 data class CreateUserRequest(
-    @field:Schema(description = "로그인에 사용할 이메일", example = "user@example.com")
+    @field:Schema(description = "로그인에 사용할 이메일. 소셜 로그인(애플 이메일 숨기기 등)에서는 빈 문자열 허용.", example = "user@example.com")
     @field:Pattern(
-        regexp = "^\\w+@[a-zA-Z_]+?\\.[a-zA-Z]{2,3}$",
+        regexp = "^$|^[\\w.+-]+@[\\w.-]+\\.[A-Za-z]{2,}$",
         message = "must match legacy email format",
     )
     val user_email: String,
@@ -55,6 +55,8 @@ data class UpdateUserRequest(
     val user_nick: String? = null,
     @field:Schema(description = "수정할 프로필 이미지 이름 또는 경로, 미수정 시 null", example = "rose", nullable = true)
     val user_image: String? = null,
+    @field:Schema(description = "수정할 기기 FCM 토큰, 미수정 시 null", example = "fcm-token-value", nullable = true)
+    val user_fcm: String? = null,
 )
 
 @Schema(description = "비밀번호 수정 요청")
