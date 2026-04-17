@@ -142,7 +142,6 @@ jobs:
           export APP_VOLUME_PREFIX="reading-garden-dev"
           export EDGE_APP_DIR="$EDGE_APP_DIR"
           export EDGE_ROUTE_FILE_NAME="dev-upstream.caddy"
-          export EDGE_CADDY_ROUTE_FILE="/etc/caddy/routes/dev-upstream.caddy"
           export SMOKE_BASE_URL="https://readinggarden-dev.duckdns.org"
 
           ./bootstrap-instance.sh
