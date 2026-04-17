@@ -96,13 +96,19 @@ fi
 
 assert_contains "$PROD_WORKFLOW" "branches:"
 assert_contains "$PROD_WORKFLOW" "- main"
-assert_contains "$PROD_WORKFLOW" "EDGE_APP_DIR: /opt/reading-garden/edge"
-assert_contains "$PROD_WORKFLOW" 'EDGE_ROUTE_FILE_NAME="prod-upstream.caddy"'
-assert_contains "$PROD_WORKFLOW" "deploy/caddy-start.sh"
+assert_contains "$PROD_WORKFLOW" "REMOTE_APP_DIR: /opt/apps/reading-garden/prod"
+assert_contains "$PROD_WORKFLOW" "deploy/docker-compose.postgres-shared.yml"
+assert_contains "$PROD_WORKFLOW" "deploy/render-host-caddy-upstream.sh"
+assert_contains "$PROD_WORKFLOW" "deploy/postgres/init/10-create-app-databases.sh"
+assert_contains "$PROD_WORKFLOW" '/tmp/reading-garden-host-caddy'
+assert_contains "$PROD_WORKFLOW" 'APP_CONTAINER_PREFIX="reading-garden-prod"'
+assert_contains "$PROD_WORKFLOW" 'HOST_CADDY_UPSTREAM_FILE="/etc/caddy/upstreams/reading-garden-prod.caddy"'
 assert_contains "$DEV_WORKFLOW" "- dev"
+assert_contains "$DEV_WORKFLOW" "REMOTE_APP_DIR: /opt/apps/reading-garden/dev"
 assert_contains "$DEV_WORKFLOW" 'IMAGE_REF: ghcr.io/readinggarden/reading-garden-kotlin:jvm-dev-${{ github.sha }}'
 assert_contains "$DEV_WORKFLOW" 'APP_CONTAINER_PREFIX="reading-garden-dev"'
-assert_contains "$DEV_WORKFLOW" 'EDGE_ROUTE_FILE_NAME="dev-upstream.caddy"'
-assert_contains "$DEV_WORKFLOW" "deploy/caddy-start.sh"
+assert_contains "$DEV_WORKFLOW" 'HOST_CADDY_UPSTREAM_FILE="/etc/caddy/upstreams/reading-garden-dev.caddy"'
+assert_contains "$DEV_WORKFLOW" "deploy/docker-compose.postgres-shared.yml"
+assert_contains "$DEV_WORKFLOW" "deploy/render-host-caddy-upstream.sh"
 
 echo "deploy layout test passed"
