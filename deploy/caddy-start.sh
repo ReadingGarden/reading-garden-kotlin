@@ -4,6 +4,7 @@ set -euo pipefail
 CADDY_ROUTE_FILE="${CADDY_ROUTE_FILE:-/etc/caddy/routes/prod-upstream.caddy}"
 UPSTREAM_WAIT_TIMEOUT_SECONDS="${UPSTREAM_WAIT_TIMEOUT_SECONDS:-120}"
 UPSTREAM_WAIT_INTERVAL_SECONDS="${UPSTREAM_WAIT_INTERVAL_SECONDS:-2}"
+TIMEOUT_BIN=""
 
 require_command() {
     local cmd="$1"
@@ -38,6 +39,10 @@ preflight_checks() {
     require_command caddy
     validate_positive_integer UPSTREAM_WAIT_TIMEOUT_SECONDS "$UPSTREAM_WAIT_TIMEOUT_SECONDS"
     validate_positive_integer UPSTREAM_WAIT_INTERVAL_SECONDS "$UPSTREAM_WAIT_INTERVAL_SECONDS"
+
+    if command -v timeout >/dev/null 2>&1; then
+        TIMEOUT_BIN="$(command -v timeout)"
+    fi
 }
 
 extract_upstream_host() {
@@ -65,16 +70,23 @@ extract_upstream_host() {
     printf '%s\n' "$upstream"
 }
 
-calculate_probe_timeout_seconds() {
+remaining_budget_seconds() {
     local start_ts="$1"
     local now_ts
     local elapsed
     local remaining
-    local probe_timeout
 
     now_ts="$(date +%s)"
     elapsed=$((now_ts - start_ts))
     remaining=$((UPSTREAM_WAIT_TIMEOUT_SECONDS - elapsed))
+
+    printf '%s\n' "$remaining"
+}
+
+calculate_probe_timeout_seconds() {
+    local remaining="$1"
+    local probe_timeout
+
     probe_timeout="$UPSTREAM_WAIT_INTERVAL_SECONDS"
 
     if [ "$remaining" -lt "$probe_timeout" ]; then
@@ -90,14 +102,10 @@ calculate_probe_timeout_seconds() {
 
 sleep_with_remaining_budget() {
     local start_ts="$1"
-    local now_ts
-    local elapsed
     local remaining
     local sleep_seconds
 
-    now_ts="$(date +%s)"
-    elapsed=$((now_ts - start_ts))
-    remaining=$((UPSTREAM_WAIT_TIMEOUT_SECONDS - elapsed))
+    remaining="$(remaining_budget_seconds "$start_ts")"
 
     if [ "$remaining" -le 0 ]; then
         return 0
@@ -116,16 +124,28 @@ sleep_with_remaining_budget() {
 wait_for_upstream_dns() {
     local host="$1"
     local start_ts
-    local now_ts
+    local remaining
+    local probe_timeout_seconds
 
     start_ts="$(date +%s)"
     while true; do
-        if getent hosts "$host" >/dev/null 2>&1; then
+        remaining="$(remaining_budget_seconds "$start_ts")"
+        if [ "$remaining" -le 0 ]; then
+            echo "ERROR: Timed out waiting for upstream DNS: $host" >&2
+            return 1
+        fi
+
+        probe_timeout_seconds="$(calculate_probe_timeout_seconds "$remaining")"
+        if [ -n "$TIMEOUT_BIN" ]; then
+            if "$TIMEOUT_BIN" "$probe_timeout_seconds" getent hosts "$host" >/dev/null 2>&1; then
+                return 0
+            fi
+        elif getent hosts "$host" >/dev/null 2>&1; then
             return 0
         fi
 
-        now_ts="$(date +%s)"
-        if [ $((now_ts - start_ts)) -ge "$UPSTREAM_WAIT_TIMEOUT_SECONDS" ]; then
+        remaining="$(remaining_budget_seconds "$start_ts")"
+        if [ "$remaining" -le 0 ]; then
             echo "ERROR: Timed out waiting for upstream DNS: $host" >&2
             return 1
         fi
@@ -137,12 +157,18 @@ wait_for_upstream_dns() {
 wait_for_upstream_health() {
     local host="$1"
     local start_ts
-    local now_ts
+    local remaining
     local probe_timeout_seconds
 
     start_ts="$(date +%s)"
     while true; do
-        probe_timeout_seconds="$(calculate_probe_timeout_seconds "$start_ts")"
+        remaining="$(remaining_budget_seconds "$start_ts")"
+        if [ "$remaining" -le 0 ]; then
+            echo "ERROR: Timed out waiting for upstream health: $host" >&2
+            return 1
+        fi
+
+        probe_timeout_seconds="$(calculate_probe_timeout_seconds "$remaining")"
         if curl \
             --connect-timeout "$probe_timeout_seconds" \
             --max-time "$probe_timeout_seconds" \
@@ -151,8 +177,8 @@ wait_for_upstream_health() {
             return 0
         fi
 
-        now_ts="$(date +%s)"
-        if [ $((now_ts - start_ts)) -ge "$UPSTREAM_WAIT_TIMEOUT_SECONDS" ]; then
+        remaining="$(remaining_budget_seconds "$start_ts")"
+        if [ "$remaining" -le 0 ]; then
             echo "ERROR: Timed out waiting for upstream health: $host" >&2
             return 1
         fi
