@@ -31,6 +31,7 @@ class AppVersionControllerIntegrationTest(
             .andExpect(jsonPath("$.data.platform").value("ios"))
             .andExpect(jsonPath("$.data.latest_version").value("1.1.0"))
             .andExpect(jsonPath("$.data.min_supported_version").value("1.0.0"))
+            // store_url is the Flyway seed placeholder — real URL is set via manual UPDATE after deployment
             .andExpect(jsonPath("$.data.store_url").value("https://apps.apple.com/app/id<APP_ID>"))
     }
 
@@ -44,6 +45,7 @@ class AppVersionControllerIntegrationTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.platform").value("android"))
             .andExpect(jsonPath("$.data.latest_version").value("1.1.0"))
+            // store_url is the Flyway seed placeholder — real URL is set via manual UPDATE after deployment
             .andExpect(jsonPath("$.data.store_url").value("https://play.google.com/store/apps/details?id=<PKG>"))
     }
 
