@@ -92,7 +92,7 @@ jobs:
         run: |
           ssh -p "$OCI_PORT" "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}" "mkdir -p '$REMOTE_APP_DIR'"
           scp -P "$OCI_PORT" deploy/docker-compose.oci.yml "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$REMOTE_APP_DIR/docker-compose.yml"
-          scp -P "$OCI_PORT" deploy/nginx.conf "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$REMOTE_APP_DIR/nginx.conf"
+          scp -P "$OCI_PORT" deploy/Caddyfile "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$REMOTE_APP_DIR/Caddyfile"
           scp -P "$OCI_PORT" deploy/blue-green-deploy.sh "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$REMOTE_APP_DIR/blue-green-deploy.sh"
           scp -P "$OCI_PORT" deploy/cutover-smoke-check.sh "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$REMOTE_APP_DIR/cutover-smoke-check.sh"
           ssh -p "$OCI_PORT" "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}" "chmod +x '$REMOTE_APP_DIR/blue-green-deploy.sh' '$REMOTE_APP_DIR/cutover-smoke-check.sh'"
