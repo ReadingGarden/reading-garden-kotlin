@@ -27,6 +27,7 @@ class SecurityRequestMatcherConfig {
                 PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/auth/find-password"),
                 PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/v1/auth/find-password/check"),
                 PathPatternRequestMatcher.pathPattern(HttpMethod.PUT, "/api/v1/auth/find-password/update-password"),
+                PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/api/v1/app/version"),
             ),
         )
 }
