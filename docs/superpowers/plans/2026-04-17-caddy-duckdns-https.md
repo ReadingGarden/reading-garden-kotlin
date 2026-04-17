@@ -105,14 +105,24 @@ Run:
 
 ```bash
 docker run --rm -v "$PWD/deploy:/etc/caddy:ro" caddy:2 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
-docker compose -f deploy/docker-compose.oci.yml config >/tmp/reading-garden-oci-compose.txt
-rg -n "reading-garden-caddy|443:443|/opt/reading-garden/Caddyfile|caddy_data|caddy_config" /tmp/reading-garden-oci-compose.txt
+mkdir -p .tmp
+: > .tmp/oci.env
+python3 - <<'PY'
+from pathlib import Path
+src = Path("deploy/docker-compose.oci.yml").read_text()
+env_path = Path(".tmp/oci.env").resolve()
+Path("/tmp/reading-garden-oci-compose.yml").write_text(
+    src.replace("/opt/reading-garden/.env", str(env_path))
+)
+PY
+IMAGE_REF=dummy DB_PASSWORD=dummy docker compose -f /tmp/reading-garden-oci-compose.yml config >/tmp/reading-garden-oci-compose.txt
+rg -n 'reading-garden-caddy|target: 443|published: "443"|protocol: udp|source: /opt/reading-garden/Caddyfile|source: caddy_data|source: caddy_config' /tmp/reading-garden-oci-compose.txt
 ```
 
 Expected:
 - `caddy validate` exits `0`
 - `docker compose ... config` exits `0`
-- `rg` prints the new caddy container name, HTTPS port mappings, and Caddy volumes
+- `rg` prints the new caddy container name, rendered HTTPS port entries, and Caddy volumes
 
 - [ ] **Step 5: Commit the proxy service replacement**
 
