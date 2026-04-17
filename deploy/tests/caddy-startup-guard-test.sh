@@ -48,6 +48,7 @@ EOF
 
         cat > "$tmp/bin/curl" <<'EOF'
 #!/usr/bin/env bash
+printf '%s\n' "$@" >> "$TMPDIR/curl-log"
 if [[ "$*" == *"http://reading-garden-blue:8080/api/health"* ]]; then
     exit 0
 fi
@@ -70,6 +71,7 @@ EOF
         "$TARGET" >"$tmp/stdout" 2>"$tmp/stderr"
 
         assert_contains "$tmp/getent-log" "hosts reading-garden-blue"
+        assert_contains "$tmp/curl-log" "http://reading-garden-blue:8080/api/health"
         assert_contains "$tmp/caddy-argv" "run"
         assert_contains "$tmp/caddy-argv" "--config"
         assert_contains "$tmp/caddy-argv" "/etc/caddy/Caddyfile"
@@ -106,6 +108,7 @@ EOF
 
         cat > "$tmp/bin/curl" <<'EOF'
 #!/usr/bin/env bash
+printf '%s\n' "$@" >> "$TMPDIR/curl-log"
 exit 0
 EOF
 
@@ -127,6 +130,8 @@ EOF
         fi
 
         assert_contains "$tmp/stderr" "Failed to extract upstream"
+        [[ ! -e "$tmp/getent-log" ]] || fail "expected getent not to be invoked"
+        [[ ! -e "$tmp/curl-log" ]] || fail "expected curl not to be invoked"
         [[ ! -e "$tmp/caddy-invoked" ]] || fail "expected caddy not to be invoked"
     )
 }
@@ -164,6 +169,7 @@ EOF
 
         cat > "$tmp/bin/curl" <<'EOF'
 #!/usr/bin/env bash
+printf '%s\n' "$@" >> "$TMPDIR/curl-log"
 exit 1
 EOF
 
@@ -185,6 +191,7 @@ EOF
         fi
 
         assert_contains "$tmp/getent-log" "hosts reading-garden-blue"
+        assert_contains "$tmp/curl-log" "http://reading-garden-blue:8080/api/health"
         assert_contains "$tmp/stderr" "Timed out waiting for upstream health"
         [[ ! -e "$tmp/caddy-invoked" ]] || fail "expected caddy not to be invoked"
     )
