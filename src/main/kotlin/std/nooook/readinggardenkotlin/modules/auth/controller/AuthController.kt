@@ -53,6 +53,7 @@ class AuthController(
             ApiResponse(
                 responseCode = "201",
                 description = "회원가입 성공",
+                useReturnTypeSchema = true,
                 content = [
                     Content(
                         mediaType = "application/json",
@@ -126,7 +127,11 @@ class AuthController(
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses(
         value = [
-            ApiResponse(responseCode = "200", description = "로그아웃 성공"),
+            ApiResponse(
+                responseCode = "200",
+                description = "로그아웃 성공",
+                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.AUTH_LOGOUT_SUCCESS)])],
+            ),
             ApiResponse(
                 responseCode = "401",
                 description = "인증 실패",
@@ -156,8 +161,16 @@ class AuthController(
     )
     @ApiResponses(
         value = [
-            ApiResponse(responseCode = "200", description = "토큰 발급 성공"),
-            ApiResponse(responseCode = "400", description = "리프레시 토큰 형식 오류"),
+            ApiResponse(
+                responseCode = "200",
+                description = "토큰 발급 성공",
+                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.AUTH_REFRESH_SUCCESS)])],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "리프레시 토큰 형식 오류",
+                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.BAD_REQUEST)])],
+            ),
         ],
     )
     fun refresh(
@@ -174,7 +187,11 @@ class AuthController(
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses(
         value = [
-            ApiResponse(responseCode = "200", description = "회원 탈퇴 성공"),
+            ApiResponse(
+                responseCode = "200",
+                description = "회원 탈퇴 성공",
+                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.AUTH_DELETE_SUCCESS)])],
+            ),
             ApiResponse(
                 responseCode = "401",
                 description = "인증 실패",
@@ -202,6 +219,20 @@ class AuthController(
             content = [Content(mediaType = "application/json", schema = Schema(implementation = UserEmailRequest::class))],
         ),
     )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "비밀번호 재설정 메일 발송 성공",
+                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.AUTH_FIND_PASSWORD_SUCCESS)])],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "이메일 형식 오류",
+                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.BAD_REQUEST)])],
+            ),
+        ],
+    )
     fun findPassword(
         @RequestBody request: UserEmailRequest,
     ): LegacyDataResponse<Map<String, Any>> {
@@ -221,6 +252,20 @@ class AuthController(
             required = true,
             content = [Content(mediaType = "application/json", schema = Schema(implementation = UserPasswordAuthRequest::class))],
         ),
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "인증 성공",
+                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.AUTH_FIND_PASSWORD_CHECK_SUCCESS)])],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "이메일 또는 인증번호 형식 오류",
+                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.BAD_REQUEST)])],
+            ),
+        ],
     )
     fun findPasswordCheck(
         @RequestBody request: UserPasswordAuthRequest,
@@ -242,6 +287,20 @@ class AuthController(
             content = [Content(mediaType = "application/json", schema = Schema(implementation = UpdateUserPasswordRequest::class))],
         ),
     )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "비밀번호 변경 성공",
+                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.AUTH_PASSWORD_UPDATE_SUCCESS)])],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "비밀번호 변경 요청 형식 오류",
+                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.BAD_REQUEST)])],
+            ),
+        ],
+    )
     fun updatePasswordWithoutToken(
         @RequestBody request: UpdateUserPasswordRequest,
     ): LegacyHttpResponse {
@@ -262,6 +321,20 @@ class AuthController(
         ),
     )
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "비밀번호 변경 성공",
+                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.AUTH_PASSWORD_UPDATE_SUCCESS)])],
+            ),
+            ApiResponse(
+                responseCode = "401",
+                description = "인증 실패",
+                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.UNAUTHORIZED)])],
+            ),
+        ],
+    )
     fun updatePassword(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @RequestBody request: UpdateUserPasswordRequest,
@@ -281,7 +354,14 @@ class AuthController(
             ApiResponse(
                 responseCode = "200",
                 description = "프로필 조회 성공",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.AUTH_PROFILE_SUCCESS)])],
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(name = "UserProfileResponse", implementation = UserProfileResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.AUTH_PROFILE_SUCCESS)],
+                    ),
+                ],
             ),
             ApiResponse(
                 responseCode = "401",
@@ -309,6 +389,27 @@ class AuthController(
         ),
     )
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "프로필 수정 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(name = "UserSummaryResponse", implementation = UserSummaryResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.AUTH_PROFILE_UPDATE_SUCCESS)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "401",
+                description = "인증 실패",
+                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.UNAUTHORIZED)])],
+            ),
+        ],
+    )
     fun updateProfile(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @RequestBody request: UpdateUserRequest,
