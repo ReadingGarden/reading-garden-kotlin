@@ -1,32 +1,16 @@
 services:
-  caddy:
-    image: caddy:2
-    container_name: reading-garden-caddy
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - /opt/reading-garden/Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      app-blue:
-        condition: service_healthy
-
   app-blue:
     image: ${IMAGE_REF:?IMAGE_REF is required}
-    container_name: reading-garden-blue
+    container_name: ${APP_CONTAINER_PREFIX:-reading-garden}-blue
     restart: unless-stopped
     pull_policy: always
     expose:
       - "8080"
     env_file:
-      - /opt/reading-garden/.env
+      - ${APP_HOST_DIR:?APP_HOST_DIR is required}/.env
     volumes:
-      - /opt/reading-garden/secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
-      - /opt/reading-garden/data:/opt/reading-garden/data
+      - ${APP_HOST_DIR:?APP_HOST_DIR is required}/secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
+      - ${APP_HOST_DIR:?APP_HOST_DIR is required}/data:/opt/reading-garden/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
       interval: 10s
@@ -36,19 +20,22 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - default
+      - public
 
   app-green:
     image: ${IMAGE_REF:?IMAGE_REF is required}
-    container_name: reading-garden-green
+    container_name: ${APP_CONTAINER_PREFIX:-reading-garden}-green
     restart: unless-stopped
     pull_policy: always
     expose:
       - "8080"
     env_file:
-      - /opt/reading-garden/.env
+      - ${APP_HOST_DIR:?APP_HOST_DIR is required}/.env
     volumes:
-      - /opt/reading-garden/secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
-      - /opt/reading-garden/data:/opt/reading-garden/data
+      - ${APP_HOST_DIR:?APP_HOST_DIR is required}/secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
+      - ${APP_HOST_DIR:?APP_HOST_DIR is required}/data:/opt/reading-garden/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
       interval: 10s
@@ -58,12 +45,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - default
+      - public
     profiles:
       - green
 
   postgres:
     image: postgres:17
-    container_name: reading-garden-db
+    container_name: ${APP_CONTAINER_PREFIX:-reading-garden}-db
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_NAME:-reading_garden}
@@ -79,7 +69,11 @@ services:
       timeout: 3s
       retries: 5
 
+networks:
+  public:
+    external: true
+    name: reading-garden-public
+
 volumes:
   pgdata:
-  caddy_data:
-  caddy_config:
+    name: ${APP_VOLUME_PREFIX:-reading-garden}_pgdata
