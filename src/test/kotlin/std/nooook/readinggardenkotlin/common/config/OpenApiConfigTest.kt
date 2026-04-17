@@ -104,6 +104,12 @@ class OpenApiConfigTest(
         assertThat(dataResponse.at("/properties").toString()).contains("resp_code", "resp_msg", "data")
     }
 
+    @Test
+    fun `open api should use same origin server instead of hard coded localhost`() {
+        assertThat(apiDocs.at("/servers/0/url").asText()).isEqualTo("/")
+        assertThat(apiDocs.at("/servers/0/url").asText()).doesNotContain("localhost:8080")
+    }
+
     private fun requireSchema(name: String): JsonNode {
         val schema = apiDocs.at("/components/schemas/$name")
         require(!schema.isMissingNode) { "Schema not found: $name" }
