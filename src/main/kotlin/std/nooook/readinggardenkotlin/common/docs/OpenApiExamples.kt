@@ -23,6 +23,35 @@ object OpenApiExamples {
         }
     """
 
+    const val APP_VERSION_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "앱 버전 조회 성공",
+          "data": {
+            "platform": "ios",
+            "latest_version": "1.2.0",
+            "min_supported_version": "1.0.0",
+            "store_url": "https://apps.apple.com/app/id1234567890"
+          }
+        }
+    """
+
+    const val APP_VERSION_BAD_REQUEST = """
+        {
+          "resp_code": 400,
+          "resp_msg": "platform must be one of: ios, android",
+          "errors": null
+        }
+    """
+
+    const val APP_VERSION_NOT_FOUND = """
+        {
+          "resp_code": 404,
+          "resp_msg": "App version not found for platform: ios",
+          "errors": null
+        }
+    """
+
     const val AUTH_SIGNUP_SUCCESS = """
         {
           "resp_code": 201,
@@ -46,6 +75,54 @@ object OpenApiExamples {
         }
     """
 
+    const val AUTH_LOGOUT_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "로그아웃 성공",
+          "data": {}
+        }
+    """
+
+    const val AUTH_REFRESH_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "토큰 발급 성공",
+          "data": "fixture-access-token"
+        }
+    """
+
+    const val AUTH_DELETE_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "회원 탈퇴 성공",
+          "data": {}
+        }
+    """
+
+    const val AUTH_FIND_PASSWORD_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "메일이 발송되었습니다. 확인해주세요.",
+          "data": {}
+        }
+    """
+
+    const val AUTH_FIND_PASSWORD_CHECK_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "인증 성공",
+          "data": {}
+        }
+    """
+
+    const val AUTH_PASSWORD_UPDATE_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "비밀번호 변경 성공",
+          "errors": null
+        }
+    """
+
     const val AUTH_PROFILE_SUCCESS = """
         {
           "resp_code": 200,
@@ -60,6 +137,23 @@ object OpenApiExamples {
             "garden_count": 1,
             "read_book_count": 0,
             "like_book_count": 0
+          }
+        }
+    """
+
+    const val AUTH_PROFILE_UPDATE_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "프로필 변경 성공",
+          "data": {
+            "user_no": 1,
+            "user_nick": "임의닉네임",
+            "user_email": "user@example.com",
+            "user_image": "데이지",
+            "user_fcm": "fcm-token-value",
+            "user_social_id": "",
+            "user_social_type": "",
+            "user_created_at": "2026-04-09T16:00:00"
           }
         }
     """

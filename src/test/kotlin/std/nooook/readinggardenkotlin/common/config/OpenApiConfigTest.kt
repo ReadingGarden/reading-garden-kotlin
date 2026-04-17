@@ -62,6 +62,27 @@ class OpenApiConfigTest(
     }
 
     @Test
+    fun `app and auth endpoints should expose concrete response examples`() {
+        val appVersion = requireOperation("get", "/api/v1/app/version")
+        val login = requireOperation("post", "/api/v1/auth/login")
+        val logout = requireOperation("post", "/api/v1/auth/logout")
+        val refresh = requireOperation("post", "/api/v1/auth/refresh")
+        val findPassword = requireOperation("post", "/api/v1/auth/find-password")
+
+        assertResponseExamplesContain(appVersion, "400", "platform must be one of: ios, android")
+        assertResponseExamplesContain(appVersion, "404", "App version not found for platform: ios")
+
+        assertResponseExamplesContain(login, "200", "로그인 성공")
+        assertResponseExamplesContain(logout, "200", "로그아웃 성공")
+        assertResponseExamplesContain(refresh, "200", "토큰 발급 성공")
+        assertResponseExamplesContain(findPassword, "200", "메일이 발송되었습니다. 확인해주세요.")
+
+        assertSchemaExample("AppVersionResponse", "latest_version", "1.2.0")
+        assertSchemaExample("UserProfileResponse", "user_nick", "임의닉네임")
+        assertSchemaExample("UserSummaryResponse", "user_fcm", "fcm-token-value")
+    }
+
+    @Test
     fun `book endpoints should expose query and multipart documentation`() {
         val search = requireOperation("get", "/api/v1/book/search")
         val upload = requireOperation("post", "/api/v1/book/image")
@@ -114,6 +135,43 @@ class OpenApiConfigTest(
         val schema = apiDocs.at("/components/schemas/$name")
         require(!schema.isMissingNode) { "Schema not found: $name" }
         return schema
+    }
+
+    private fun assertResponseExamplesContain(operation: JsonNode, responseCode: String, expectedText: String) {
+        val content = operation.at("/responses/$responseCode/content")
+        assertThat(content.isMissingNode).isFalse
+
+        val exampleValues = mutableListOf<JsonNode>()
+        val mediaTypeNames = content.fieldNames()
+        while (mediaTypeNames.hasNext()) {
+            val mediaTypeNode = content.get(mediaTypeNames.next()) ?: continue
+            mediaTypeNode.get("example")?.takeUnless { it.isMissingNode }?.let(exampleValues::add)
+
+            val examplesNode = mediaTypeNode.get("examples")
+            val exampleNames = examplesNode?.fieldNames()
+            while (exampleNames != null && exampleNames.hasNext()) {
+                val exampleNode = examplesNode.get(exampleNames.next())?.get("value")?.takeUnless { it.isMissingNode }
+                if (exampleNode != null) {
+                    exampleValues.add(exampleNode)
+                }
+            }
+        }
+
+        assertThat(exampleValues).isNotEmpty
+        assertThat(exampleValues).anySatisfy { example ->
+            assertThat(example.renderExampleText()).contains(expectedText)
+        }
+    }
+
+    private fun assertSchemaExample(schemaName: String, propertyName: String, expectedExample: String) {
+        val example = requireSchema(schemaName).at("/properties/$propertyName/example")
+        assertThat(example.isMissingNode).isFalse
+        assertThat(example.asText()).isEqualTo(expectedExample)
+    }
+
+    private fun JsonNode.renderExampleText(): String = when {
+        isTextual || isNumber || isBoolean || isNull -> asText()
+        else -> toString()
     }
 
     private fun requireOperation(method: String, vararg candidates: String): JsonNode {
