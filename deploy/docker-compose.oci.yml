@@ -1,12 +1,14 @@
 services:
   app-blue:
     image: ${IMAGE_REF:?IMAGE_REF is required}
-    container_name: ${APP_CONTAINER_PREFIX:-reading-garden}-blue
+    container_name: ${APP_CONTAINER_PREFIX:?APP_CONTAINER_PREFIX is required}-blue
     restart: unless-stopped
     stop_grace_period: ${APP_STOP_GRACE_PERIOD:-35s}
     pull_policy: always
-    expose:
-      - "8080"
+    ports:
+      - "127.0.0.1:${APP_BLUE_HOST_PORT:?APP_BLUE_HOST_PORT is required}:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
       - ${APP_HOST_DIR:?APP_HOST_DIR is required}/.env
     volumes:
@@ -18,21 +20,17 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - default
-      - public
 
   app-green:
     image: ${IMAGE_REF:?IMAGE_REF is required}
-    container_name: ${APP_CONTAINER_PREFIX:-reading-garden}-green
+    container_name: ${APP_CONTAINER_PREFIX:?APP_CONTAINER_PREFIX is required}-green
     restart: unless-stopped
     stop_grace_period: ${APP_STOP_GRACE_PERIOD:-35s}
     pull_policy: always
-    expose:
-      - "8080"
+    ports:
+      - "127.0.0.1:${APP_GREEN_HOST_PORT:?APP_GREEN_HOST_PORT is required}:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
       - ${APP_HOST_DIR:?APP_HOST_DIR is required}/.env
     volumes:
@@ -44,38 +42,5 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - default
-      - public
     profiles:
       - green
-
-  postgres:
-    image: postgres:17
-    container_name: ${APP_CONTAINER_PREFIX:-reading-garden}-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${DB_NAME:-reading_garden}
-      POSTGRES_USER: ${DB_USER:-book}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    expose:
-      - "5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-book} -d ${DB_NAME:-reading_garden}"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-networks:
-  public:
-    external: true
-    name: reading-garden-public
-
-volumes:
-  pgdata:
-    name: ${APP_VOLUME_PREFIX:-reading-garden}_pgdata

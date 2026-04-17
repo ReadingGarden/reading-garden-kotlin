@@ -68,7 +68,8 @@ APP_HOST_DIR="${APP_HOST_DIR}" \
 APP_CONTAINER_PREFIX="reading-garden-dev" \
 APP_VOLUME_PREFIX="reading-garden-dev" \
 APP_STOP_GRACE_PERIOD="35s" \
-DB_PASSWORD="test-password" \
+APP_BLUE_HOST_PORT="18090" \
+APP_GREEN_HOST_PORT="18091" \
 docker compose --profile green -f "$APP_COMPOSE" config > "${TMP_DIR}/app-compose.yaml"
 
 if grep -Fq "reading-garden-caddy" "${TMP_DIR}/app-compose.yaml"; then
@@ -78,12 +79,20 @@ fi
 
 assert_contains "${TMP_DIR}/app-compose.yaml" "container_name: reading-garden-dev-blue"
 assert_contains "${TMP_DIR}/app-compose.yaml" "container_name: reading-garden-dev-green"
-assert_contains "${TMP_DIR}/app-compose.yaml" "container_name: reading-garden-dev-db"
 assert_contains "${TMP_DIR}/app-compose.yaml" "stop_grace_period: 35s"
+assert_contains "${TMP_DIR}/app-compose.yaml" "published: \"18090\""
+assert_contains "${TMP_DIR}/app-compose.yaml" "published: \"18091\""
+assert_contains "${TMP_DIR}/app-compose.yaml" "host.docker.internal=host-gateway"
 assert_contains "${TMP_DIR}/app-compose.yaml" "source: ${APP_HOST_DIR}/data"
 assert_contains "${TMP_DIR}/app-compose.yaml" "source: ${APP_HOST_DIR}/secrets/firebase-service-account.json"
-assert_contains "${TMP_DIR}/app-compose.yaml" "name: reading-garden-dev_pgdata"
-assert_contains "${TMP_DIR}/app-compose.yaml" "name: reading-garden-public"
+if grep -Fq "container_name: reading-garden-dev-db" "${TMP_DIR}/app-compose.yaml"; then
+    echo "app compose should not include postgres service" >&2
+    exit 1
+fi
+if grep -Fq "name: reading-garden-public" "${TMP_DIR}/app-compose.yaml"; then
+    echo "app compose should not depend on public docker network" >&2
+    exit 1
+fi
 
 assert_contains "$PROD_WORKFLOW" "branches:"
 assert_contains "$PROD_WORKFLOW" "- main"
