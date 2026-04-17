@@ -16,10 +16,11 @@ mkdir -p \
     "$APP_DIR/secrets"
 
 if [[ ! -f "$APP_DIR/.env" ]]; then
-    cp "$SOURCE_APP_DIR/.env" "$APP_DIR/.env"
+    echo "Missing required env file: $APP_DIR/.env" >&2
+    exit 1
 fi
 
 if [[ ! -f "$APP_DIR/secrets/firebase-service-account.json" ]]; then
-    cp "$SOURCE_APP_DIR/secrets/firebase-service-account.json" \
-        "$APP_DIR/secrets/firebase-service-account.json"
+    echo "Missing required secret file: $APP_DIR/secrets/firebase-service-account.json" >&2
+    exit 1
 fi

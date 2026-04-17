@@ -62,14 +62,16 @@ assert_contains "${TMP_DIR}/dev-route.caddy" "reverse_proxy reading-garden-dev-b
 assert_contains "${TMP_DIR}/dev-route.caddy" "header_up X-Forwarded-Proto {scheme}"
 
 mkdir -p "${TMP_DIR}/source/secrets"
-mkdir -p "${TMP_DIR}/target"
+mkdir -p "${TMP_DIR}/target/secrets"
 printf 'DB_HOST=postgres\n' > "${TMP_DIR}/source/.env"
 printf '{}' > "${TMP_DIR}/source/secrets/firebase-service-account.json"
+printf 'DB_HOST=target-postgres\n' > "${TMP_DIR}/target/.env"
+printf '{"target":true}\n' > "${TMP_DIR}/target/secrets/firebase-service-account.json"
 
 SOURCE_APP_DIR="${TMP_DIR}/source" REMOTE_APP_DIR="${TMP_DIR}/target" "$BOOTSTRAP_SCRIPT"
 
-assert_contains "${TMP_DIR}/target/.env" "DB_HOST=postgres"
-assert_contains "${TMP_DIR}/target/secrets/firebase-service-account.json" "{}"
+assert_contains "${TMP_DIR}/target/.env" "DB_HOST=target-postgres"
+assert_contains "${TMP_DIR}/target/secrets/firebase-service-account.json" '"target":true'
 
 mkdir -p "${TMP_DIR}/edge/defaults" "${TMP_DIR}/edge/routes" "${TMP_DIR}/legacy" "${TMP_DIR}/bin"
 cat > "${TMP_DIR}/edge/defaults/prod-upstream.caddy" <<'EOF'
