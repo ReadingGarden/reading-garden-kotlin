@@ -5,8 +5,23 @@ set -euo pipefail
 
 APP_DIR="${REMOTE_APP_DIR:-/opt/reading-garden}"
 COMPOSE_FILE="${APP_DIR}/docker-compose.yml"
-NGINX_CONF="${APP_DIR}/nginx.conf"
+CADDY_FILE="${APP_DIR}/Caddyfile"
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-120}"
+SMOKE_BASE_URL="${SMOKE_BASE_URL:-https://nooook.duckdns.org}"
+
+reload_caddy() {
+    docker compose -f "$COMPOSE_FILE" exec -T caddy \
+        caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+    docker compose -f "$COMPOSE_FILE" exec -T caddy \
+        caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+}
+
+switch_proxy_target() {
+    local from="$1"
+    local to="$2"
+    sed -i "s/${from}:8080/${to}:8080/" "$CADDY_FILE"
+    reload_caddy
+}
 
 cd "$APP_DIR"
 
@@ -14,12 +29,12 @@ export IMAGE_REF="${IMAGE_REF:?IMAGE_REF is required}"
 
 # First deployment — no containers running yet
 if ! docker ps --format '{{.Names}}' | grep -q 'reading-garden-blue\|reading-garden-green'; then
-    echo "=== First deployment: starting blue + nginx + postgres ==="
-    # Ensure nginx.conf points to blue
-    sed -i 's/reading-garden-green:8080/reading-garden-blue:8080/' "$NGINX_CONF"
+    echo "=== First deployment: starting blue + caddy + postgres ==="
+    sed -i 's/reading-garden-green:8080/reading-garden-blue:8080/' "$CADDY_FILE" || true
 
     docker compose -f "$COMPOSE_FILE" pull
     docker compose -f "$COMPOSE_FILE" up -d
+    reload_caddy
 
     echo "=== Waiting for app-blue to become healthy ==="
     deadline=$((SECONDS + TIMEOUT_SECONDS))
@@ -32,6 +47,7 @@ if ! docker ps --format '{{.Names}}' | grep -q 'reading-garden-blue\|reading-gar
         sleep 2
     done
 
+    TIMEOUT_SECONDS=30 "${APP_DIR}/cutover-smoke-check.sh" "${SMOKE_BASE_URL}"
     echo "=== First deployment complete: app-blue is active ==="
     docker system prune -f || true
     exit 0
@@ -72,16 +88,12 @@ until docker inspect --format='{{.State.Health.Status}}' "reading-garden-${STAND
 done
 echo "=== app-${STANDBY} is healthy ==="
 
-# Switch nginx upstream to standby
-sed -i "s/reading-garden-${ACTIVE}:8080/reading-garden-${STANDBY}:8080/" "$NGINX_CONF"
-docker restart reading-garden-proxy
-echo "=== Nginx switched to app-${STANDBY} ==="
+switch_proxy_target "reading-garden-${ACTIVE}" "reading-garden-${STANDBY}"
+echo "=== Caddy switched to app-${STANDBY} ==="
 
-# Run smoke check against nginx
-if ! TIMEOUT_SECONDS=30 "${APP_DIR}/cutover-smoke-check.sh" "http://127.0.0.1:80"; then
+if ! TIMEOUT_SECONDS=30 "${APP_DIR}/cutover-smoke-check.sh" "${SMOKE_BASE_URL}"; then
     echo "ERROR: Smoke check failed, rolling back to app-${ACTIVE}" >&2
-    sed -i "s/reading-garden-${STANDBY}:8080/reading-garden-${ACTIVE}:8080/" "$NGINX_CONF"
-    docker restart reading-garden-proxy
+    switch_proxy_target "reading-garden-${STANDBY}" "reading-garden-${ACTIVE}"
     docker compose -f "$COMPOSE_FILE" stop "app-${STANDBY}"
     exit 1
 fi
