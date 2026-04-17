@@ -37,12 +37,10 @@ preflight_checks() {
     require_command getent
     require_command curl
     require_command caddy
+    require_command timeout
     validate_positive_integer UPSTREAM_WAIT_TIMEOUT_SECONDS "$UPSTREAM_WAIT_TIMEOUT_SECONDS"
     validate_positive_integer UPSTREAM_WAIT_INTERVAL_SECONDS "$UPSTREAM_WAIT_INTERVAL_SECONDS"
-
-    if command -v timeout >/dev/null 2>&1; then
-        TIMEOUT_BIN="$(command -v timeout)"
-    fi
+    TIMEOUT_BIN="$(command -v timeout)"
 }
 
 extract_upstream_host() {
@@ -136,11 +134,7 @@ wait_for_upstream_dns() {
         fi
 
         probe_timeout_seconds="$(calculate_probe_timeout_seconds "$remaining")"
-        if [ -n "$TIMEOUT_BIN" ]; then
-            if "$TIMEOUT_BIN" "$probe_timeout_seconds" getent hosts "$host" >/dev/null 2>&1; then
-                return 0
-            fi
-        elif getent hosts "$host" >/dev/null 2>&1; then
+        if "$TIMEOUT_BIN" "$probe_timeout_seconds" getent hosts "$host" >/dev/null 2>&1; then
             return 0
         fi
 

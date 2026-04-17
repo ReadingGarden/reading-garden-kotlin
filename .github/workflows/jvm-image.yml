@@ -90,12 +90,17 @@ jobs:
 
       - name: Copy deployment files
         run: |
-          ssh -p "$OCI_PORT" "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}" "mkdir -p '$REMOTE_APP_DIR'"
+          ssh -p "$OCI_PORT" "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}" "mkdir -p '$REMOTE_APP_DIR/edge/routes' '$REMOTE_APP_DIR/edge/defaults'"
           scp -P "$OCI_PORT" deploy/docker-compose.oci.yml "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$REMOTE_APP_DIR/docker-compose.yml"
-          scp -P "$OCI_PORT" deploy/Caddyfile "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$REMOTE_APP_DIR/Caddyfile"
           scp -P "$OCI_PORT" deploy/blue-green-deploy.sh "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$REMOTE_APP_DIR/blue-green-deploy.sh"
+          scp -P "$OCI_PORT" deploy/caddy-start.sh "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$REMOTE_APP_DIR/caddy-start.sh"
           scp -P "$OCI_PORT" deploy/cutover-smoke-check.sh "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$REMOTE_APP_DIR/cutover-smoke-check.sh"
-          ssh -p "$OCI_PORT" "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}" "chmod +x '$REMOTE_APP_DIR/blue-green-deploy.sh' '$REMOTE_APP_DIR/cutover-smoke-check.sh'"
+          scp -P "$OCI_PORT" deploy/edge/Caddyfile "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$REMOTE_APP_DIR/edge/Caddyfile"
+          scp -P "$OCI_PORT" deploy/edge/routes/prod-upstream.caddy "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$REMOTE_APP_DIR/edge/defaults/prod-upstream.caddy"
+          scp -P "$OCI_PORT" deploy/edge/routes/dev-upstream.caddy "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$REMOTE_APP_DIR/edge/defaults/dev-upstream.caddy"
+          ssh -p "$OCI_PORT" "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}" "test -f '$REMOTE_APP_DIR/edge/routes/prod-upstream.caddy' || cp '$REMOTE_APP_DIR/edge/defaults/prod-upstream.caddy' '$REMOTE_APP_DIR/edge/routes/prod-upstream.caddy'"
+          ssh -p "$OCI_PORT" "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}" "test -f '$REMOTE_APP_DIR/edge/routes/dev-upstream.caddy' || cp '$REMOTE_APP_DIR/edge/defaults/dev-upstream.caddy' '$REMOTE_APP_DIR/edge/routes/dev-upstream.caddy'"
+          ssh -p "$OCI_PORT" "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}" "chmod +x '$REMOTE_APP_DIR/blue-green-deploy.sh' '$REMOTE_APP_DIR/cutover-smoke-check.sh' '$REMOTE_APP_DIR/caddy-start.sh'"
 
       - name: Deploy with blue-green
         run: |
@@ -110,6 +115,7 @@ jobs:
           test -f secrets/firebase-service-account.json
 
           echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+          docker network inspect reading-garden-public >/dev/null 2>&1 || docker network create reading-garden-public
 
           export IMAGE_REF="$IMAGE_REF"
           ./blue-green-deploy.sh

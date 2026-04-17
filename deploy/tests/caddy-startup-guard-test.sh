@@ -9,6 +9,26 @@ fail() {
     exit 1
 }
 
+write_timeout_stub() {
+    local path="$1"
+    cat > "$path" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" >> "$TMPDIR/timeout-log"
+secs="${1:-}"
+shift || true
+if [[ -z "$secs" || "$#" -eq 0 ]]; then
+    exit 1
+fi
+
+if [[ "${TIMEOUT_STUB_MODE:-}" == "force-timeout" ]]; then
+    sleep "${TIMEOUT_STUB_SLEEP_SECONDS:-1}"
+    exit "${TIMEOUT_STUB_EXIT_CODE:-124}"
+fi
+
+"$@"
+EOF
+}
+
 assert_contains() {
     local file="$1"
     local expected="$2"
@@ -86,8 +106,9 @@ touch "$TMPDIR/caddy-invoked"
 printf '%s\n' "$$" > "$TMPDIR/caddy-pid"
 printf '%s\n' "$@" > "$TMPDIR/caddy-argv"
 EOF
+        write_timeout_stub "$tmp/bin/timeout"
 
-        chmod +x "$tmp/bin/getent" "$tmp/bin/curl" "$tmp/bin/caddy"
+        chmod +x "$tmp/bin/getent" "$tmp/bin/curl" "$tmp/bin/caddy" "$tmp/bin/timeout"
 
         PATH="$tmp/bin:$PATH" \
         TMPDIR="$tmp" \
@@ -100,8 +121,19 @@ EOF
             fail "expected success path to exit 0"
         fi
 
+        assert_file_lines_exact "$tmp/timeout-log" \
+            1 \
+            getent \
+            hosts \
+            reading-garden-blue
         assert_line_equals "$tmp/getent-log" "hosts reading-garden-blue"
-        assert_line_equals "$tmp/curl-log" "http://reading-garden-blue:8080/api/health"
+        assert_file_lines_exact "$tmp/curl-log" \
+            --connect-timeout \
+            1 \
+            --max-time \
+            1 \
+            -fsS \
+            http://reading-garden-blue:8080/api/health
         assert_file_lines_exact "$tmp/caddy-argv" \
             run \
             --config \
@@ -158,8 +190,9 @@ printf 'caddy\n' >> "$TMPDIR/event-log"
 touch "$TMPDIR/caddy-invoked"
 printf '%s\n' "$@" > "$TMPDIR/caddy-argv"
 EOF
+        write_timeout_stub "$tmp/bin/timeout"
 
-        chmod +x "$tmp/bin/getent" "$tmp/bin/curl" "$tmp/bin/caddy"
+        chmod +x "$tmp/bin/getent" "$tmp/bin/curl" "$tmp/bin/caddy" "$tmp/bin/timeout"
 
         if PATH="$tmp/bin:$PATH" \
             TMPDIR="$tmp" \
@@ -216,8 +249,9 @@ EOF
 touch "$TMPDIR/caddy-invoked"
 printf '%s\n' "$@" > "$TMPDIR/caddy-argv"
 EOF
+        write_timeout_stub "$tmp/bin/timeout"
 
-        chmod +x "$tmp/bin/getent" "$tmp/bin/curl" "$tmp/bin/caddy"
+        chmod +x "$tmp/bin/getent" "$tmp/bin/curl" "$tmp/bin/caddy" "$tmp/bin/timeout"
 
         if PATH="$tmp/bin:$PATH" \
             TMPDIR="$tmp" \
@@ -228,8 +262,82 @@ EOF
             fail "expected DNS failure"
         fi
 
+        assert_file_lines_exact "$tmp/timeout-log" \
+            1 \
+            getent \
+            hosts \
+            reading-garden-blue
         assert_line_equals "$tmp/getent-log" "hosts reading-garden-blue"
         assert_contains "$tmp/stderr" "upstream DNS"
+        [[ ! -e "$tmp/curl-log" ]] || fail "expected curl not to be invoked"
+        [[ ! -e "$tmp/caddy-invoked" ]] || fail "expected caddy not to be invoked"
+    )
+}
+
+test_dns_probe_timeout_is_bounded() {
+    (
+        set -euo pipefail
+        local tmp
+        tmp="$(mktemp -d)"
+        trap 'rm -rf "$tmp"' EXIT
+        mkdir -p "$tmp/bin" "$tmp/routes"
+
+        cat > "$tmp/routes/prod-upstream.caddy" <<'EOF'
+handle_path /api/* {
+    rewrite * /api{path}
+
+    reverse_proxy reading-garden-blue:8080 {
+        header_up Host {host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    encode gzip zstd
+}
+EOF
+
+        cat > "$tmp/bin/getent" <<'EOF'
+#!/usr/bin/env bash
+printf '%s %s\n' "${1:-}" "${2:-}" >> "$TMPDIR/getent-log"
+sleep 5
+exit 1
+EOF
+
+        cat > "$tmp/bin/curl" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" >> "$TMPDIR/curl-log"
+exit 0
+EOF
+
+        cat > "$tmp/bin/caddy" <<'EOF'
+#!/usr/bin/env bash
+touch "$TMPDIR/caddy-invoked"
+printf '%s\n' "$@" > "$TMPDIR/caddy-argv"
+EOF
+        write_timeout_stub "$tmp/bin/timeout"
+
+        chmod +x "$tmp/bin/getent" "$tmp/bin/curl" "$tmp/bin/caddy" "$tmp/bin/timeout"
+
+        SECONDS=0
+        if PATH="$tmp/bin:$PATH" \
+            TMPDIR="$tmp" \
+            TIMEOUT_STUB_MODE=force-timeout \
+            TIMEOUT_STUB_SLEEP_SECONDS=1 \
+            TIMEOUT_STUB_EXIT_CODE=124 \
+            CADDY_ROUTE_FILE="$tmp/routes/prod-upstream.caddy" \
+            UPSTREAM_WAIT_TIMEOUT_SECONDS=1 \
+            UPSTREAM_WAIT_INTERVAL_SECONDS=1 \
+            "$TARGET" >"$tmp/stdout" 2>"$tmp/stderr"; then
+            fail "expected DNS probe timeout failure"
+        fi
+
+        [[ "$SECONDS" -lt 4 ]] || fail "expected DNS probe timeout to stay within budget, got ${SECONDS}s"
+        assert_file_lines_exact "$tmp/timeout-log" \
+            1 \
+            getent \
+            hosts \
+            reading-garden-blue
+        assert_contains "$tmp/stderr" "Timed out waiting for upstream DNS"
+        [[ ! -e "$tmp/getent-log" ]] || fail "expected timeout wrapper to intercept hanging getent"
         [[ ! -e "$tmp/curl-log" ]] || fail "expected curl not to be invoked"
         [[ ! -e "$tmp/caddy-invoked" ]] || fail "expected caddy not to be invoked"
     )
@@ -271,7 +379,27 @@ EOF
 #!/usr/bin/env bash
 printf 'curl\n' >> "$TMPDIR/event-log"
 printf '%s\n' "$@" >> "$TMPDIR/curl-log"
-exit 1
+args=("$@")
+connect_timeout=""
+max_time=""
+i=0
+while [[ "$i" -lt "${#args[@]}" ]]; do
+    case "${args[$i]}" in
+        --connect-timeout)
+            i=$((i + 1))
+            connect_timeout="${args[$i]:-}"
+            ;;
+        --max-time)
+            i=$((i + 1))
+            max_time="${args[$i]:-}"
+            ;;
+    esac
+    i=$((i + 1))
+done
+[[ -n "$connect_timeout" ]] || exit 97
+[[ -n "$max_time" ]] || exit 98
+sleep "$max_time"
+exit 28
 EOF
 
         cat > "$tmp/bin/caddy" <<'EOF'
@@ -280,9 +408,11 @@ printf 'caddy\n' >> "$TMPDIR/event-log"
 touch "$TMPDIR/caddy-invoked"
 printf '%s\n' "$@" > "$TMPDIR/caddy-argv"
 EOF
+        write_timeout_stub "$tmp/bin/timeout"
 
-        chmod +x "$tmp/bin/getent" "$tmp/bin/curl" "$tmp/bin/caddy"
+        chmod +x "$tmp/bin/getent" "$tmp/bin/curl" "$tmp/bin/caddy" "$tmp/bin/timeout"
 
+        SECONDS=0
         if PATH="$tmp/bin:$PATH" \
             TMPDIR="$tmp" \
             CADDY_ROUTE_FILE="$tmp/routes/prod-upstream.caddy" \
@@ -292,8 +422,20 @@ EOF
             fail "expected health timeout failure"
         fi
 
+        [[ "$SECONDS" -lt 4 ]] || fail "expected health probe timeout to stay within budget, got ${SECONDS}s"
+        assert_file_lines_exact "$tmp/timeout-log" \
+            1 \
+            getent \
+            hosts \
+            reading-garden-blue
         assert_line_equals "$tmp/getent-log" "hosts reading-garden-blue"
-        assert_line_equals "$tmp/curl-log" "http://reading-garden-blue:8080/api/health"
+        assert_file_lines_exact "$tmp/curl-log" \
+            --connect-timeout \
+            1 \
+            --max-time \
+            1 \
+            -fsS \
+            http://reading-garden-blue:8080/api/health
         assert_contains "$tmp/stderr" "Timed out waiting for upstream health"
         event_lines=()
         while IFS= read -r line; do
@@ -307,6 +449,7 @@ EOF
 test_success_execs_caddy_run
 test_route_parse_failure
 test_dns_failure
+test_dns_probe_timeout_is_bounded
 test_health_timeout_failure
 
 echo "PASS: caddy startup guard"
