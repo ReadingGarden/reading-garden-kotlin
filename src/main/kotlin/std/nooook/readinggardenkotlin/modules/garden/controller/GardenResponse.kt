@@ -91,3 +91,46 @@ data class GardenDetailResponse(
     @field:Schema(description = "가든 멤버 목록")
     val garden_members: List<GardenListMemberResponse>,
 )
+
+@Schema(description = "가든 빈 객체 응답 데이터")
+class GardenEmptyData
+
+@Schema(name = "GardenListLegacyDataResponse", description = "가든 목록 조회 성공 레거시 envelope")
+data class GardenListLegacyDataResponse(
+    @field:Schema(description = "HTTP 상태 코드와 동일한 레거시 응답 코드", example = "200")
+    val resp_code: Int,
+    @field:Schema(description = "레거시 응답 메시지", example = "가든 리스트 조회 성공")
+    val resp_msg: String,
+    @field:Schema(description = "가든 목록 데이터")
+    val data: List<GardenListItemResponse>,
+)
+
+@Schema(name = "GardenDetailLegacyDataResponse", description = "가든 상세 조회 성공 레거시 envelope")
+data class GardenDetailLegacyDataResponse(
+    @field:Schema(description = "HTTP 상태 코드와 동일한 레거시 응답 코드", example = "200")
+    val resp_code: Int,
+    @field:Schema(description = "레거시 응답 메시지", example = "가든 상세 조회 성공")
+    val resp_msg: String,
+    @field:Schema(description = "가든 상세 데이터")
+    val data: GardenDetailResponse,
+)
+
+@Schema(name = "CreateGardenLegacyDataResponse", description = "가든 생성 성공 레거시 envelope")
+data class CreateGardenLegacyDataResponse(
+    @field:Schema(description = "HTTP 상태 코드와 동일한 레거시 응답 코드", example = "201")
+    val resp_code: Int,
+    @field:Schema(description = "레거시 응답 메시지", example = "가든 추가 성공")
+    val resp_msg: String,
+    @field:Schema(description = "생성된 가든 데이터")
+    val data: CreateGardenResponse,
+)
+
+@Schema(name = "GardenEmptyLegacyDataResponse", description = "빈 객체 데이터를 담는 가든 레거시 envelope")
+data class GardenEmptyLegacyDataResponse(
+    @field:Schema(description = "HTTP 상태 코드와 동일한 레거시 응답 코드", example = "200")
+    val resp_code: Int,
+    @field:Schema(description = "레거시 응답 메시지", example = "가든 수정 성공")
+    val resp_msg: String,
+    @field:Schema(description = "빈 객체 데이터")
+    val data: GardenEmptyData,
+)

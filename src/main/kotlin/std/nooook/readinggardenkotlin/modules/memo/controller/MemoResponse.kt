@@ -65,3 +65,33 @@ data class MemoDetailResponse(
     @field:Schema(description = "메모 작성 시각", example = "2026-04-09T16:30:00")
     val memo_created_at: String,
 )
+
+@Schema(name = "MemoListLegacyDataResponse", description = "메모 목록 조회 성공 레거시 envelope")
+data class MemoListLegacyDataResponse(
+    @field:Schema(description = "HTTP 상태 코드와 동일한 레거시 응답 코드", example = "200")
+    val resp_code: Int,
+    @field:Schema(description = "레거시 응답 메시지", example = "메모 리스트 조회 성공")
+    val resp_msg: String,
+    @field:Schema(description = "메모 목록 데이터")
+    val data: MemoListResponse,
+)
+
+@Schema(name = "MemoDetailLegacyDataResponse", description = "메모 상세 조회 성공 레거시 envelope")
+data class MemoDetailLegacyDataResponse(
+    @field:Schema(description = "HTTP 상태 코드와 동일한 레거시 응답 코드", example = "200")
+    val resp_code: Int,
+    @field:Schema(description = "레거시 응답 메시지", example = "메모 상세 조회 성공")
+    val resp_msg: String,
+    @field:Schema(description = "메모 상세 데이터")
+    val data: MemoDetailResponse,
+)
+
+@Schema(name = "CreateMemoLegacyDataResponse", description = "메모 생성 성공 레거시 envelope")
+data class CreateMemoLegacyDataResponse(
+    @field:Schema(description = "HTTP 상태 코드와 동일한 레거시 응답 코드", example = "201")
+    val resp_code: Int,
+    @field:Schema(description = "레거시 응답 메시지", example = "메모 추가 성공")
+    val resp_msg: String,
+    @field:Schema(description = "생성된 메모 데이터")
+    val data: CreateMemoResponse,
+)

@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import std.nooook.readinggardenkotlin.common.api.LegacyHttpResponse
 import std.nooook.readinggardenkotlin.common.api.LegacyDataResponse
 import std.nooook.readinggardenkotlin.common.docs.OpenApiExamples
 import std.nooook.readinggardenkotlin.modules.app.service.AppVersionQueryService
@@ -32,11 +33,10 @@ class AppVersionController(
             ApiResponse(
                 responseCode = "200",
                 description = "앱 버전 조회 성공",
-                useReturnTypeSchema = true,
                 content = [
                     Content(
                         mediaType = "application/json",
-                        schema = Schema(name = "AppVersionResponse", implementation = AppVersionResponse::class),
+                        schema = Schema(implementation = AppVersionLegacyDataResponse::class),
                         examples = [ExampleObject(value = OpenApiExamples.APP_VERSION_SUCCESS)],
                     ),
                 ],
@@ -44,12 +44,24 @@ class AppVersionController(
             ApiResponse(
                 responseCode = "400",
                 description = "platform 파라미터가 누락되었거나 허용되지 않은 값",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.APP_VERSION_BAD_REQUEST)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.APP_VERSION_BAD_REQUEST)],
+                    ),
+                ],
             ),
             ApiResponse(
                 responseCode = "404",
                 description = "해당 플랫폼의 앱 버전 정보가 존재하지 않음",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.APP_VERSION_NOT_FOUND)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.APP_VERSION_NOT_FOUND)],
+                    ),
+                ],
             ),
         ],
     )

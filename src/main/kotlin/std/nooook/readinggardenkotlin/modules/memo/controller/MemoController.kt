@@ -45,6 +45,21 @@ class MemoController(
     @GetMapping("")
     @Operation(summary = "메모 목록 조회", description = "현재 사용자의 메모 목록을 페이지 단위로 조회합니다.")
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "메모 목록 조회 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = MemoListLegacyDataResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.MEMO_LIST_SUCCESS)],
+                    ),
+                ],
+            ),
+        ],
+    )
     fun getMemoList(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "페이지 번호", example = "1")
@@ -70,7 +85,13 @@ class MemoController(
             ApiResponse(
                 responseCode = "200",
                 description = "메모 상세 조회 성공",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.MEMO_DETAIL_SUCCESS)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = MemoDetailLegacyDataResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.MEMO_DETAIL_SUCCESS)],
+                    ),
+                ],
             ),
         ],
     )
@@ -98,6 +119,15 @@ class MemoController(
         ),
     )
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "201",
+                description = "메모 생성 성공",
+                content = [Content(mediaType = "application/json", schema = Schema(implementation = CreateMemoLegacyDataResponse::class))],
+            ),
+        ],
+    )
     fun createMemo(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @RequestBody request: CreateMemoRequest,
@@ -123,6 +153,21 @@ class MemoController(
         ),
     )
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "메모 수정 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.MEMO_UPDATE_SUCCESS)],
+                    ),
+                ],
+            ),
+        ],
+    )
     fun updateMemo(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "수정할 메모 id", example = "1")
@@ -140,6 +185,21 @@ class MemoController(
     @DeleteMapping("")
     @Operation(summary = "메모 삭제", description = "`id`에 해당하는 메모를 삭제합니다.")
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "메모 삭제 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.MEMO_DELETE_SUCCESS)],
+                    ),
+                ],
+            ),
+        ],
+    )
     fun deleteMemo(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "삭제할 메모 id", example = "1")
@@ -167,17 +227,35 @@ class MemoController(
             ApiResponse(
                 responseCode = "201",
                 description = "업로드 성공",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.CREATED_EMPTY_SUCCESS)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.MEMO_IMAGE_UPLOAD_SUCCESS)],
+                    ),
+                ],
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "multipart 요청 형식 오류",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.BAD_REQUEST)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.BAD_REQUEST)],
+                    ),
+                ],
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "인증 실패",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.UNAUTHORIZED)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.UNAUTHORIZED)],
+                    ),
+                ],
             ),
         ],
     )
@@ -198,6 +276,21 @@ class MemoController(
     @DeleteMapping("/image")
     @Operation(summary = "메모 이미지 삭제", description = "`id`에 연결된 메모 이미지를 삭제합니다.")
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "201",
+                description = "메모 이미지 삭제 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.MEMO_IMAGE_DELETE_SUCCESS)],
+                    ),
+                ],
+            ),
+        ],
+    )
     fun deleteMemoImage(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "이미지를 삭제할 메모 id", example = "1")
@@ -213,6 +306,21 @@ class MemoController(
     @PutMapping("/like")
     @Operation(summary = "메모 좋아요 토글", description = "`id`에 해당하는 메모의 좋아요 상태를 토글합니다.")
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "메모 좋아요 토글 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.MEMO_LIKE_SUCCESS)],
+                    ),
+                ],
+            ),
+        ],
+    )
     fun toggleMemoLike(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "좋아요를 토글할 메모 id", example = "1")

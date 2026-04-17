@@ -75,6 +75,22 @@ object OpenApiExamples {
         }
     """
 
+    const val AUTH_LOGIN_EMAIL_NOT_FOUND = """
+        {
+          "resp_code": 400,
+          "resp_msg": "등록되지 않은 이메일 주소입니다.",
+          "errors": null
+        }
+    """
+
+    const val AUTH_LOGIN_PASSWORD_MISMATCH = """
+        {
+          "resp_code": 400,
+          "resp_msg": "비밀번호가 일치하지 않습니다.",
+          "errors": null
+        }
+    """
+
     const val AUTH_LOGOUT_SUCCESS = """
         {
           "resp_code": 200,
@@ -107,11 +123,27 @@ object OpenApiExamples {
         }
     """
 
+    const val AUTH_EMAIL_NOT_FOUND = """
+        {
+          "resp_code": 400,
+          "resp_msg": "등록되지 않은 이메일 주소입니다.",
+          "errors": null
+        }
+    """
+
     const val AUTH_FIND_PASSWORD_CHECK_SUCCESS = """
         {
           "resp_code": 200,
           "resp_msg": "인증 성공",
           "data": {}
+        }
+    """
+
+    const val AUTH_FIND_PASSWORD_CHECK_MISMATCH = """
+        {
+          "resp_code": 400,
+          "resp_msg": "인증번호 불일치",
+          "errors": null
         }
     """
 
@@ -179,6 +211,36 @@ object OpenApiExamples {
         }
     """
 
+    const val BOOK_DUPLICATION_AVAILABLE = """
+        {
+          "resp_code": 200,
+          "resp_msg": "책 등록 가능",
+          "errors": null
+        }
+    """
+
+    const val BOOK_DUPLICATION_CONFLICT = """
+        {
+          "resp_code": 403,
+          "resp_msg": "책 중복",
+          "errors": null
+        }
+    """
+
+    const val BOOK_LOOKUP_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "책 검색(ISBN) 성공",
+          "data": {
+            "title": "클린 코드",
+            "author": "로버트 C. 마틴",
+            "isbn13": "9780132350884",
+            "cover": "https://example.com/cover.jpg",
+            "publisher": "프래그마틱"
+          }
+        }
+    """
+
     const val BOOK_DETAIL_SUCCESS = """
         {
           "resp_code": 200,
@@ -196,6 +258,54 @@ object OpenApiExamples {
             "record": {},
             "memo": {}
           }
+        }
+    """
+
+    const val BOOK_UPDATE_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "책 수정 성공",
+          "errors": null
+        }
+    """
+
+    const val BOOK_DELETE_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "책 삭제 성공",
+          "errors": null
+        }
+    """
+
+    const val BOOK_READ_UPDATE_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "독서 기록 수정 성공",
+          "errors": null
+        }
+    """
+
+    const val BOOK_READ_DELETE_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "책 기록 삭제 성공",
+          "errors": null
+        }
+    """
+
+    const val BOOK_IMAGE_UPLOAD_SUCCESS = """
+        {
+          "resp_code": 201,
+          "resp_msg": "이미지 업로드 성공",
+          "errors": null
+        }
+    """
+
+    const val BOOK_IMAGE_DELETE_SUCCESS = """
+        {
+          "resp_code": 201,
+          "resp_msg": "이미지 삭제 성공",
+          "errors": null
         }
     """
 
@@ -217,6 +327,88 @@ object OpenApiExamples {
         }
     """
 
+    const val GARDEN_UPDATE_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "가든 수정 성공",
+          "data": {}
+        }
+    """
+
+    const val GARDEN_DELETE_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "가든 삭제 성공",
+          "errors": null
+        }
+    """
+
+    const val GARDEN_MOVE_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "가든 책 이동 성공",
+          "errors": null
+        }
+    """
+
+    const val GARDEN_LEAVE_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "가든 탈퇴 성공",
+          "errors": null
+        }
+    """
+
+    const val GARDEN_LEADER_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "가든 멤버 변경 성공",
+          "errors": null
+        }
+    """
+
+    const val GARDEN_MAIN_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "가든 메인 변경 성공",
+          "errors": null
+        }
+    """
+
+    const val GARDEN_INVITE_SUCCESS = """
+        {
+          "resp_code": 201,
+          "resp_msg": "가든 초대 완료",
+          "errors": null
+        }
+    """
+
+    const val MEMO_LIST_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "메모 리스트 조회 성공",
+          "data": {
+            "current_page": 1,
+            "max_page": 3,
+            "total": 20,
+            "page_size": 10,
+            "list": [
+              {
+                "id": 1,
+                "book_no": 1,
+                "book_title": "클린 코드",
+                "book_author": "저자",
+                "book_image_url": "https://example.com/book.jpg",
+                "memo_content": "좋았던 문장",
+                "memo_like": true,
+                "image_url": "https://example.com/memo.jpg",
+                "memo_created_at": "2026-04-09T16:30:00"
+              }
+            ]
+          }
+        }
+    """
+
     const val MEMO_DETAIL_SUCCESS = """
         {
           "resp_code": 200,
@@ -232,6 +424,46 @@ object OpenApiExamples {
             "image_url": null,
             "memo_created_at": "2026-04-09T16:30:00"
           }
+        }
+    """
+
+    const val MEMO_UPDATE_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "메모 수정 성공",
+          "errors": null
+        }
+    """
+
+    const val MEMO_DELETE_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "메모 삭제 성공",
+          "errors": null
+        }
+    """
+
+    const val MEMO_LIKE_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "메모 즐겨찾기 추가/해제",
+          "errors": null
+        }
+    """
+
+    const val MEMO_IMAGE_DELETE_SUCCESS = """
+        {
+          "resp_code": 201,
+          "resp_msg": "이미지 삭제 성공",
+          "errors": null
+        }
+    """
+
+    const val MEMO_IMAGE_UPLOAD_SUCCESS = """
+        {
+          "resp_code": 201,
+          "resp_msg": "이미지 업로드 성공",
+          "errors": null
         }
     """
 
@@ -253,6 +485,34 @@ object OpenApiExamples {
           "resp_code": 200,
           "resp_msg": "푸시 알림 수정 성공",
           "errors": null
+        }
+    """
+
+    const val PUSH_BOOK_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "독서 알림 푸시 전송 성공",
+          "data": [
+            {
+              "token": "fcm-token-value",
+              "result": "sent",
+              "message_id": "message-1"
+            }
+          ]
+        }
+    """
+
+    const val PUSH_NOTICE_SUCCESS = """
+        {
+          "resp_code": 200,
+          "resp_msg": "공지사항 푸시 전송 성공",
+          "data": [
+            {
+              "token": "fcm-token-value",
+              "result": "sent",
+              "message_id": "message-2"
+            }
+          ]
         }
     """
 

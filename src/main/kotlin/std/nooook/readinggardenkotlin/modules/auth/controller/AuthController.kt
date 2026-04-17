@@ -53,10 +53,10 @@ class AuthController(
             ApiResponse(
                 responseCode = "201",
                 description = "회원가입 성공",
-                useReturnTypeSchema = true,
                 content = [
                     Content(
                         mediaType = "application/json",
+                        schema = Schema(implementation = SignupLegacyDataResponse::class),
                         examples = [ExampleObject(name = "signup-success", value = OpenApiExamples.AUTH_SIGNUP_SUCCESS)],
                     ),
                 ],
@@ -64,7 +64,13 @@ class AuthController(
             ApiResponse(
                 responseCode = "400",
                 description = "요청 본문 검증 실패",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.BAD_REQUEST)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.BAD_REQUEST)],
+                    ),
+                ],
             ),
         ],
     )
@@ -94,12 +100,27 @@ class AuthController(
             ApiResponse(
                 responseCode = "200",
                 description = "로그인 성공",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.AUTH_LOGIN_SUCCESS)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LoginLegacyDataResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.AUTH_LOGIN_SUCCESS)],
+                    ),
+                ],
             ),
             ApiResponse(
                 responseCode = "400",
-                description = "로그인 요청 형식 오류",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.BAD_REQUEST)])],
+                description = "로그인 실패",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [
+                            ExampleObject(name = "email-not-found", value = OpenApiExamples.AUTH_LOGIN_EMAIL_NOT_FOUND),
+                            ExampleObject(name = "password-mismatch", value = OpenApiExamples.AUTH_LOGIN_PASSWORD_MISMATCH),
+                        ],
+                    ),
+                ],
             ),
         ],
     )
@@ -130,12 +151,24 @@ class AuthController(
             ApiResponse(
                 responseCode = "200",
                 description = "로그아웃 성공",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.AUTH_LOGOUT_SUCCESS)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = EmptyLegacyDataResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.AUTH_LOGOUT_SUCCESS)],
+                    ),
+                ],
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "인증 실패",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.UNAUTHORIZED)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.UNAUTHORIZED)],
+                    ),
+                ],
             ),
         ],
     )
@@ -164,12 +197,24 @@ class AuthController(
             ApiResponse(
                 responseCode = "200",
                 description = "토큰 발급 성공",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.AUTH_REFRESH_SUCCESS)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = TokenRefreshLegacyDataResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.AUTH_REFRESH_SUCCESS)],
+                    ),
+                ],
             ),
             ApiResponse(
-                responseCode = "400",
-                description = "리프레시 토큰 형식 오류",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.BAD_REQUEST)])],
+                responseCode = "401",
+                description = "리프레시 토큰이 유효하지 않음",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.UNAUTHORIZED)],
+                    ),
+                ],
             ),
         ],
     )
@@ -190,12 +235,24 @@ class AuthController(
             ApiResponse(
                 responseCode = "200",
                 description = "회원 탈퇴 성공",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.AUTH_DELETE_SUCCESS)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = EmptyLegacyDataResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.AUTH_DELETE_SUCCESS)],
+                    ),
+                ],
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "인증 실패",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.UNAUTHORIZED)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.UNAUTHORIZED)],
+                    ),
+                ],
             ),
         ],
     )
@@ -224,12 +281,24 @@ class AuthController(
             ApiResponse(
                 responseCode = "200",
                 description = "비밀번호 재설정 메일 발송 성공",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.AUTH_FIND_PASSWORD_SUCCESS)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = EmptyLegacyDataResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.AUTH_FIND_PASSWORD_SUCCESS)],
+                    ),
+                ],
             ),
             ApiResponse(
                 responseCode = "400",
-                description = "이메일 형식 오류",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.BAD_REQUEST)])],
+                description = "등록되지 않은 이메일 주소",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.AUTH_EMAIL_NOT_FOUND)],
+                    ),
+                ],
             ),
         ],
     )
@@ -258,12 +327,27 @@ class AuthController(
             ApiResponse(
                 responseCode = "200",
                 description = "인증 성공",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.AUTH_FIND_PASSWORD_CHECK_SUCCESS)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = EmptyLegacyDataResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.AUTH_FIND_PASSWORD_CHECK_SUCCESS)],
+                    ),
+                ],
             ),
             ApiResponse(
                 responseCode = "400",
-                description = "이메일 또는 인증번호 형식 오류",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.BAD_REQUEST)])],
+                description = "등록되지 않은 이메일이거나 인증번호가 일치하지 않음",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [
+                            ExampleObject(name = "email-not-found", value = OpenApiExamples.AUTH_EMAIL_NOT_FOUND),
+                            ExampleObject(name = "auth-number-mismatch", value = OpenApiExamples.AUTH_FIND_PASSWORD_CHECK_MISMATCH),
+                        ],
+                    ),
+                ],
             ),
         ],
     )
@@ -292,12 +376,24 @@ class AuthController(
             ApiResponse(
                 responseCode = "200",
                 description = "비밀번호 변경 성공",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.AUTH_PASSWORD_UPDATE_SUCCESS)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.AUTH_PASSWORD_UPDATE_SUCCESS)],
+                    ),
+                ],
             ),
             ApiResponse(
                 responseCode = "400",
-                description = "비밀번호 변경 요청 형식 오류",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.BAD_REQUEST)])],
+                description = "등록되지 않은 이메일 주소",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.AUTH_EMAIL_NOT_FOUND)],
+                    ),
+                ],
             ),
         ],
     )
@@ -326,12 +422,24 @@ class AuthController(
             ApiResponse(
                 responseCode = "200",
                 description = "비밀번호 변경 성공",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.AUTH_PASSWORD_UPDATE_SUCCESS)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.AUTH_PASSWORD_UPDATE_SUCCESS)],
+                    ),
+                ],
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "인증 실패",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.UNAUTHORIZED)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.UNAUTHORIZED)],
+                    ),
+                ],
             ),
         ],
     )
@@ -354,11 +462,10 @@ class AuthController(
             ApiResponse(
                 responseCode = "200",
                 description = "프로필 조회 성공",
-                useReturnTypeSchema = true,
                 content = [
                     Content(
                         mediaType = "application/json",
-                        schema = Schema(name = "UserProfileResponse", implementation = UserProfileResponse::class),
+                        schema = Schema(implementation = UserProfileLegacyDataResponse::class),
                         examples = [ExampleObject(value = OpenApiExamples.AUTH_PROFILE_SUCCESS)],
                     ),
                 ],
@@ -366,7 +473,13 @@ class AuthController(
             ApiResponse(
                 responseCode = "401",
                 description = "인증 실패",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.UNAUTHORIZED)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.UNAUTHORIZED)],
+                    ),
+                ],
             ),
         ],
     )
@@ -394,11 +507,10 @@ class AuthController(
             ApiResponse(
                 responseCode = "200",
                 description = "프로필 수정 성공",
-                useReturnTypeSchema = true,
                 content = [
                     Content(
                         mediaType = "application/json",
-                        schema = Schema(name = "UserSummaryResponse", implementation = UserSummaryResponse::class),
+                        schema = Schema(implementation = UserSummaryLegacyDataResponse::class),
                         examples = [ExampleObject(value = OpenApiExamples.AUTH_PROFILE_UPDATE_SUCCESS)],
                     ),
                 ],
@@ -406,7 +518,13 @@ class AuthController(
             ApiResponse(
                 responseCode = "401",
                 description = "인증 실패",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.UNAUTHORIZED)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.UNAUTHORIZED)],
+                    ),
+                ],
             ),
         ],
     )
