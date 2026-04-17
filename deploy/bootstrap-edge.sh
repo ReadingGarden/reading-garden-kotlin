@@ -16,7 +16,9 @@ PROD_CONTAINER_PREFIX="${PROD_CONTAINER_PREFIX:-reading-garden}"
 
 mkdir -p "${EDGE_APP_DIR}/routes" "${EDGE_DEFAULTS_DIR}"
 
+prod_route_was_missing=false
 if [[ ! -f "$EDGE_PROD_ROUTE_FILE" && -f "${EDGE_DEFAULTS_DIR}/prod-upstream.caddy" ]]; then
+    prod_route_was_missing=true
     cp "${EDGE_DEFAULTS_DIR}/prod-upstream.caddy" "$EDGE_PROD_ROUTE_FILE"
 fi
 
@@ -47,7 +49,7 @@ legacy_target="$(
         "$LEGACY_CADDY_FILE" 2>/dev/null | head -n 1
 )"
 
-if [[ -n "$legacy_target" && -f "$EDGE_PROD_ROUTE_FILE" ]]; then
+if [[ "$prod_route_was_missing" == true && -n "$legacy_target" && -f "$EDGE_PROD_ROUTE_FILE" ]]; then
     tmp_route="$(mktemp "${EDGE_PROD_ROUTE_FILE}.XXXXXX")"
     sed -E \
         "s/reverse_proxy reading-garden-(blue|green):8080/reverse_proxy ${legacy_target}:8080/" \
