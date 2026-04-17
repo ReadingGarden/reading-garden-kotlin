@@ -45,7 +45,6 @@ assert_file "$APP_COMPOSE"
 assert_file "$PROD_WORKFLOW"
 assert_file "$DEV_WORKFLOW"
 
-EDGE_CADDY_ROUTE_FILE="/etc/caddy/routes/prod-upstream.caddy" \
 docker compose -f "$EDGE_COMPOSE" config > "${TMP_DIR}/edge-compose.yaml"
 
 assert_contains "$EDGE_CADDYFILE" "readinggarden.duckdns.org"
@@ -61,7 +60,8 @@ assert_contains "${TMP_DIR}/edge-compose.yaml" "reading-garden-public"
 assert_contains "${TMP_DIR}/edge-compose.yaml" "entrypoint:"
 assert_contains "${TMP_DIR}/edge-compose.yaml" "/usr/local/bin/caddy-start.sh"
 assert_contains "${TMP_DIR}/edge-compose.yaml" "/opt/reading-garden/edge/caddy-start.sh"
-assert_contains "${TMP_DIR}/edge-compose.yaml" "CADDY_ROUTE_FILE: /etc/caddy/routes/prod-upstream.caddy"
+assert_contains "${TMP_DIR}/edge-compose.yaml" 'UPSTREAM_WAIT_TIMEOUT_SECONDS: "120"'
+assert_contains "${TMP_DIR}/edge-compose.yaml" 'UPSTREAM_WAIT_INTERVAL_SECONDS: "2"'
 
 IMAGE_REF="ghcr.io/example/reading-garden:test" \
 APP_HOST_DIR="${APP_HOST_DIR}" \
@@ -89,13 +89,11 @@ assert_contains "$PROD_WORKFLOW" "branches:"
 assert_contains "$PROD_WORKFLOW" "- main"
 assert_contains "$PROD_WORKFLOW" "EDGE_APP_DIR: /opt/reading-garden/edge"
 assert_contains "$PROD_WORKFLOW" 'EDGE_ROUTE_FILE_NAME="prod-upstream.caddy"'
-assert_contains "$PROD_WORKFLOW" 'EDGE_CADDY_ROUTE_FILE="/etc/caddy/routes/prod-upstream.caddy"'
 assert_contains "$PROD_WORKFLOW" "deploy/caddy-start.sh"
 assert_contains "$DEV_WORKFLOW" "- dev"
 assert_contains "$DEV_WORKFLOW" 'IMAGE_REF: ghcr.io/readinggarden/reading-garden-kotlin:jvm-dev-${{ github.sha }}'
 assert_contains "$DEV_WORKFLOW" 'APP_CONTAINER_PREFIX="reading-garden-dev"'
 assert_contains "$DEV_WORKFLOW" 'EDGE_ROUTE_FILE_NAME="dev-upstream.caddy"'
-assert_contains "$DEV_WORKFLOW" 'EDGE_CADDY_ROUTE_FILE="/etc/caddy/routes/dev-upstream.caddy"'
 assert_contains "$DEV_WORKFLOW" "deploy/caddy-start.sh"
 
 echo "deploy layout test passed"

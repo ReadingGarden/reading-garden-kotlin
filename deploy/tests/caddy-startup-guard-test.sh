@@ -112,7 +112,7 @@ EOF
 
         PATH="$tmp/bin:$PATH" \
         TMPDIR="$tmp" \
-        CADDY_ROUTE_FILE="$tmp/routes/prod-upstream.caddy" \
+        CADDY_ROUTES_DIR="$tmp/routes" \
         UPSTREAM_WAIT_TIMEOUT_SECONDS=1 \
         UPSTREAM_WAIT_INTERVAL_SECONDS=1 \
         "$TARGET" >"$tmp/stdout" 2>"$tmp/stderr" &
@@ -196,14 +196,14 @@ EOF
 
         if PATH="$tmp/bin:$PATH" \
             TMPDIR="$tmp" \
-            CADDY_ROUTE_FILE="$tmp/routes/prod-upstream.caddy" \
+            CADDY_ROUTES_DIR="$tmp/routes" \
             UPSTREAM_WAIT_TIMEOUT_SECONDS=1 \
             UPSTREAM_WAIT_INTERVAL_SECONDS=1 \
             "$TARGET" >"$tmp/stdout" 2>"$tmp/stderr"; then
             fail "expected route parse failure"
         fi
 
-        assert_contains "$tmp/stderr" "Failed to extract upstream"
+        assert_contains "$tmp/stderr" "Failed to extract upstreams from $tmp/routes"
         [[ ! -e "$tmp/event-log" ]] || fail "expected no events before parse failure"
         [[ ! -e "$tmp/getent-log" ]] || fail "expected getent not to be invoked"
         [[ ! -e "$tmp/curl-log" ]] || fail "expected curl not to be invoked"
@@ -255,7 +255,7 @@ EOF
 
         if PATH="$tmp/bin:$PATH" \
             TMPDIR="$tmp" \
-            CADDY_ROUTE_FILE="$tmp/routes/prod-upstream.caddy" \
+            CADDY_ROUTES_DIR="$tmp/routes" \
             UPSTREAM_WAIT_TIMEOUT_SECONDS=1 \
             UPSTREAM_WAIT_INTERVAL_SECONDS=1 \
             "$TARGET" >"$tmp/stdout" 2>"$tmp/stderr"; then
@@ -268,7 +268,7 @@ EOF
             hosts \
             reading-garden-blue
         assert_line_equals "$tmp/getent-log" "hosts reading-garden-blue"
-        assert_contains "$tmp/stderr" "upstream DNS"
+        assert_contains "$tmp/stderr" "healthy upstream"
         [[ ! -e "$tmp/curl-log" ]] || fail "expected curl not to be invoked"
         [[ ! -e "$tmp/caddy-invoked" ]] || fail "expected caddy not to be invoked"
     )
@@ -323,7 +323,7 @@ EOF
             TIMEOUT_STUB_MODE=force-timeout \
             TIMEOUT_STUB_SLEEP_SECONDS=1 \
             TIMEOUT_STUB_EXIT_CODE=124 \
-            CADDY_ROUTE_FILE="$tmp/routes/prod-upstream.caddy" \
+            CADDY_ROUTES_DIR="$tmp/routes" \
             UPSTREAM_WAIT_TIMEOUT_SECONDS=1 \
             UPSTREAM_WAIT_INTERVAL_SECONDS=1 \
             "$TARGET" >"$tmp/stdout" 2>"$tmp/stderr"; then
@@ -336,7 +336,7 @@ EOF
             getent \
             hosts \
             reading-garden-blue
-        assert_contains "$tmp/stderr" "Timed out waiting for upstream DNS"
+        assert_contains "$tmp/stderr" "Timed out waiting for a healthy upstream from $tmp/routes"
         [[ ! -e "$tmp/getent-log" ]] || fail "expected timeout wrapper to intercept hanging getent"
         [[ ! -e "$tmp/curl-log" ]] || fail "expected curl not to be invoked"
         [[ ! -e "$tmp/caddy-invoked" ]] || fail "expected caddy not to be invoked"
@@ -415,7 +415,7 @@ EOF
         SECONDS=0
         if PATH="$tmp/bin:$PATH" \
             TMPDIR="$tmp" \
-            CADDY_ROUTE_FILE="$tmp/routes/prod-upstream.caddy" \
+            CADDY_ROUTES_DIR="$tmp/routes" \
             UPSTREAM_WAIT_TIMEOUT_SECONDS=1 \
             UPSTREAM_WAIT_INTERVAL_SECONDS=1 \
             "$TARGET" >"$tmp/stdout" 2>"$tmp/stderr"; then
@@ -436,7 +436,7 @@ EOF
             1 \
             -fsS \
             http://reading-garden-blue:8080/api/health
-        assert_contains "$tmp/stderr" "Timed out waiting for upstream health"
+        assert_contains "$tmp/stderr" "Timed out waiting for a healthy upstream from $tmp/routes"
         event_lines=()
         while IFS= read -r line; do
             event_lines+=("$line")
