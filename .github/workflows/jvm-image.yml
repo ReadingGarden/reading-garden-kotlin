@@ -98,6 +98,8 @@ jobs:
             "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:/opt/infra/postgresql/docker-compose.yml"
           scp -P "$OCI_PORT" deploy/blue-green-deploy.sh \
             "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$REMOTE_APP_DIR/blue-green-deploy.sh"
+          scp -P "$OCI_PORT" deploy/bootstrap-shared-postgres.sh \
+            "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$REMOTE_APP_DIR/bootstrap-shared-postgres.sh"
           scp -P "$OCI_PORT" deploy/render-host-caddy-upstream.sh \
             "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:$REMOTE_APP_DIR/render-host-caddy-upstream.sh"
           scp -P "$OCI_PORT" deploy/cutover-smoke-check.sh \
@@ -111,6 +113,7 @@ jobs:
           ssh -p "$OCI_PORT" "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}" \
             "chmod +x \
               '$REMOTE_APP_DIR/blue-green-deploy.sh' \
+              '$REMOTE_APP_DIR/bootstrap-shared-postgres.sh' \
               '$REMOTE_APP_DIR/render-host-caddy-upstream.sh' \
               '$REMOTE_APP_DIR/cutover-smoke-check.sh' \
               '$REMOTE_APP_DIR/bootstrap-instance.sh' \
@@ -133,12 +136,16 @@ jobs:
           export APP_VOLUME_PREFIX="reading-garden-prod"
           export APP_BLUE_HOST_PORT="18080"
           export APP_GREEN_HOST_PORT="18081"
+          export POSTGRES_STACK_DIR="/opt/infra/postgresql"
+          export SHARED_BACKEND_NETWORK_NAME="reading-garden-shared-backend"
           export HOST_CADDY_UPSTREAM_FILE="/etc/caddy/upstreams/reading-garden-prod.caddy"
           export ROUTE_RENDERER="$REMOTE_APP_DIR/render-host-caddy-upstream.sh"
           export SMOKE_BASE_URL="https://readinggarden.duckdns.org"
 
+          ./bootstrap-shared-postgres.sh
           ./bootstrap-instance.sh
           test -f .env
+          test -f .runtime.env
           test -f secrets/firebase-service-account.json
           ./blue-green-deploy.sh
           EOF

@@ -7,13 +7,15 @@ services:
     pull_policy: always
     ports:
       - "127.0.0.1:${APP_BLUE_HOST_PORT:?APP_BLUE_HOST_PORT is required}:8080"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     env_file:
       - ${APP_HOST_DIR:?APP_HOST_DIR is required}/.env
+      - ${APP_HOST_DIR:?APP_HOST_DIR is required}/.runtime.env
     volumes:
       - ${APP_HOST_DIR:?APP_HOST_DIR is required}/secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
       - ${APP_HOST_DIR:?APP_HOST_DIR is required}/data:/opt/reading-garden/data
+    networks:
+      - default
+      - shared-backend
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
       interval: 10s
@@ -29,13 +31,15 @@ services:
     pull_policy: always
     ports:
       - "127.0.0.1:${APP_GREEN_HOST_PORT:?APP_GREEN_HOST_PORT is required}:8080"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     env_file:
       - ${APP_HOST_DIR:?APP_HOST_DIR is required}/.env
+      - ${APP_HOST_DIR:?APP_HOST_DIR is required}/.runtime.env
     volumes:
       - ${APP_HOST_DIR:?APP_HOST_DIR is required}/secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
       - ${APP_HOST_DIR:?APP_HOST_DIR is required}/data:/opt/reading-garden/data
+    networks:
+      - default
+      - shared-backend
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
       interval: 10s
@@ -44,3 +48,8 @@ services:
       start_period: 30s
     profiles:
       - green
+
+networks:
+  shared-backend:
+    name: ${SHARED_BACKEND_NETWORK_NAME:-reading-garden-shared-backend}
+    external: true

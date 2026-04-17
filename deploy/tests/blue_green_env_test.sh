@@ -54,6 +54,8 @@ assert_contains "$BLUE_GREEN_SCRIPT" 'sleep "$CUTOVER_DRAIN_SECONDS"'
 assert_contains "$BLUE_GREEN_SCRIPT" 'docker compose -f "$COMPOSE_FILE" stop -t "$APP_STOP_TIMEOUT_SECONDS" "app-${ACTIVE}"'
 assert_contains "$BLUE_GREEN_SCRIPT" 'ROUTE_RENDERER="${ROUTE_RENDERER:-${APP_DIR}/render-host-caddy-upstream.sh}"'
 assert_contains "$BOOTSTRAP_SCRIPT" 'REMOTE_APP_DIR:-${APP_DIR:-}'
+assert_contains "$BOOTSTRAP_SCRIPT" 'SHARED_POSTGRES_HOST="${SHARED_POSTGRES_HOST:-shared-postgres}"'
+assert_contains "$BOOTSTRAP_SCRIPT" 'SHARED_POSTGRES_PORT="${SHARED_POSTGRES_PORT:-5432}"'
 assert_contains "$BOOTSTRAP_EDGE_SCRIPT" 'EDGE_CADDY_START_SCRIPT="${EDGE_APP_DIR}/caddy-start.sh"'
 
 "$ROUTE_RENDERER" "reading-garden" "green" > "${TMP_DIR}/prod-route.caddy"
@@ -70,10 +72,14 @@ printf '{}' > "${TMP_DIR}/source/secrets/firebase-service-account.json"
 printf 'DB_HOST=target-postgres\n' > "${TMP_DIR}/target/.env"
 printf '{"target":true}\n' > "${TMP_DIR}/target/secrets/firebase-service-account.json"
 
+printf 'DB_NAME=reading_garden_dev\n' >> "${TMP_DIR}/target/.env"
+
 SOURCE_APP_DIR="${TMP_DIR}/source" REMOTE_APP_DIR="${TMP_DIR}/target" "$BOOTSTRAP_SCRIPT"
 
 assert_contains "${TMP_DIR}/target/.env" "DB_HOST=target-postgres"
 assert_contains "${TMP_DIR}/target/secrets/firebase-service-account.json" '"target":true'
+assert_contains "${TMP_DIR}/target/.runtime.env" "DB_HOST=shared-postgres"
+assert_contains "${TMP_DIR}/target/.runtime.env" "SPRING_DATASOURCE_URL=jdbc:postgresql://shared-postgres:5432/reading_garden_dev"
 
 mkdir -p "${TMP_DIR}/edge/defaults" "${TMP_DIR}/edge/routes" "${TMP_DIR}/legacy" "${TMP_DIR}/bin"
 cat > "${TMP_DIR}/edge/defaults/prod-upstream.caddy" <<'EOF'

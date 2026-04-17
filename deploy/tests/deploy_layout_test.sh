@@ -8,6 +8,7 @@ APP_HOST_DIR="${TMP_DIR}/reading-garden-dev"
 
 mkdir -p "${APP_HOST_DIR}/secrets" "${APP_HOST_DIR}/data"
 printf 'DB_PASSWORD=test-password\n' > "${APP_HOST_DIR}/.env"
+printf 'DB_HOST=shared-postgres\n' > "${APP_HOST_DIR}/.runtime.env"
 printf '{}' > "${APP_HOST_DIR}/secrets/firebase-service-account.json"
 
 assert_file() {
@@ -82,11 +83,16 @@ assert_contains "${TMP_DIR}/app-compose.yaml" "container_name: reading-garden-de
 assert_contains "${TMP_DIR}/app-compose.yaml" "stop_grace_period: 35s"
 assert_contains "${TMP_DIR}/app-compose.yaml" "published: \"18090\""
 assert_contains "${TMP_DIR}/app-compose.yaml" "published: \"18091\""
-assert_contains "${TMP_DIR}/app-compose.yaml" "host.docker.internal=host-gateway"
+assert_contains "${TMP_DIR}/app-compose.yaml" "DB_HOST: shared-postgres"
+assert_contains "${TMP_DIR}/app-compose.yaml" "name: reading-garden-shared-backend"
 assert_contains "${TMP_DIR}/app-compose.yaml" "source: ${APP_HOST_DIR}/data"
 assert_contains "${TMP_DIR}/app-compose.yaml" "source: ${APP_HOST_DIR}/secrets/firebase-service-account.json"
 if grep -Fq "container_name: reading-garden-dev-db" "${TMP_DIR}/app-compose.yaml"; then
     echo "app compose should not include postgres service" >&2
+    exit 1
+fi
+if grep -Fq "host.docker.internal=host-gateway" "${TMP_DIR}/app-compose.yaml"; then
+    echo "app compose should not use host-gateway bridge access" >&2
     exit 1
 fi
 if grep -Fq "name: reading-garden-public" "${TMP_DIR}/app-compose.yaml"; then
@@ -98,15 +104,19 @@ assert_contains "$PROD_WORKFLOW" "branches:"
 assert_contains "$PROD_WORKFLOW" "- main"
 assert_contains "$PROD_WORKFLOW" "REMOTE_APP_DIR: /opt/apps/reading-garden/prod"
 assert_contains "$PROD_WORKFLOW" "deploy/docker-compose.postgres-shared.yml"
+assert_contains "$PROD_WORKFLOW" "deploy/bootstrap-shared-postgres.sh"
 assert_contains "$PROD_WORKFLOW" "deploy/render-host-caddy-upstream.sh"
 assert_contains "$PROD_WORKFLOW" "deploy/postgres/init/10-create-app-databases.sh"
 assert_contains "$PROD_WORKFLOW" '/tmp/reading-garden-host-caddy'
 assert_contains "$PROD_WORKFLOW" 'APP_CONTAINER_PREFIX="reading-garden-prod"'
+assert_contains "$PROD_WORKFLOW" 'SHARED_BACKEND_NETWORK_NAME="reading-garden-shared-backend"'
 assert_contains "$PROD_WORKFLOW" 'HOST_CADDY_UPSTREAM_FILE="/etc/caddy/upstreams/reading-garden-prod.caddy"'
 assert_contains "$DEV_WORKFLOW" "- dev"
 assert_contains "$DEV_WORKFLOW" "REMOTE_APP_DIR: /opt/apps/reading-garden/dev"
 assert_contains "$DEV_WORKFLOW" 'IMAGE_REF: ghcr.io/readinggarden/reading-garden-kotlin:jvm-dev-${{ github.sha }}'
 assert_contains "$DEV_WORKFLOW" 'APP_CONTAINER_PREFIX="reading-garden-dev"'
+assert_contains "$DEV_WORKFLOW" "deploy/bootstrap-shared-postgres.sh"
+assert_contains "$DEV_WORKFLOW" 'SHARED_BACKEND_NETWORK_NAME="reading-garden-shared-backend"'
 assert_contains "$DEV_WORKFLOW" 'HOST_CADDY_UPSTREAM_FILE="/etc/caddy/upstreams/reading-garden-dev.caddy"'
 assert_contains "$DEV_WORKFLOW" "deploy/docker-compose.postgres-shared.yml"
 assert_contains "$DEV_WORKFLOW" "deploy/render-host-caddy-upstream.sh"

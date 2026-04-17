@@ -6,6 +6,7 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 
 mkdir -p "$TMP_DIR/secrets" "$TMP_DIR/data"
 touch "$TMP_DIR/.env"
+touch "$TMP_DIR/.runtime.env"
 printf '{}\n' > "$TMP_DIR/secrets/firebase-service-account.json"
 
 CONFIG_OUTPUT="$(
@@ -21,10 +22,15 @@ CONFIG_OUTPUT="$(
 printf '%s\n' "$CONFIG_OUTPUT" | grep -q 'host_ip: 127.0.0.1'
 printf '%s\n' "$CONFIG_OUTPUT" | grep -q 'published: "18080"'
 printf '%s\n' "$CONFIG_OUTPUT" | grep -q 'published: "18081"'
-printf '%s\n' "$CONFIG_OUTPUT" | grep -q 'host.docker.internal=host-gateway'
+printf '%s\n' "$CONFIG_OUTPUT" | grep -q 'name: reading-garden-shared-backend'
 
 if printf '%s\n' "$CONFIG_OUTPUT" | grep -q 'postgres:'; then
     echo "app compose must not define postgres service" >&2
+    exit 1
+fi
+
+if printf '%s\n' "$CONFIG_OUTPUT" | grep -q 'host.docker.internal=host-gateway'; then
+    echo "app compose must not rely on host-gateway for postgres access" >&2
     exit 1
 fi
 
