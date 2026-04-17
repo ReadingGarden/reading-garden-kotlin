@@ -320,6 +320,7 @@ class AuthController(
                 userId = principal.userId,
                 userNick = request.user_nick,
                 userImage = request.user_image,
+                userFcm = request.user_fcm,
             ),
         )
 }
