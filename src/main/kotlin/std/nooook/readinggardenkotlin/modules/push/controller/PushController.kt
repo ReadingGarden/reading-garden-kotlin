@@ -40,7 +40,13 @@ class PushController(
             ApiResponse(
                 responseCode = "200",
                 description = "푸시 알림 조회 성공",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.PUSH_GET_SUCCESS)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = PushLegacyDataResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.PUSH_GET_SUCCESS)],
+                    ),
+                ],
             ),
         ],
     )
@@ -68,7 +74,13 @@ class PushController(
             ApiResponse(
                 responseCode = "200",
                 description = "푸시 알림 수정 성공",
-                content = [Content(mediaType = "application/json", examples = [ExampleObject(value = OpenApiExamples.PUSH_UPDATE_SUCCESS)])],
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = LegacyHttpResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.PUSH_UPDATE_SUCCESS)],
+                    ),
+                ],
             ),
         ],
     )
@@ -89,6 +101,21 @@ class PushController(
     @PostMapping("/book")
     @Operation(summary = "독서 푸시 즉시 전송", description = "운영성 endpoint로, 독서 푸시 대상 사용자에게 즉시 푸시를 전송합니다.")
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "독서 푸시 즉시 전송 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = PushSendLegacyDataResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.PUSH_BOOK_SUCCESS)],
+                    ),
+                ],
+            ),
+        ],
+    )
     fun sendBookPush(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
     ): LegacyDataResponse<List<Map<String, Any>>> =
@@ -101,6 +128,21 @@ class PushController(
     @PostMapping("/notice")
     @Operation(summary = "공지 푸시 전송", description = "입력한 `content`를 공지 푸시로 전송합니다.")
     @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "공지 푸시 전송 성공",
+                content = [
+                    Content(
+                        mediaType = "application/json",
+                        schema = Schema(implementation = PushSendLegacyDataResponse::class),
+                        examples = [ExampleObject(value = OpenApiExamples.PUSH_NOTICE_SUCCESS)],
+                    ),
+                ],
+            ),
+        ],
+    )
     fun sendNoticePush(
         @AuthenticationPrincipal principal: LegacyAuthenticationPrincipal,
         @Parameter(description = "공지 푸시 내용", example = "오늘 저녁 9시에 점검이 있습니다.")
@@ -123,4 +165,38 @@ data class PushResponse(
     val push_book_ok: Boolean,
     @field:Schema(description = "예약 시각", example = "2026-04-10T21:00:00", nullable = true)
     val push_time: LocalDateTime?,
+)
+
+@Schema(description = "푸시 전송 결과 항목")
+data class PushSendResultDocument(
+    @field:Schema(description = "FCM 전송 대상 토큰", example = "fcm-token-value")
+    val token: String,
+    @field:Schema(description = "전송 결과", example = "sent")
+    val result: String,
+    @field:Schema(description = "FCM message id", example = "message-1", nullable = true)
+    val message_id: String? = null,
+    @field:Schema(description = "전송 실패 코드", example = "UNREGISTERED", nullable = true)
+    val error_code: String? = null,
+    @field:Schema(description = "전송 실패 메시지", example = "registration token is invalid", nullable = true)
+    val error: String? = null,
+)
+
+@Schema(name = "PushLegacyDataResponse", description = "푸시 설정 조회 성공 레거시 envelope")
+data class PushLegacyDataResponse(
+    @field:Schema(description = "HTTP 상태 코드와 동일한 레거시 응답 코드", example = "200")
+    val resp_code: Int,
+    @field:Schema(description = "레거시 응답 메시지", example = "푸시 알림 조회 성공")
+    val resp_msg: String,
+    @field:Schema(description = "푸시 설정 데이터")
+    val data: PushResponse,
+)
+
+@Schema(name = "PushSendLegacyDataResponse", description = "푸시 전송 성공 레거시 envelope")
+data class PushSendLegacyDataResponse(
+    @field:Schema(description = "HTTP 상태 코드와 동일한 레거시 응답 코드", example = "200")
+    val resp_code: Int,
+    @field:Schema(description = "레거시 응답 메시지", example = "공지사항 푸시 전송 성공")
+    val resp_msg: String,
+    @field:Schema(description = "푸시 전송 결과 목록")
+    val data: List<PushSendResultDocument>,
 )
