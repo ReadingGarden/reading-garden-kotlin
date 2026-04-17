@@ -14,8 +14,24 @@ assert_contains() {
     fi
 }
 
+assert_file_equals() {
+    local file="$1"
+    local expected="$2"
+    local actual
+    actual="$(cat "$file")"
+    if [[ "$actual" != "$expected" ]]; then
+        echo "unexpected file contents in $file" >&2
+        echo "--- expected ---" >&2
+        printf '%s\n' "$expected" >&2
+        echo "--- actual ---" >&2
+        printf '%s\n' "$actual" >&2
+        exit 1
+    fi
+}
+
 ROUTE_RENDERER="${ROOT_DIR}/deploy/render-edge-route.sh"
 BOOTSTRAP_SCRIPT="${ROOT_DIR}/deploy/bootstrap-instance.sh"
+BOOTSTRAP_EDGE_SCRIPT="${ROOT_DIR}/deploy/bootstrap-edge.sh"
 BLUE_GREEN_SCRIPT="${ROOT_DIR}/deploy/blue-green-deploy.sh"
 
 if [[ ! -x "$ROUTE_RENDERER" ]]; then
@@ -32,8 +48,8 @@ assert_contains "$BLUE_GREEN_SCRIPT" 'APP_CONTAINER_PREFIX="${APP_CONTAINER_PREF
 assert_contains "$BLUE_GREEN_SCRIPT" 'EDGE_APP_DIR="${EDGE_APP_DIR:-/opt/reading-garden/edge}"'
 assert_contains "$BLUE_GREEN_SCRIPT" 'EDGE_ROUTE_FILE_NAME="${EDGE_ROUTE_FILE_NAME:-prod-upstream.caddy}"'
 assert_contains "$BOOTSTRAP_SCRIPT" 'REMOTE_APP_DIR:-${APP_DIR:-}'
-assert_contains "${ROOT_DIR}/deploy/bootstrap-edge.sh" 'EDGE_CADDY_START_SCRIPT="${EDGE_APP_DIR}/caddy-start.sh"'
-assert_contains "${ROOT_DIR}/deploy/bootstrap-edge.sh" 'EDGE_CADDY_ROUTE_FILE="${EDGE_CADDY_ROUTE_FILE:-/etc/caddy/routes/prod-upstream.caddy}"'
+assert_contains "$BOOTSTRAP_EDGE_SCRIPT" 'EDGE_CADDY_START_SCRIPT="${EDGE_APP_DIR}/caddy-start.sh"'
+assert_contains "$BOOTSTRAP_EDGE_SCRIPT" 'EDGE_CADDY_ROUTE_FILE="${EDGE_CADDY_ROUTE_FILE:-/etc/caddy/routes/prod-upstream.caddy}"'
 
 "$ROUTE_RENDERER" "reading-garden" "green" > "${TMP_DIR}/prod-route.caddy"
 "$ROUTE_RENDERER" "reading-garden-dev" "blue" > "${TMP_DIR}/dev-route.caddy"
@@ -51,5 +67,60 @@ SOURCE_APP_DIR="${TMP_DIR}/source" REMOTE_APP_DIR="${TMP_DIR}/target" "$BOOTSTRA
 
 assert_contains "${TMP_DIR}/target/.env" "DB_HOST=postgres"
 assert_contains "${TMP_DIR}/target/secrets/firebase-service-account.json" "{}"
+
+mkdir -p "${TMP_DIR}/edge/defaults" "${TMP_DIR}/edge/routes" "${TMP_DIR}/legacy" "${TMP_DIR}/bin"
+cat > "${TMP_DIR}/edge/defaults/prod-upstream.caddy" <<'EOF'
+reverse_proxy reading-garden-blue:8080 {
+    header_up Host {host}
+}
+EOF
+cat > "${TMP_DIR}/edge/defaults/dev-upstream.caddy" <<'EOF'
+reverse_proxy reading-garden-dev-blue:8080 {
+    header_up Host {host}
+}
+EOF
+cat > "${TMP_DIR}/edge/routes/prod-upstream.caddy" <<'EOF'
+reverse_proxy reading-garden-green:8080 {
+    header_up Host {host}
+}
+EOF
+cat > "${TMP_DIR}/legacy/Caddyfile" <<'EOF'
+reverse_proxy reading-garden-blue:8080 {
+    header_up Host {host}
+}
+EOF
+cat > "${TMP_DIR}/bin/docker" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${1:-}" == "inspect" ]]; then
+    exit 1
+fi
+
+if [[ "${1:-}" == "ps" ]]; then
+    exit 0
+fi
+
+if [[ "${1:-}" == "network" || "${1:-}" == "volume" || "${1:-}" == "compose" ]]; then
+    exit 0
+fi
+
+echo "unexpected docker invocation: $*" >&2
+exit 1
+EOF
+chmod +x "${TMP_DIR}/bin/docker"
+
+PATH="${TMP_DIR}/bin:$PATH" \
+EDGE_APP_DIR="${TMP_DIR}/edge" \
+LEGACY_APP_DIR="${TMP_DIR}/legacy" \
+EDGE_CADDY_ROUTE_FILE="/etc/caddy/routes/dev-upstream.caddy" \
+"$BOOTSTRAP_EDGE_SCRIPT"
+
+assert_file_equals "${TMP_DIR}/edge/routes/prod-upstream.caddy" "$(cat <<'EOF'
+reverse_proxy reading-garden-green:8080 {
+    header_up Host {host}
+}
+EOF
+)"
 
 echo "blue green env test passed"
