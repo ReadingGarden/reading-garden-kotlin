@@ -136,7 +136,7 @@ probe_upstream_health() {
 }
 
 wait_for_any_upstream() {
-    local hosts=("$@")
+    local hosts="$1"
     local start_ts
     local remaining
     local probe_timeout_seconds
@@ -150,7 +150,7 @@ wait_for_any_upstream() {
             return 1
         fi
 
-        for host in "${hosts[@]}"; do
+        for host in $hosts; do
             remaining="$(remaining_budget_seconds "$start_ts")"
             if [ "$remaining" -le 0 ]; then
                 echo "ERROR: Timed out waiting for a healthy upstream from $CADDY_ROUTES_DIR" >&2
@@ -170,8 +170,7 @@ wait_for_any_upstream() {
 
 main() {
     local upstream_hosts
-    local upstream_host
-    local upstream_array=()
+    local upstream_hosts_inline
 
     preflight_checks
     upstream_hosts="$(extract_upstream_hosts "$CADDY_ROUTES_DIR")"
@@ -180,16 +179,11 @@ main() {
         return 1
     fi
 
-    while IFS= read -r upstream_host; do
-        [ -n "$upstream_host" ] || continue
-        upstream_array+=("$upstream_host")
-    done <<EOF
-$upstream_hosts
-EOF
+    upstream_hosts_inline="$(printf '%s\n' "$upstream_hosts" | tr '\n' ' ' | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//')"
 
     printf 'INFO: Waiting for any healthy upstream from %s: %s\n' \
-        "$CADDY_ROUTES_DIR" "${upstream_array[*]}" >&2
-    wait_for_any_upstream "${upstream_array[@]}"
+        "$CADDY_ROUTES_DIR" "$upstream_hosts_inline" >&2
+    wait_for_any_upstream "$upstream_hosts_inline"
     exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
 }
 
