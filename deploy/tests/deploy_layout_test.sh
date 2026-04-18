@@ -8,6 +8,7 @@ APP_HOST_DIR="${TMP_DIR}/reading-garden-dev"
 
 mkdir -p "${APP_HOST_DIR}/secrets" "${APP_HOST_DIR}/data"
 printf 'DB_PASSWORD=test-password\n' > "${APP_HOST_DIR}/.env"
+printf 'DB_HOST=shared-postgres\n' > "${APP_HOST_DIR}/.runtime.env"
 printf '{}' > "${APP_HOST_DIR}/secrets/firebase-service-account.json"
 
 assert_file() {
@@ -44,6 +45,7 @@ assert_file "$EDGE_START_SCRIPT"
 assert_file "$APP_COMPOSE"
 assert_file "$PROD_WORKFLOW"
 assert_file "$DEV_WORKFLOW"
+assert_file "${ROOT_DIR}/deploy/bootstrap-host-caddy.sh"
 
 docker compose -f "$EDGE_COMPOSE" config > "${TMP_DIR}/edge-compose.yaml"
 
@@ -68,7 +70,8 @@ APP_HOST_DIR="${APP_HOST_DIR}" \
 APP_CONTAINER_PREFIX="reading-garden-dev" \
 APP_VOLUME_PREFIX="reading-garden-dev" \
 APP_STOP_GRACE_PERIOD="35s" \
-DB_PASSWORD="test-password" \
+APP_BLUE_HOST_PORT="18090" \
+APP_GREEN_HOST_PORT="18091" \
 docker compose --profile green -f "$APP_COMPOSE" config > "${TMP_DIR}/app-compose.yaml"
 
 if grep -Fq "reading-garden-caddy" "${TMP_DIR}/app-compose.yaml"; then
@@ -78,22 +81,49 @@ fi
 
 assert_contains "${TMP_DIR}/app-compose.yaml" "container_name: reading-garden-dev-blue"
 assert_contains "${TMP_DIR}/app-compose.yaml" "container_name: reading-garden-dev-green"
-assert_contains "${TMP_DIR}/app-compose.yaml" "container_name: reading-garden-dev-db"
 assert_contains "${TMP_DIR}/app-compose.yaml" "stop_grace_period: 35s"
+assert_contains "${TMP_DIR}/app-compose.yaml" "published: \"18090\""
+assert_contains "${TMP_DIR}/app-compose.yaml" "published: \"18091\""
+assert_contains "${TMP_DIR}/app-compose.yaml" "DB_HOST: shared-postgres"
+assert_contains "${TMP_DIR}/app-compose.yaml" "name: reading-garden-shared-backend"
 assert_contains "${TMP_DIR}/app-compose.yaml" "source: ${APP_HOST_DIR}/data"
 assert_contains "${TMP_DIR}/app-compose.yaml" "source: ${APP_HOST_DIR}/secrets/firebase-service-account.json"
-assert_contains "${TMP_DIR}/app-compose.yaml" "name: reading-garden-dev_pgdata"
-assert_contains "${TMP_DIR}/app-compose.yaml" "name: reading-garden-public"
+if grep -Fq "container_name: reading-garden-dev-db" "${TMP_DIR}/app-compose.yaml"; then
+    echo "app compose should not include postgres service" >&2
+    exit 1
+fi
+if grep -Fq "host.docker.internal=host-gateway" "${TMP_DIR}/app-compose.yaml"; then
+    echo "app compose should not use host-gateway bridge access" >&2
+    exit 1
+fi
+if grep -Fq "name: reading-garden-public" "${TMP_DIR}/app-compose.yaml"; then
+    echo "app compose should not depend on public docker network" >&2
+    exit 1
+fi
 
 assert_contains "$PROD_WORKFLOW" "branches:"
 assert_contains "$PROD_WORKFLOW" "- main"
-assert_contains "$PROD_WORKFLOW" "EDGE_APP_DIR: /opt/reading-garden/edge"
-assert_contains "$PROD_WORKFLOW" 'EDGE_ROUTE_FILE_NAME="prod-upstream.caddy"'
-assert_contains "$PROD_WORKFLOW" "deploy/caddy-start.sh"
+assert_contains "$PROD_WORKFLOW" "REMOTE_APP_DIR: /opt/apps/reading-garden/prod"
+assert_contains "$PROD_WORKFLOW" "deploy/docker-compose.postgres-shared.yml"
+assert_contains "$PROD_WORKFLOW" "deploy/bootstrap-host-caddy.sh"
+assert_contains "$PROD_WORKFLOW" "deploy/bootstrap-shared-postgres.sh"
+assert_contains "$PROD_WORKFLOW" "deploy/render-host-caddy-upstream.sh"
+assert_contains "$PROD_WORKFLOW" "deploy/postgres/init/10-create-app-databases.sh"
+assert_contains "$PROD_WORKFLOW" '/tmp/reading-garden-host-caddy'
+assert_contains "$PROD_WORKFLOW" 'APP_CONTAINER_PREFIX="reading-garden-prod"'
+assert_contains "$PROD_WORKFLOW" 'SHARED_BACKEND_NETWORK_NAME="reading-garden-shared-backend"'
+assert_contains "$PROD_WORKFLOW" 'sudo HOST_CADDY_STAGE_DIR=/tmp/reading-garden-host-caddy'
+assert_contains "$PROD_WORKFLOW" 'HOST_CADDY_UPSTREAM_FILE="/etc/caddy/upstreams/reading-garden-prod.caddy"'
 assert_contains "$DEV_WORKFLOW" "- dev"
+assert_contains "$DEV_WORKFLOW" "REMOTE_APP_DIR: /opt/apps/reading-garden/dev"
 assert_contains "$DEV_WORKFLOW" 'IMAGE_REF: ghcr.io/readinggarden/reading-garden-kotlin:jvm-dev-${{ github.sha }}'
 assert_contains "$DEV_WORKFLOW" 'APP_CONTAINER_PREFIX="reading-garden-dev"'
-assert_contains "$DEV_WORKFLOW" 'EDGE_ROUTE_FILE_NAME="dev-upstream.caddy"'
-assert_contains "$DEV_WORKFLOW" "deploy/caddy-start.sh"
+assert_contains "$DEV_WORKFLOW" "deploy/bootstrap-host-caddy.sh"
+assert_contains "$DEV_WORKFLOW" "deploy/bootstrap-shared-postgres.sh"
+assert_contains "$DEV_WORKFLOW" 'SHARED_BACKEND_NETWORK_NAME="reading-garden-shared-backend"'
+assert_contains "$DEV_WORKFLOW" 'sudo HOST_CADDY_STAGE_DIR=/tmp/reading-garden-host-caddy'
+assert_contains "$DEV_WORKFLOW" 'HOST_CADDY_UPSTREAM_FILE="/etc/caddy/upstreams/reading-garden-dev.caddy"'
+assert_contains "$DEV_WORKFLOW" "deploy/docker-compose.postgres-shared.yml"
+assert_contains "$DEV_WORKFLOW" "deploy/render-host-caddy-upstream.sh"
 
 echo "deploy layout test passed"
