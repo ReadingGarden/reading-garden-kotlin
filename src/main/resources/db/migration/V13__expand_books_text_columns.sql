@@ -1,0 +1,4 @@
+ALTER TABLE books
+    ALTER COLUMN title TYPE TEXT,
+    ALTER COLUMN author TYPE TEXT,
+    ALTER COLUMN publisher TYPE TEXT;

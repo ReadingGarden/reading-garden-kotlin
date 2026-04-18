@@ -22,11 +22,11 @@ class BookEntity(
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "garden_id")
     var garden: GardenEntity? = null,
-    @Column(nullable = false, length = 300)
+    @Column(nullable = false, columnDefinition = "TEXT")
     var title: String = "",
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false, columnDefinition = "TEXT")
     var author: String = "",
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false, columnDefinition = "TEXT")
     var publisher: String = "",
     @Column(nullable = false)
     var status: Int = 0,
