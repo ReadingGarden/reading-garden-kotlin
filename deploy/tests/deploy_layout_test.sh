@@ -45,6 +45,7 @@ assert_file "$EDGE_START_SCRIPT"
 assert_file "$APP_COMPOSE"
 assert_file "$PROD_WORKFLOW"
 assert_file "$DEV_WORKFLOW"
+assert_file "${ROOT_DIR}/deploy/bootstrap-host-caddy.sh"
 
 docker compose -f "$EDGE_COMPOSE" config > "${TMP_DIR}/edge-compose.yaml"
 
@@ -104,19 +105,23 @@ assert_contains "$PROD_WORKFLOW" "branches:"
 assert_contains "$PROD_WORKFLOW" "- main"
 assert_contains "$PROD_WORKFLOW" "REMOTE_APP_DIR: /opt/apps/reading-garden/prod"
 assert_contains "$PROD_WORKFLOW" "deploy/docker-compose.postgres-shared.yml"
+assert_contains "$PROD_WORKFLOW" "deploy/bootstrap-host-caddy.sh"
 assert_contains "$PROD_WORKFLOW" "deploy/bootstrap-shared-postgres.sh"
 assert_contains "$PROD_WORKFLOW" "deploy/render-host-caddy-upstream.sh"
 assert_contains "$PROD_WORKFLOW" "deploy/postgres/init/10-create-app-databases.sh"
 assert_contains "$PROD_WORKFLOW" '/tmp/reading-garden-host-caddy'
 assert_contains "$PROD_WORKFLOW" 'APP_CONTAINER_PREFIX="reading-garden-prod"'
 assert_contains "$PROD_WORKFLOW" 'SHARED_BACKEND_NETWORK_NAME="reading-garden-shared-backend"'
+assert_contains "$PROD_WORKFLOW" 'sudo HOST_CADDY_STAGE_DIR=/tmp/reading-garden-host-caddy'
 assert_contains "$PROD_WORKFLOW" 'HOST_CADDY_UPSTREAM_FILE="/etc/caddy/upstreams/reading-garden-prod.caddy"'
 assert_contains "$DEV_WORKFLOW" "- dev"
 assert_contains "$DEV_WORKFLOW" "REMOTE_APP_DIR: /opt/apps/reading-garden/dev"
 assert_contains "$DEV_WORKFLOW" 'IMAGE_REF: ghcr.io/readinggarden/reading-garden-kotlin:jvm-dev-${{ github.sha }}'
 assert_contains "$DEV_WORKFLOW" 'APP_CONTAINER_PREFIX="reading-garden-dev"'
+assert_contains "$DEV_WORKFLOW" "deploy/bootstrap-host-caddy.sh"
 assert_contains "$DEV_WORKFLOW" "deploy/bootstrap-shared-postgres.sh"
 assert_contains "$DEV_WORKFLOW" 'SHARED_BACKEND_NETWORK_NAME="reading-garden-shared-backend"'
+assert_contains "$DEV_WORKFLOW" 'sudo HOST_CADDY_STAGE_DIR=/tmp/reading-garden-host-caddy'
 assert_contains "$DEV_WORKFLOW" 'HOST_CADDY_UPSTREAM_FILE="/etc/caddy/upstreams/reading-garden-dev.caddy"'
 assert_contains "$DEV_WORKFLOW" "deploy/docker-compose.postgres-shared.yml"
 assert_contains "$DEV_WORKFLOW" "deploy/render-host-caddy-upstream.sh"

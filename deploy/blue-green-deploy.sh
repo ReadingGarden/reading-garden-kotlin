@@ -15,13 +15,24 @@ APP_STOP_TIMEOUT_SECONDS="${APP_STOP_TIMEOUT_SECONDS:-35}"
 HOST_CADDY_UPSTREAM_FILE="${HOST_CADDY_UPSTREAM_FILE:?HOST_CADDY_UPSTREAM_FILE is required}"
 APP_BLUE_HOST_PORT="${APP_BLUE_HOST_PORT:?APP_BLUE_HOST_PORT is required}"
 APP_GREEN_HOST_PORT="${APP_GREEN_HOST_PORT:?APP_GREEN_HOST_PORT is required}"
+HOST_CADDY_SUDO="${HOST_CADDY_SUDO:-sudo}"
 HOST_CADDY_VALIDATE_CMD="${HOST_CADDY_VALIDATE_CMD:-caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile}"
-HOST_CADDY_RELOAD_CMD="${HOST_CADDY_RELOAD_CMD:-caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile}"
+HOST_CADDY_RELOAD_CMD="${HOST_CADDY_RELOAD_CMD:-caddy reload --address unix//var/lib/caddy/caddy-admin.sock --config /etc/caddy/Caddyfile --adapter caddyfile}"
 ROUTE_RENDERER="${ROUTE_RENDERER:-${APP_DIR}/render-host-caddy-upstream.sh}"
 
+run_host_caddy_cmd() {
+    local command="$1"
+
+    if [[ -n "$HOST_CADDY_SUDO" ]]; then
+        "$HOST_CADDY_SUDO" env PATH="$PATH" bash -lc "$command"
+    else
+        env PATH="$PATH" bash -lc "$command"
+    fi
+}
+
 reload_caddy() {
-    eval "$HOST_CADDY_VALIDATE_CMD"
-    eval "$HOST_CADDY_RELOAD_CMD"
+    run_host_caddy_cmd "$HOST_CADDY_VALIDATE_CMD"
+    run_host_caddy_cmd "$HOST_CADDY_RELOAD_CMD"
 }
 
 route_file_has_upstream() {
@@ -52,7 +63,7 @@ render_route_file_for_target() {
 write_route_file_in_place() {
     local source_path="$1"
 
-    cat "$source_path" > "$HOST_CADDY_UPSTREAM_FILE"
+    run_host_caddy_cmd "install -m 644 '$source_path' '$HOST_CADDY_UPSTREAM_FILE'"
 }
 
 switch_proxy_target() {
@@ -62,13 +73,13 @@ switch_proxy_target() {
     local had_previous=false
     local previous_target
 
-    backup="$(mktemp "${HOST_CADDY_UPSTREAM_FILE}.backup.XXXXXX")"
-    candidate="$(mktemp "${HOST_CADDY_UPSTREAM_FILE}.candidate.XXXXXX")"
+    backup="$(mktemp)"
+    candidate="$(mktemp)"
     previous_target=""
 
-    if [[ -f "$HOST_CADDY_UPSTREAM_FILE" ]]; then
+    if run_host_caddy_cmd "test -f '$HOST_CADDY_UPSTREAM_FILE'"; then
         had_previous=true
-        if ! cp "$HOST_CADDY_UPSTREAM_FILE" "$backup"; then
+        if ! run_host_caddy_cmd "cp '$HOST_CADDY_UPSTREAM_FILE' '$backup'"; then
             rm -f "$backup" "$candidate"
             return 1
         fi
@@ -96,7 +107,7 @@ switch_proxy_target() {
             reload_caddy || true
         fi
     else
-        rm -f "$HOST_CADDY_UPSTREAM_FILE"
+        run_host_caddy_cmd "rm -f '$HOST_CADDY_UPSTREAM_FILE'" || true
     fi
     rm -f "$backup" "$candidate"
     return 1
