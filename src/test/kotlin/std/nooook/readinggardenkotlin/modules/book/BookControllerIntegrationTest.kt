@@ -309,6 +309,49 @@ class BookControllerIntegrationTest(
     }
 
     @Test
+    fun `create should persist long title author and publisher values`() {
+        val accessToken = signupAndGetAccessToken("createlong@example.com")
+        val longTitle = "제목".repeat(180)
+        val longAuthor = "저자".repeat(80)
+        val longPublisher = "출판사".repeat(60)
+
+        val response = mockMvc.perform(
+            post("/api/v1/book/")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    objectMapper.writeValueAsString(
+                        mapOf(
+                            "book_isbn" to "9788937462790",
+                            "book_title" to longTitle,
+                            "book_info" to "긴 메타데이터 저장 회귀 검증",
+                            "book_author" to longAuthor,
+                            "book_publisher" to longPublisher,
+                            "book_tree" to "seed",
+                            "book_image_url" to "https://example.com/book-long.jpg",
+                            "book_status" to 2,
+                            "book_page" to 300,
+                        ),
+                    ),
+                ),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.resp_code").value(201))
+            .andExpect(jsonPath("$.resp_msg").value("책 등록 성공"))
+            .andReturn()
+
+        val bookNo = objectMapper.readTree(response.response.contentAsString)
+            .path("data")
+            .path("book_no")
+            .asLong()
+        val savedBook = checkNotNull(bookRepository.findById(bookNo).orElse(null))
+
+        assertEquals(longTitle, savedBook.title)
+        assertEquals(longAuthor, savedBook.author)
+        assertEquals(longPublisher, savedBook.publisher)
+    }
+
+    @Test
     fun `create should allow unlimited books when garden_no is null like legacy`() {
         val accessToken = signupAndGetAccessToken("createlimit@example.com")
         val user = checkNotNull(userRepository.findByEmail("createlimit@example.com"))
