@@ -10,6 +10,9 @@ required=(
   'HOST_CADDY_SUDO="${HOST_CADDY_SUDO:-sudo}"'
   'HOST_CADDY_RELOAD_CMD="${HOST_CADDY_RELOAD_CMD:-caddy reload --address unix//var/lib/caddy/caddy-admin.sock --config /etc/caddy/Caddyfile --adapter caddyfile}"'
   'ROUTE_RENDERER="${ROUTE_RENDERER:-${APP_DIR}/render-host-caddy-upstream.sh}"'
+  'docker compose -f "$COMPOSE_FILE" up --pull never -d app-blue'
+  'docker compose -f "$COMPOSE_FILE" --profile green up --pull never -d "app-${STANDBY}"'
+  'docker compose -f "$COMPOSE_FILE" up --pull never -d "app-${STANDBY}"'
 )
 
 for pattern in "${required[@]}"; do

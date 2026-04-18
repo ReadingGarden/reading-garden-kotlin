@@ -130,7 +130,7 @@ if ! running_container_exists "${APP_CONTAINER_PREFIX}-blue" && ! running_contai
     echo "=== First deployment: starting blue ==="
 
     docker compose -f "$COMPOSE_FILE" pull
-    docker compose -f "$COMPOSE_FILE" up -d app-blue
+    docker compose -f "$COMPOSE_FILE" up --pull never -d app-blue
 
     echo "=== Waiting for app-blue to become healthy ==="
     deadline=$((SECONDS + TIMEOUT_SECONDS))
@@ -170,9 +170,9 @@ echo "=== Current active: $ACTIVE, deploying to: $STANDBY ==="
 docker compose -f "$COMPOSE_FILE" pull "app-${STANDBY}"
 
 if [[ "$STANDBY" = "green" ]]; then
-    docker compose -f "$COMPOSE_FILE" --profile green up -d "app-${STANDBY}"
+    docker compose -f "$COMPOSE_FILE" --profile green up --pull never -d "app-${STANDBY}"
 else
-    docker compose -f "$COMPOSE_FILE" up -d "app-${STANDBY}"
+    docker compose -f "$COMPOSE_FILE" up --pull never -d "app-${STANDBY}"
 fi
 
 echo "=== Waiting for app-${STANDBY} to become healthy ==="
