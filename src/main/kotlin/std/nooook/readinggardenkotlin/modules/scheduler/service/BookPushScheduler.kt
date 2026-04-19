@@ -9,7 +9,7 @@ class BookPushScheduler(
     private val pushService: PushService,
     private val schedulerJobExecutionRunner: SchedulerJobExecutionRunner,
 ) {
-    @Scheduled(cron = "\${app.push.book-cron:0 * * * * *}")
+    @Scheduled(cron = "\${app.push.book-cron:0 * * * * *}", zone = "Asia/Seoul")
     fun sendBookPush() {
         schedulerJobExecutionRunner.run(
             jobName = BOOK_PUSH_JOB_NAME,

@@ -28,7 +28,7 @@ class PushDeliveryService(
                 pushTime.hour == now.hour && pushTime.minute == now.minute
             }
 
-        logger.info(
+        logger.debug(
             "Book push check: now={}:{}, totalPushEnabled={}, matchingTargets={}, targetUserIds={}",
             now.hour, now.minute, allPushTargets.size, targets.size, targets.map { it.user.id },
         )
