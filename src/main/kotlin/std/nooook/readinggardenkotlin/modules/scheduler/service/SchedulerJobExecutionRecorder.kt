@@ -112,14 +112,14 @@ data class SchedulerJobExecutionRecord(
 class LoggingSchedulerJobExecutionRecorder : SchedulerJobExecutionRecorder {
     override fun record(record: SchedulerJobExecutionRecord) {
         when (record.phase) {
-            SchedulerJobExecutionPhase.STARTED -> logger.info(
+            SchedulerJobExecutionPhase.STARTED -> logger.debug(
                 "Scheduler job started: jobName={}, jobId={}, triggerSource={}, context={}",
                 record.jobName,
                 record.jobId,
                 record.triggerSource,
                 record.context,
             )
-            SchedulerJobExecutionPhase.SUCCEEDED -> logger.info(
+            SchedulerJobExecutionPhase.SUCCEEDED -> logger.debug(
                 "Scheduler job succeeded: jobName={}, jobId={}, triggerSource={}, context={}",
                 record.jobName,
                 record.jobId,
@@ -134,7 +134,7 @@ class LoggingSchedulerJobExecutionRecorder : SchedulerJobExecutionRecorder {
                 record.context,
                 record.failure,
             )
-            SchedulerJobExecutionPhase.SKIPPED -> logger.info(
+            SchedulerJobExecutionPhase.SKIPPED -> logger.debug(
                 "Scheduler job skipped: jobName={}, jobId={}, triggerSource={}, reason={}, context={}",
                 record.jobName,
                 record.jobId,

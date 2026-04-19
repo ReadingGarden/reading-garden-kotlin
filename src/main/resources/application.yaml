@@ -40,6 +40,10 @@ springdoc:
     operations-sorter: method
     tags-sorter: alpha
 
+logging:
+  pattern:
+    dateformat: "yyyy-MM-dd'T'HH:mm:ss.SSSXXX,Asia/Seoul"
+
 app:
   security:
     secret-key: ${APP_SECRET_KEY:${SECRET_KEY:}}

@@ -58,6 +58,7 @@ class BookPushSchedulerTest {
         val scheduled = method.getAnnotation(Scheduled::class.java)
 
         assertEquals("\${app.push.book-cron:0 * * * * *}", scheduled.cron)
+        assertEquals("Asia/Seoul", scheduled.zone)
     }
 
     @Test
