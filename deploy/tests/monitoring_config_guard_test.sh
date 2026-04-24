@@ -13,6 +13,15 @@ test -x deploy/monitoring/scripts/verify-monitoring.sh
 test -f deploy/monitoring/RUNBOOK.md
 
 grep -Fq 'retention.time=7d' deploy/monitoring/docker-compose.monitoring.yml
+grep -Fq 'container_name: a1-monitoring-prometheus' deploy/monitoring/docker-compose.monitoring.yml
+grep -Fq 'container_name: a1-monitoring-grafana' deploy/monitoring/docker-compose.monitoring.yml
+grep -Fq 'container_name: a1-monitoring-node-exporter' deploy/monitoring/docker-compose.monitoring.yml
+grep -Fq 'container_name: a1-monitoring-cadvisor' deploy/monitoring/docker-compose.monitoring.yml
+grep -Fq 'container_name: a1-monitoring-blackbox-exporter' deploy/monitoring/docker-compose.monitoring.yml
+if rg -n 'container_name: reading-garden-monitoring-' deploy/monitoring/docker-compose.monitoring.yml; then
+  echo 'Monitoring container names must be A1-generic, not ReadingGarden-specific.' >&2
+  exit 1
+fi
 grep -Fq 'gcr.io/cadvisor/cadvisor:v0.52.1' deploy/monitoring/docker-compose.monitoring.yml
 grep -Fq 'prom/blackbox-exporter' deploy/monitoring/docker-compose.monitoring.yml
 grep -Fq 'GF_METRICS_ENABLED: "true"' deploy/monitoring/docker-compose.monitoring.yml
