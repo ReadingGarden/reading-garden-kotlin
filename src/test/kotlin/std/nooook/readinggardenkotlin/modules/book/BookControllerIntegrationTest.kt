@@ -555,7 +555,7 @@ class BookControllerIntegrationTest(
     }
 
     @Test
-    fun `status should keep legacy internal error for zero page percent`() {
+    fun `status should return zero percent when book page is zero`() {
         val accessToken = signupAndGetAccessToken("statuszeropage@example.com")
         val user = checkNotNull(userRepository.findByEmail("statuszeropage@example.com"))
         val userNo = user.id
@@ -584,9 +584,12 @@ class BookControllerIntegrationTest(
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .queryParam("status", "0"),
         )
-            .andExpect(status().isInternalServerError)
-            .andExpect(jsonPath("$.resp_code").value(500))
-            .andExpect(jsonPath("$.resp_msg").value("An unexpected error occurred."))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("책 상태 조회 성공"))
+            .andExpect(jsonPath("$.data.list[0].book_no").value(bookNo))
+            .andExpect(jsonPath("$.data.list[0].percent").value(0.0))
+            .andExpect(jsonPath("$.data.list[0].book_page").value(0))
     }
 
     @Test
@@ -823,7 +826,7 @@ class BookControllerIntegrationTest(
     }
 
     @Test
-    fun `read detail should keep legacy internal error for zero page percent`() {
+    fun `read detail should return zero percent when book page is zero`() {
         val accessToken = signupAndGetAccessToken("readzeropage@example.com")
         val user = checkNotNull(userRepository.findByEmail("readzeropage@example.com"))
         val userNo = user.id
@@ -861,9 +864,13 @@ class BookControllerIntegrationTest(
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
                 .queryParam("book_no", bookNo.toString()),
         )
-            .andExpect(status().isInternalServerError)
-            .andExpect(jsonPath("$.resp_code").value(500))
-            .andExpect(jsonPath("$.resp_msg").value("An unexpected error occurred."))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("독서 기록 조회 성공"))
+            .andExpect(jsonPath("$.data.book_no").value(bookNo))
+            .andExpect(jsonPath("$.data.book_current_page").value(1))
+            .andExpect(jsonPath("$.data.percent").value(0.0))
+            .andExpect(jsonPath("$.data.book_page").value(0))
     }
 
     @Test
