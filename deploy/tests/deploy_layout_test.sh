@@ -72,6 +72,8 @@ APP_VOLUME_PREFIX="reading-garden-dev" \
 APP_STOP_GRACE_PERIOD="35s" \
 APP_BLUE_HOST_PORT="18090" \
 APP_GREEN_HOST_PORT="18091" \
+APP_BLUE_MANAGEMENT_HOST_PORT="19090" \
+APP_GREEN_MANAGEMENT_HOST_PORT="19091" \
 docker compose --profile green -f "$APP_COMPOSE" config > "${TMP_DIR}/app-compose.yaml"
 
 if grep -Fq "reading-garden-caddy" "${TMP_DIR}/app-compose.yaml"; then
@@ -84,6 +86,8 @@ assert_contains "${TMP_DIR}/app-compose.yaml" "container_name: reading-garden-de
 assert_contains "${TMP_DIR}/app-compose.yaml" "stop_grace_period: 35s"
 assert_contains "${TMP_DIR}/app-compose.yaml" "published: \"18090\""
 assert_contains "${TMP_DIR}/app-compose.yaml" "published: \"18091\""
+assert_contains "${TMP_DIR}/app-compose.yaml" "published: \"19090\""
+assert_contains "${TMP_DIR}/app-compose.yaml" "published: \"19091\""
 assert_contains "${TMP_DIR}/app-compose.yaml" "DB_HOST: shared-postgres"
 assert_contains "${TMP_DIR}/app-compose.yaml" "name: reading-garden-shared-backend"
 assert_contains "${TMP_DIR}/app-compose.yaml" "source: ${APP_HOST_DIR}/data"
