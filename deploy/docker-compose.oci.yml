@@ -7,6 +7,7 @@ services:
     pull_policy: always
     ports:
       - "127.0.0.1:${APP_BLUE_HOST_PORT:?APP_BLUE_HOST_PORT is required}:8080"
+      - "127.0.0.1:${APP_BLUE_MANAGEMENT_HOST_PORT:?APP_BLUE_MANAGEMENT_HOST_PORT is required}:8081"
     env_file:
       - ${APP_HOST_DIR:?APP_HOST_DIR is required}/.env
       - ${APP_HOST_DIR:?APP_HOST_DIR is required}/.runtime.env
@@ -31,6 +32,7 @@ services:
     pull_policy: always
     ports:
       - "127.0.0.1:${APP_GREEN_HOST_PORT:?APP_GREEN_HOST_PORT is required}:8080"
+      - "127.0.0.1:${APP_GREEN_MANAGEMENT_HOST_PORT:?APP_GREEN_MANAGEMENT_HOST_PORT is required}:8081"
     env_file:
       - ${APP_HOST_DIR:?APP_HOST_DIR is required}/.env
       - ${APP_HOST_DIR:?APP_HOST_DIR is required}/.runtime.env

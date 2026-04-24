@@ -14,6 +14,9 @@ class SecurityRequestMatcherConfig {
         OrRequestMatcher(
             listOf(
                 PathPatternRequestMatcher.pathPattern("/api/health"),
+                PathPatternRequestMatcher.pathPattern("/actuator/health"),
+                PathPatternRequestMatcher.pathPattern("/actuator/health/**"),
+                PathPatternRequestMatcher.pathPattern("/actuator/prometheus"),
                 PathPatternRequestMatcher.pathPattern("/v3/api-docs"),
                 PathPatternRequestMatcher.pathPattern("/v3/api-docs/**"),
                 PathPatternRequestMatcher.pathPattern("/v3/api-docs.yaml"),

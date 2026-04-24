@@ -139,6 +139,8 @@ jobs:
           export APP_VOLUME_PREFIX="reading-garden-dev"
           export APP_BLUE_HOST_PORT="18090"
           export APP_GREEN_HOST_PORT="18091"
+          export APP_BLUE_MANAGEMENT_HOST_PORT="19090"
+          export APP_GREEN_MANAGEMENT_HOST_PORT="19091"
           export POSTGRES_STACK_DIR="/opt/infra/postgresql"
           export SHARED_BACKEND_NETWORK_NAME="reading-garden-shared-backend"
           export HOST_CADDY_UPSTREAM_FILE="/etc/caddy/upstreams/reading-garden-dev.caddy"
