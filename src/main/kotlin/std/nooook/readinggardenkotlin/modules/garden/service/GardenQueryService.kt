@@ -49,10 +49,6 @@ class DefaultGardenQueryService(
 
     @Transactional
     override fun getGardenDetail(userId: Long, gardenNo: Long): GardenDetailResponse {
-        if (!gardenMemberRepository.existsByGardenIdAndUserId(gardenNo, userId)) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 가든이 없습니다.")
-        }
-
         val garden = gardenRepository.findById(gardenNo)
             .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 가든이 없습니다.") }
         val members = gardenMemberRepository.findAllByGardenIdOrderByIsLeaderDescJoinDateAsc(gardenNo)

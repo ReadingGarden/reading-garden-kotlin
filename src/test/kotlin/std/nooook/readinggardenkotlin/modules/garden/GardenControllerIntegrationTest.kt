@@ -556,8 +556,8 @@ class GardenControllerIntegrationTest(
     }
 
     @Test
-    fun `garden detail should reject when caller is not a member`() {
-        val ownerToken = signupAndGetAccessToken("gardenowner@example.com")
+    fun `garden detail should allow authenticated non member for invite preview`() {
+        signupAndGetAccessToken("gardenowner@example.com")
         val owner = checkNotNull(userRepository.findByEmail("gardenowner@example.com"))
         val ownerNo = owner.id
         removeSignupGarden(ownerNo)
@@ -566,8 +566,8 @@ class GardenControllerIntegrationTest(
         removeSignupGarden(outsiderNo)
         val garden = gardenRepository.save(
             GardenEntity(
-                title = "비공개 가든",
-                info = "소속 제한",
+                title = "초대 미리보기 가든",
+                info = "초대 화면 조회",
                 color = "black",
             ),
         )
@@ -582,18 +582,15 @@ class GardenControllerIntegrationTest(
 
         mockMvc.perform(
             get("/api/v1/garden/detail")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer $ownerToken")
-                .queryParam("garden_no", checkNotNull(garden.id).toString()),
-        )
-            .andExpect(status().isOk)
-
-        mockMvc.perform(
-            get("/api/v1/garden/detail")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer $outsiderToken")
                 .queryParam("garden_no", checkNotNull(garden.id).toString()),
         )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.resp_code").value(400))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.resp_msg").value("가든 상세 조회 성공"))
+            .andExpect(jsonPath("$.data.garden_no").value(checkNotNull(garden.id)))
+            .andExpect(jsonPath("$.data.garden_title").value("초대 미리보기 가든"))
+            .andExpect(jsonPath("$.data.garden_members[0].user_no").value(ownerNo))
     }
 
     @Test
