@@ -28,42 +28,21 @@ assert_contains() {
     fi
 }
 
-EDGE_COMPOSE="${ROOT_DIR}/deploy/docker-compose.edge.yml"
-EDGE_CADDYFILE="${ROOT_DIR}/deploy/Caddyfile.edge"
-PROD_ROUTE="${ROOT_DIR}/deploy/routes/prod-upstream.caddy"
-DEV_ROUTE="${ROOT_DIR}/deploy/routes/dev-upstream.caddy"
-EDGE_START_SCRIPT="${ROOT_DIR}/deploy/caddy-start.sh"
 APP_COMPOSE="${ROOT_DIR}/deploy/docker-compose.oci.yml"
 PROD_WORKFLOW="${ROOT_DIR}/.github/workflows/jvm-image.yml"
 DEV_WORKFLOW="${ROOT_DIR}/.github/workflows/jvm-image-dev.yml"
 
-assert_file "$EDGE_COMPOSE"
-assert_file "$EDGE_CADDYFILE"
-assert_file "$PROD_ROUTE"
-assert_file "$DEV_ROUTE"
-assert_file "$EDGE_START_SCRIPT"
 assert_file "$APP_COMPOSE"
 assert_file "$PROD_WORKFLOW"
 assert_file "$DEV_WORKFLOW"
 assert_file "${ROOT_DIR}/deploy/bootstrap-host-caddy.sh"
-
-docker compose -f "$EDGE_COMPOSE" config > "${TMP_DIR}/edge-compose.yaml"
-
-assert_contains "$EDGE_CADDYFILE" "readinggarden.duckdns.org"
-assert_contains "$EDGE_CADDYFILE" "readinggarden-dev.duckdns.org"
-assert_contains "$EDGE_CADDYFILE" "/etc/caddy/routes/prod-upstream.caddy"
-assert_contains "$EDGE_CADDYFILE" "/etc/caddy/routes/dev-upstream.caddy"
-assert_contains "$EDGE_CADDYFILE" "log {"
-assert_contains "$EDGE_CADDYFILE" "output stdout"
-assert_contains "$EDGE_CADDYFILE" "format json"
-assert_contains "$PROD_ROUTE" "reverse_proxy reading-garden-blue:8080"
-assert_contains "$DEV_ROUTE" "reverse_proxy reading-garden-dev-blue:8080"
-assert_contains "${TMP_DIR}/edge-compose.yaml" "reading-garden-public"
-assert_contains "${TMP_DIR}/edge-compose.yaml" "entrypoint:"
-assert_contains "${TMP_DIR}/edge-compose.yaml" "/usr/local/bin/caddy-start.sh"
-assert_contains "${TMP_DIR}/edge-compose.yaml" "/opt/reading-garden/edge/caddy-start.sh"
-assert_contains "${TMP_DIR}/edge-compose.yaml" 'UPSTREAM_WAIT_TIMEOUT_SECONDS: "120"'
-assert_contains "${TMP_DIR}/edge-compose.yaml" 'UPSTREAM_WAIT_INTERVAL_SECONDS: "2"'
+assert_file "${ROOT_DIR}/deploy/render-host-caddy-upstream.sh"
+assert_file "${ROOT_DIR}/deploy/host-caddy/Caddyfile"
+assert_file "${ROOT_DIR}/deploy/host-caddy/sites/reading-garden-prod.caddy"
+assert_file "${ROOT_DIR}/deploy/host-caddy/sites/reading-garden-dev.caddy"
+assert_file "${ROOT_DIR}/deploy/docker-compose.postgres-shared.yml"
+assert_file "${ROOT_DIR}/deploy/bootstrap-shared-postgres.sh"
+assert_file "${ROOT_DIR}/deploy/postgres/init/10-create-app-databases.sh"
 
 IMAGE_REF="ghcr.io/example/reading-garden:test" \
 APP_HOST_DIR="${APP_HOST_DIR}" \
