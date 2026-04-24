@@ -88,7 +88,6 @@ jobs:
           repository: ReadingGarden/a1-infra
           ref: main
           path: infra
-          token: ${{ secrets.A1_INFRA_REPO_TOKEN }}
 
       - name: Prepare SSH key
         run: |
