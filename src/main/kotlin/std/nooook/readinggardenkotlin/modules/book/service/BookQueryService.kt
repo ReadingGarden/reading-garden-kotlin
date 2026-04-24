@@ -150,8 +150,8 @@ class BookQueryService(
         value.format(LEGACY_DATE_TIME_FORMATTER)
 
     private fun calculatePercent(bookCurrentPage: Int, bookPage: Int): Double {
-        if (bookPage == 0) {
-            throw ArithmeticException("/ by zero")
+        if (bookPage <= 0) {
+            return 0.0
         }
         return bookCurrentPage.toDouble() / bookPage * 100
     }
