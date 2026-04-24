@@ -13,7 +13,7 @@ test -x deploy/monitoring/scripts/verify-monitoring.sh
 test -f deploy/monitoring/RUNBOOK.md
 
 grep -Fq 'retention.time=7d' deploy/monitoring/docker-compose.monitoring.yml
-grep -Fq 'gcr.io/cadvisor/cadvisor' deploy/monitoring/docker-compose.monitoring.yml
+grep -Fq 'gcr.io/cadvisor/cadvisor:v0.52.1' deploy/monitoring/docker-compose.monitoring.yml
 grep -Fq 'prom/blackbox-exporter' deploy/monitoring/docker-compose.monitoring.yml
 grep -Fq 'GF_METRICS_ENABLED: "true"' deploy/monitoring/docker-compose.monitoring.yml
 grep -Fq 'network_mode: host' deploy/monitoring/docker-compose.monitoring.yml
