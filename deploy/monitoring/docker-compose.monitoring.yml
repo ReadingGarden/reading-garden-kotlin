@@ -1,7 +1,7 @@
 services:
   prometheus:
     image: prom/prometheus:v3.4.0
-    container_name: reading-garden-monitoring-prometheus
+    container_name: a1-monitoring-prometheus
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
@@ -17,7 +17,7 @@ services:
 
   grafana:
     image: grafana/grafana:12.0.0
-    container_name: reading-garden-monitoring-grafana
+    container_name: a1-monitoring-grafana
     depends_on:
       - prometheus
     network_mode: host
@@ -36,7 +36,7 @@ services:
 
   node-exporter:
     image: prom/node-exporter:v1.9.1
-    container_name: reading-garden-monitoring-node-exporter
+    container_name: a1-monitoring-node-exporter
     command:
       - --path.rootfs=/host
       - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/docker/.+|var/lib/docker/.+)($|/)
@@ -52,7 +52,7 @@ services:
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.52.1
-    container_name: reading-garden-monitoring-cadvisor
+    container_name: a1-monitoring-cadvisor
     privileged: true
     devices:
       - /dev/kmsg
@@ -71,7 +71,7 @@ services:
 
   blackbox-exporter:
     image: prom/blackbox-exporter:v0.27.0
-    container_name: reading-garden-monitoring-blackbox-exporter
+    container_name: a1-monitoring-blackbox-exporter
     command:
       - --config.file=/etc/blackbox_exporter/blackbox.yml
     volumes:
