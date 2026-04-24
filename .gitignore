@@ -5,8 +5,8 @@ CLAUDE.md
 /env
 .env
 .env.*
-!deploy/monitoring/.env.example
 external/ReadingGarden-App/
+external/a1-infra/
 scripts/bootrun-local.sh
 /docs
 external/ReadingGarden-App/
