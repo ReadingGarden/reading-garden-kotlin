@@ -5,6 +5,7 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.security.MessageDigest
 import org.slf4j.LoggerFactory
 
 class HttpFcmClient(
@@ -30,7 +31,12 @@ class HttpFcmClient(
             try {
                 sendSingle(token, title, body, data)
             } catch (exception: Exception) {
-                logger.warn("FCM send failed for token {}: {}", token, exception.message)
+                logger.warn(
+                    "FCM send failed: tokenHash={}, errorCode={}, message={}",
+                    token.sha256Prefix(),
+                    exception::class.simpleName ?: "EXCEPTION",
+                    exception.message,
+                )
                 mapOf(
                     "token" to token,
                     "result" to "failed",
@@ -66,12 +72,21 @@ class HttpFcmClient(
         return if (response.statusCode() == 200) {
             mapOf("token" to token, "result" to "sent")
         } else {
-            logger.warn("FCM HTTP error for token {}: status={}, body={}", token, response.statusCode(), response.body())
+            val fcmError = FcmErrorBody.from(response.body())
+            val errorCode = fcmError.errorCode ?: "HTTP_${response.statusCode()}"
+            logger.warn(
+                "FCM HTTP error: tokenHash={}, status={}, fcmStatus={}, fcmErrorCode={}, fcmMessage={}",
+                token.sha256Prefix(),
+                response.statusCode(),
+                fcmError.status,
+                fcmError.errorCode,
+                fcmError.message,
+            )
             mapOf(
                 "token" to token,
                 "result" to "failed",
-                "error_code" to "HTTP_${response.statusCode()}",
-                "error" to response.body(),
+                "error_code" to errorCode,
+                "error" to fcmError.summary(response.statusCode()),
             )
         }
     }
@@ -88,4 +103,38 @@ class HttpFcmClient(
     companion object {
         private val logger = LoggerFactory.getLogger(HttpFcmClient::class.java)
     }
+}
+
+private data class FcmErrorBody(
+    val status: String?,
+    val message: String?,
+    val errorCode: String?,
+) {
+    fun summary(httpStatus: Int): String =
+        listOfNotNull(
+            "http_status=$httpStatus",
+            status?.let { "fcm_status=$it" },
+            message?.let { "fcm_message=$it" },
+            errorCode?.let { "fcm_error_code=$it" },
+        ).joinToString(",")
+
+    companion object {
+        private val statusRegex = Regex(""""status"\s*:\s*"([^"]+)"""")
+        private val messageRegex = Regex(""""message"\s*:\s*"([^"]+)"""")
+        private val errorCodeRegex = Regex(""""errorCode"\s*:\s*"([^"]+)"""")
+
+        fun from(body: String): FcmErrorBody =
+            FcmErrorBody(
+                status = statusRegex.find(body)?.groupValues?.get(1),
+                message = messageRegex.find(body)?.groupValues?.get(1),
+                errorCode = errorCodeRegex.find(body)?.groupValues?.get(1),
+            )
+    }
+}
+
+private fun String.sha256Prefix(): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+        .digest(toByteArray(Charsets.UTF_8))
+        .joinToString("") { "%02x".format(it) }
+    return digest.take(12)
 }

@@ -48,7 +48,7 @@ class PushDeliveryService(
             body = "책 어디까지 읽으셨나요? 독서가든에서 기록해보세요!",
             data = HashMap(),
         )
-        logger.info("Book push results: {}", results)
+        logAndCleanupResults("Book push", results)
         return results
     }
 
@@ -59,12 +59,14 @@ class PushDeliveryService(
             return emptyList()
         }
 
-        return fcmClient.sendToMany(
+        val results = fcmClient.sendToMany(
             tokens = tokens,
             title = "독서가든",
             body = content,
             data = HashMap(),
         )
+        logAndCleanupResults("Notice push", results)
+        return results
     }
 
     fun sendNewMemberPush(
@@ -85,12 +87,14 @@ class PushDeliveryService(
             ?.title
             ?: return emptyList()
 
-        return fcmClient.sendToMany(
+        val results = fcmClient.sendToMany(
             tokens = tokens,
             title = "NEW 가드너 등장🧑‍🌾",
             body = "$gardenTitle" + "에 새로운 멤버가 들어왔어요. 함께 책을 읽어 가든을 채워주세요",
             data = mapOf("garden_no" to gardenNo.toString()),
         )
+        logAndCleanupResults("New member push", results)
+        return results
     }
 
     private fun selectTokens(userIds: List<Long>): List<String> {
@@ -107,6 +111,56 @@ class PushDeliveryService(
                 ?.takeIf { it.isNotBlank() }
         }
     }
+
+    private fun logAndCleanupResults(
+        pushName: String,
+        results: List<Map<String, Any>>,
+    ) {
+        val sentCount = results.count { it["result"] == "sent" }
+        val failedCount = results.count { it["result"] == "failed" }
+        val staleTokens = results
+            .filter { it["result"] == "failed" && it.isStaleFcmTokenFailure() }
+            .mapNotNull { it["token"]?.toString()?.trim()?.takeIf(String::isNotBlank) }
+            .distinct()
+
+        if (failedCount == 0) {
+            logger.info("{} completed: sentCount={}, failedCount=0", pushName, sentCount)
+        } else {
+            logger.warn(
+                "{} completed with failures: sentCount={}, failedCount={}, staleTokenCount={}, errorCodes={}",
+                pushName,
+                sentCount,
+                failedCount,
+                staleTokens.size,
+                results.errorCodes(),
+            )
+        }
+
+        if (staleTokens.isNotEmpty()) {
+            val cleanedCount = userRepository.clearFcmTokens(staleTokens)
+            logger.warn(
+                "{} stale FCM tokens cleaned: staleTokenCount={}, cleanedUserCount={}",
+                pushName,
+                staleTokens.size,
+                cleanedCount,
+            )
+        }
+    }
+
+    private fun Map<String, Any>.isStaleFcmTokenFailure(): Boolean {
+        val errorCode = this["error_code"]?.toString().orEmpty()
+        val error = this["error"]?.toString().orEmpty()
+        return errorCode == "UNREGISTERED" ||
+            errorCode == "messaging/registration-token-not-registered" ||
+            (errorCode == "HTTP_404" && (error.contains("UNREGISTERED") || error.contains("NotRegistered")))
+    }
+
+    private fun List<Map<String, Any>>.errorCodes(): List<String> =
+        mapNotNull { result ->
+            result["error_code"]
+                ?.toString()
+                ?.takeIf(String::isNotBlank)
+        }.distinct()
 
     companion object {
         private val logger = LoggerFactory.getLogger(PushDeliveryService::class.java)

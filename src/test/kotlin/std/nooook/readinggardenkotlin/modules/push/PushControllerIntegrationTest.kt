@@ -269,6 +269,47 @@ class PushControllerIntegrationTest(
         )
     }
 
+    @Test
+    fun `send notice push should clear unregistered fcm token`() {
+        val expected = listOf(
+            mapOf(
+                "result" to "failed",
+                "token" to "notice-stale-token",
+                "error_code" to "UNREGISTERED",
+                "error" to "registration token is not registered",
+            ),
+        )
+        given(
+            fcmClient.sendToMany(
+                listOf("notice-stale-token"),
+                "독서가든",
+                "공지사항 내용",
+                emptyMap(),
+            ),
+        ).willReturn(expected)
+
+        val senderEmail = "notice_cleanup_sender@example.com"
+        val accessToken = signupAndGetAccessToken(senderEmail, "sender-token")
+        val senderUserNo = assertNotNull(userRepository.findByEmail(senderEmail)?.id)
+        val staleUserNo = signupAndGetUserNo("notice_stale@example.com", " notice-stale-token ")
+
+        updatePushSettings(senderUserNo, appOk = false, bookOk = false, pushTime = null)
+        updatePushSettings(staleUserNo, appOk = true, bookOk = false, pushTime = null)
+
+        mockMvc.perform(
+            post("/api/v1/push/notice")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .param("content", "공지사항 내용"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.resp_code").value(200))
+            .andExpect(jsonPath("$.data[0].result").value("failed"))
+            .andExpect(jsonPath("$.data[0].error_code").value("UNREGISTERED"))
+
+        val staleUser = assertNotNull(userRepository.findByEmail("notice_stale@example.com"))
+        assertEquals("", staleUser.fcm)
+    }
+
     private fun signupAndGetAccessToken(
         email: String,
         fcmToken: String,

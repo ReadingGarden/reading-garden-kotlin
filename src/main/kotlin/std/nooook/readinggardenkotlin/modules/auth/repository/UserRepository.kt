@@ -1,8 +1,10 @@
 package std.nooook.readinggardenkotlin.modules.auth.repository
 
 import jakarta.persistence.LockModeType
+import jakarta.transaction.Transactional
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import std.nooook.readinggardenkotlin.modules.auth.entity.UserEntity
@@ -21,4 +23,9 @@ interface UserRepository : JpaRepository<UserEntity, Long> {
     fun existsByEmail(email: String): Boolean
 
     fun existsBySocialIdAndSocialType(socialId: String, socialType: String): Boolean
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
+    @Query("update UserEntity u set u.fcm = '' where trim(u.fcm) in :tokens")
+    fun clearFcmTokens(@Param("tokens") tokens: Collection<String>): Int
 }
