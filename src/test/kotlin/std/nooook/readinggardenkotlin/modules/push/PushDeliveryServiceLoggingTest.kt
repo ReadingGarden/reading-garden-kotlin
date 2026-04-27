@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.mockito.BDDMockito.given
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.verify
 import org.slf4j.LoggerFactory
 import std.nooook.readinggardenkotlin.modules.auth.entity.UserEntity
 import std.nooook.readinggardenkotlin.modules.auth.repository.UserRepository
@@ -106,5 +107,52 @@ class PushDeliveryServiceLoggingTest {
 
         assertTrue(listAppender.list.any { it.level == Level.DEBUG && it.formattedMessage.contains("Book push check") })
         assertTrue(listAppender.list.none { it.level == Level.INFO && it.formattedMessage.contains("Book push check") })
+    }
+
+    @Test
+    fun `send book push should cleanup stale fcm token and avoid noisy token logs`() {
+        val user = UserEntity(id = 7L, fcm = "token-7")
+        given(pushSettingsRepository.findAllByBookOkTrueAndPushTimeIsNotNull()).willReturn(
+            listOf(
+                PushSettingsEntity(
+                    user = user,
+                    appOk = true,
+                    bookOk = true,
+                    pushTime = LocalDateTime.of(2026, 4, 19, 13, 24, 0),
+                ),
+            ),
+        )
+        given(userRepository.findAllByIdIn(listOf(7L))).willReturn(listOf(user))
+        given(
+            fcmClient.sendToMany(
+                listOf("token-7"),
+                "💧물 주는 시간이에요!",
+                "책 어디까지 읽으셨나요? 독서가든에서 기록해보세요!",
+                emptyMap(),
+            ),
+        ).willReturn(
+            listOf(
+                mapOf(
+                    "token" to "token-7",
+                    "result" to "failed",
+                    "error_code" to "HTTP_404",
+                    "error" to """{"error":{"code":404,"message":"NotRegistered","status":"NOT_FOUND","details":[{"errorCode":"UNREGISTERED"}]}}""",
+                ),
+            ),
+        )
+
+        service.sendBookPush()
+
+        verify(userRepository).clearFcmTokens(listOf("token-7"))
+        assertTrue(
+            listAppender.list.any {
+                it.level == Level.WARN &&
+                    it.formattedMessage.contains("Book push stale FCM tokens cleaned") &&
+                    it.formattedMessage.contains("staleTokenCount=1")
+            },
+        )
+        assertTrue(listAppender.list.none { it.formattedMessage.contains("token-7") })
+        assertTrue(listAppender.list.none { it.formattedMessage.contains("Book push results") })
+        assertTrue(listAppender.list.none { it.formattedMessage.contains("\"details\"") })
     }
 }

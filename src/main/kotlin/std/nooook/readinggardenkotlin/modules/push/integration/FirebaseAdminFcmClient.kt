@@ -2,6 +2,7 @@ package std.nooook.readinggardenkotlin.modules.push.integration
 
 import com.google.firebase.FirebaseApp
 import org.slf4j.LoggerFactory
+import java.security.MessageDigest
 
 class FirebaseAdminFcmClient(
     private val firebaseMessagingSender: FirebaseMessagingSender,
@@ -33,7 +34,12 @@ class FirebaseAdminFcmClient(
                         response == null -> failedResult(token, "UNKNOWN", "FCM response is missing")
                         response.successful -> successResult(token, response.messageId)
                         else -> {
-                            logger.warn("FCM send failed for token {}: errorCode={}, message={}", token, response.errorCode, response.errorMessage)
+                            logger.warn(
+                                "FCM send failed: tokenHash={}, errorCode={}, message={}",
+                                token.sha256Prefix(),
+                                response.errorCode,
+                                response.errorMessage,
+                            )
                             failedResult(
                                 token = token,
                                 errorCode = response.errorCode ?: "UNKNOWN",
@@ -94,6 +100,13 @@ class FirebaseAdminFcmClient(
         private const val MAX_MULTICAST_TOKENS = 500
         private val logger = LoggerFactory.getLogger(FirebaseAdminFcmClient::class.java)
     }
+}
+
+private fun String.sha256Prefix(): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+        .digest(toByteArray(Charsets.UTF_8))
+        .joinToString("") { "%02x".format(it) }
+    return digest.take(12)
 }
 
 internal class NoopFcmClient : FcmClient {
