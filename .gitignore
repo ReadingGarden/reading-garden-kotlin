@@ -7,7 +7,6 @@ CLAUDE.md
 .env.*
 external/ReadingGarden-App/
 external/a1-infra/
-scripts/bootrun-local.sh
 /docs
 external/ReadingGarden-App/
 
