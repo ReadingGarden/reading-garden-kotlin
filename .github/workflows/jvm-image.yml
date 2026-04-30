@@ -33,7 +33,7 @@ jobs:
     needs: test
     runs-on: ubuntu-24.04-arm
     env:
-      REGISTRY_IMAGE: ghcr.io/readinggarden/reading-garden-kotlin
+      REGISTRY_IMAGE: ghcr.io/nooook-studio/reading-garden-kotlin
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -74,7 +74,7 @@ jobs:
     permissions:
       contents: read
     env:
-      IMAGE_REF: ghcr.io/readinggarden/reading-garden-kotlin:jvm-${{ github.sha }}
+      IMAGE_REF: ghcr.io/nooook-studio/reading-garden-kotlin:jvm-${{ github.sha }}
       REMOTE_APP_DIR: /opt/apps/reading-garden/prod
       DEPLOY_DIR: infra/deploy
       OCI_PORT: ${{ vars.OCI_PORT || '22' }}
@@ -85,7 +85,7 @@ jobs:
       - name: Checkout A1 infra
         uses: actions/checkout@v6
         with:
-          repository: ReadingGarden/a1-infra
+          repository: NooooK-STUDIO/a1-infra
           ref: main
           path: infra
 
