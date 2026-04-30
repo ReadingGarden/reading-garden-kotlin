@@ -1,6 +1,6 @@
 package std.nooook.readinggardenkotlin.modules.app.service
 
-import jakarta.transaction.Transactional
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
@@ -8,7 +8,7 @@ import std.nooook.readinggardenkotlin.modules.app.controller.AppVersionResponse
 import std.nooook.readinggardenkotlin.modules.app.repository.AppVersionRepository
 
 @Service
-@Transactional
+@Transactional(readOnly = true)
 class AppVersionQueryService(
     private val appVersionRepository: AppVersionRepository,
 ) {

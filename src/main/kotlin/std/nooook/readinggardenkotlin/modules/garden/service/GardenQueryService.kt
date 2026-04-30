@@ -1,6 +1,6 @@
 package std.nooook.readinggardenkotlin.modules.garden.service
 
-import jakarta.transaction.Transactional
+import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import org.springframework.http.HttpStatus
@@ -30,7 +30,7 @@ class DefaultGardenQueryService(
     private val bookReadRepository: BookReadRepository,
     private val userRepository: UserRepository,
 ) : GardenQueryService {
-    @Transactional
+    @Transactional(readOnly = true)
     override fun getGardenList(userId: Long): List<GardenListItemResponse> =
         gardenMemberRepository.findAllByUserIdOrderByIsMainDescJoinDateAsc(userId)
             .map { membership ->
@@ -47,7 +47,7 @@ class DefaultGardenQueryService(
                 )
             }
 
-    @Transactional
+    @Transactional(readOnly = true)
     override fun getGardenDetail(userId: Long, gardenNo: Long): GardenDetailResponse {
         val garden = gardenRepository.findById(gardenNo)
             .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 가든이 없습니다.") }
