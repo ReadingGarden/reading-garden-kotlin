@@ -1,7 +1,7 @@
 package std.nooook.readinggardenkotlin.modules.auth.repository
 
 import jakarta.persistence.LockModeType
-import jakarta.transaction.Transactional
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Modifying

@@ -1,6 +1,6 @@
 package std.nooook.readinggardenkotlin.modules.push.service
 
-import jakarta.transaction.Transactional
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.stereotype.Service
 import std.nooook.readinggardenkotlin.modules.push.controller.PushResponse
 import std.nooook.readinggardenkotlin.modules.push.repository.PushSettingsRepository
@@ -10,6 +10,7 @@ import java.time.LocalDateTime
 class PushPreferenceService(
     private val pushSettingsRepository: PushSettingsRepository,
 ) {
+    @Transactional(readOnly = true)
     fun getPush(userId: Long): PushResponse {
         val push = requireNotNull(pushSettingsRepository.findByUserId(userId)) {
             "Push settings not found for user $userId"
