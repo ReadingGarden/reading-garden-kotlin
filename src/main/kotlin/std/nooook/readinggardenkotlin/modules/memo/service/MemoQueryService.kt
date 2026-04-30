@@ -1,6 +1,6 @@
 package std.nooook.readinggardenkotlin.modules.memo.service
 
-import jakarta.transaction.Transactional
+import org.springframework.transaction.annotation.Transactional
 import java.time.format.DateTimeFormatter
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -21,7 +21,7 @@ class MemoQueryService(
             DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     fun getMemoDetail(
         userId: Long,
         id: Long,

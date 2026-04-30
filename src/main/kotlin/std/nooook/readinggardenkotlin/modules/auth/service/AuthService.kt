@@ -1,7 +1,7 @@
 package std.nooook.readinggardenkotlin.modules.auth.service
 
 import io.jsonwebtoken.JwtException
-import jakarta.transaction.Transactional
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.http.HttpStatus
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
@@ -217,6 +217,7 @@ class AuthService(
         )
     }
 
+    @Transactional(noRollbackFor = [ResponseStatusException::class])
     fun checkPasswordResetAuth(
         email: String,
         authNumber: String,
@@ -249,6 +250,7 @@ class AuthService(
         userRepository.save(user)
     }
 
+    @Transactional(readOnly = true)
     fun getProfile(userId: Long): UserProfileResponse {
         val user = requireUser(userId)
         return UserProfileResponse(

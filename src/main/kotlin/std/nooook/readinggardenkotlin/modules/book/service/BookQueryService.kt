@@ -1,6 +1,6 @@
 package std.nooook.readinggardenkotlin.modules.book.service
 
-import jakarta.transaction.Transactional
+import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import org.springframework.http.HttpStatus
@@ -30,7 +30,7 @@ class BookQueryService(
             DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     fun checkDuplication(
         userId: Long,
         isbn: String,
@@ -41,7 +41,7 @@ class BookQueryService(
         return "책 등록 가능"
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     fun getBookStatus(
         userId: Long,
         gardenNo: Long?,
@@ -95,7 +95,7 @@ class BookQueryService(
         )
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     fun getBookRead(bookNo: Long): BookReadDetailResponse {
         val book = bookRepository.findById(bookNo)
             .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "일치하는 책 정보가 없습니다.") }
